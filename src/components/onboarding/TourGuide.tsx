@@ -1,274 +1,283 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { X, ChevronRight, ChevronLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { X, ChevronRight, ChevronLeft, BookOpen, Brain, FileText, Users, LayoutDashboard, Sparkles } from 'lucide-react';
-import { useAuthStore } from '@/store/authStore';
-import confetti from 'canvas-confetti';
-import { hasCompletedTour, isNewAccount, clearNewAccountFlag, markTourCompleted, resetTour } from '@/utils/userOnboardingUtils';
+import { useLocation } from 'react-router-dom';
+import { isNewAccount, markTourComplete } from '@/utils/userOnboardingUtils';
 
 interface TourStep {
-  target: string;
   title: string;
-  content: string;
-  position: 'top' | 'bottom' | 'left' | 'right';
-  icon?: React.ReactNode;
+  description: string;
+  targetId: string;
+  position: 'top' | 'bottom' | 'left' | 'right' | 'center';
+  route: string;
 }
 
-const tourSteps: TourStep[] = [
-  {
-    target: '.navbar',
-    title: 'Welcome to MindGrove',
-    content: 'Your AI-powered tutor and research assistant. Let me show you around our powerful features!',
-    position: 'bottom',
-    icon: <Sparkles className="h-6 w-6 text-primary" />
-  },
-  {
-    target: '.sidebar',
-    title: 'Smart Navigation',
-    content: 'Access your documents, flashcards, and learning dashboard from this intuitive sidebar menu.',
-    position: 'right',
-    icon: <LayoutDashboard className="h-6 w-6 text-primary" />
-  },
-  {
-    target: '.document-upload-button',
-    title: 'Upload Documents',
-    content: 'Quickly add your study materials here. We support PDFs and will extract all the valuable content automatically.',
-    position: 'bottom',
-    icon: <FileText className="h-6 w-6 text-primary" />
-  },
-  {
-    target: '.ai-tools',
-    title: 'AI-Powered Learning',
-    content: 'Generate comprehensive summaries and effective flashcards with just one click. Our AI identifies key concepts and helps you master them.',
-    position: 'top',
-    icon: <Brain className="h-6 w-6 text-primary" />
-  },
-  {
-    target: '.dashboard-stats',
-    title: 'Track Your Progress',
-    content: 'Monitor your learning journey with detailed statistics, streak counters, and personalized insights to stay motivated.',
-    position: 'bottom',
-    icon: <BookOpen className="h-6 w-6 text-primary" />
-  }
-];
-
-const TourGuide: React.FC = () => {
+const TourGuide = () => {
+  const [isVisible, setIsVisible] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
-  const [visible, setVisible] = useState(false);
   const [targetElement, setTargetElement] = useState<DOMRect | null>(null);
-  const { user } = useAuthStore();
+  const [windowSize, setWindowSize] = useState({
+    width: window.innerWidth,
+    height: window.innerHeight
+  });
+  const location = useLocation();
 
-  // Check if user has completed the tour
-  useEffect(() => {
-    const tourCompleted = hasCompletedTour();
-    const newAccount = isNewAccount();
-    
-    if (user && newAccount && !tourCompleted) {
-      // Clear the new account flag
-      clearNewAccountFlag();
-      
-      // Play notification sound
-      const audio = new Audio('/sounds/notification.mp3');
-      audio.play().catch(e => console.error('Error playing sound:', e));
-      
-      // Trigger confetti
-      confetti({
-        particleCount: 100,
-        spread: 70,
-        origin: { y: 0.6 },
-        colors: ['#9b87f5', '#7E69AB', '#33C3F0']
-      });
-      
-      // Show tour after a short delay
-      setTimeout(() => {
-        setVisible(true);
-      }, 1000);
+  // Define tour steps for different pages
+  const tourSteps: TourStep[] = [
+    {
+      title: "Welcome to MindGrove!",
+      description: "Let's take a quick tour to help you get started with our AI-powered research assistant.",
+      targetId: "body",
+      position: "center",
+      route: "/dashboard"
+    },
+    {
+      title: "Dashboard Overview",
+      description: "Your dashboard gives you a quick overview of your documents and research stats.",
+      targetId: "dashboard-header",
+      position: "bottom",
+      route: "/dashboard"
+    },
+    {
+      title: "Upload Documents",
+      description: "Click here to upload your research papers, PDFs, and academic documents.",
+      targetId: "upload-button",
+      position: "bottom",
+      route: "/dashboard"
+    },
+    {
+      title: "AI Insights",
+      description: "Our AI will analyze your documents to create summaries and generate flashcards for effective studying.",
+      targetId: "ai-tools-section",
+      position: "top",
+      route: "/dashboard"
+    },
+    {
+      title: "Need Help?",
+      description: "Click the chat bubble anytime to get help from our AI assistant.",
+      targetId: "chat-button",
+      position: "left",
+      route: "/dashboard"
     }
-  }, [user]);
+  ];
 
-  // Find target element and calculate its position
   useEffect(() => {
-    if (visible) {
+    // Check if user is new or returning
+    if (isNewAccount() && location.pathname === '/dashboard') {
+      setTimeout(() => setIsVisible(true), 1000);
+    } else {
+      setIsVisible(false);
+    }
+  }, [location.pathname]);
+
+  useEffect(() => {
+    const handleResize = () => {
+      setWindowSize({
+        width: window.innerWidth,
+        height: window.innerHeight
+      });
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  useEffect(() => {
+    if (isVisible && tourSteps[currentStep]) {
       const step = tourSteps[currentStep];
-      const target = document.querySelector(step.target);
       
-      if (target) {
-        setTargetElement(target.getBoundingClientRect());
+      if (step.targetId === 'body') {
+        // Center in viewport for intro steps
+        setTargetElement(null);
+        return;
+      }
+      
+      const element = document.getElementById(step.targetId);
+      
+      if (element) {
+        const rect = element.getBoundingClientRect();
+        setTargetElement(rect);
       } else {
-        // If target not found, use fallback position
         setTargetElement(null);
       }
     }
-  }, [currentStep, visible]);
+  }, [currentStep, isVisible, windowSize]);
 
-  const handleNext = () => {
+  const closeTour = () => {
+    setIsVisible(false);
+    markTourComplete();
+  };
+
+  const nextStep = () => {
     if (currentStep < tourSteps.length - 1) {
-      setCurrentStep(currentStep + 1);
+      setCurrentStep(prevStep => prevStep + 1);
     } else {
-      handleComplete();
+      closeTour();
     }
   };
 
-  const handlePrevious = () => {
+  const prevStep = () => {
     if (currentStep > 0) {
-      setCurrentStep(currentStep - 1);
+      setCurrentStep(prevStep => prevStep - 1);
     }
   };
 
-  const handleComplete = () => {
-    setVisible(false);
-    markTourCompleted();
-    
-    // Trigger confetti again when completing the tour
-    confetti({
-      particleCount: 200,
-      spread: 90,
-      origin: { y: 0.6 },
-      colors: ['#9b87f5', '#7E69AB', '#33C3F0']
-    });
-  };
-
-  const handleSkip = () => {
-    setVisible(false);
-    markTourCompleted();
-  };
-
-  const calculatePosition = () => {
+  // Calculate tooltip position based on target element
+  const getPosition = () => {
     if (!targetElement) {
-      // Fallback position if element not found
-      return { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' };
+      return {
+        left: '50%',
+        top: '50%',
+        transform: 'translate(-50%, -50%)'
+      };
     }
-    
+
     const step = tourSteps[currentStep];
-    const windowWidth = window.innerWidth;
-    const windowHeight = window.innerHeight;
-    
-    let top, left, transform = '';
-    
+    const padding = 20; // Space between target and tooltip
+
     switch (step.position) {
       case 'top':
-        top = targetElement.top - 10 - 250 + window.scrollY;
-        left = targetElement.left + targetElement.width / 2;
-        transform = 'translateX(-50%)';
-        break;
+        return {
+          left: `${targetElement.left + targetElement.width / 2}px`,
+          top: `${targetElement.top - padding}px`,
+          transform: 'translate(-50%, -100%)'
+        };
       case 'bottom':
-        top = targetElement.bottom + 10 + window.scrollY;
-        left = targetElement.left + targetElement.width / 2;
-        transform = 'translateX(-50%)';
-        break;
+        return {
+          left: `${targetElement.left + targetElement.width / 2}px`,
+          top: `${targetElement.bottom + padding}px`,
+          transform: 'translate(-50%, 0)'
+        };
       case 'left':
-        top = targetElement.top + targetElement.height / 2 + window.scrollY;
-        left = targetElement.left - 420;
-        transform = 'translateY(-50%)';
-        break;
+        return {
+          left: `${targetElement.left - padding}px`,
+          top: `${targetElement.top + targetElement.height / 2}px`,
+          transform: 'translate(-100%, -50%)'
+        };
       case 'right':
-        top = targetElement.top + targetElement.height / 2 + window.scrollY;
-        left = targetElement.right + 10;
-        transform = 'translateY(-50%)';
-        break;
+        return {
+          left: `${targetElement.right + padding}px`,
+          top: `${targetElement.top + targetElement.height / 2}px`,
+          transform: 'translate(0, -50%)'
+        };
+      case 'center':
       default:
-        top = '50%';
-        left = '50%';
-        transform = 'translate(-50%, -50%)';
-    } 
-    
-    // Ensure the tooltip stays within viewport
-    const tooltipWidth = 400;
-    const tooltipHeight = 250;
-    
-    top = Math.max(10, Math.min(windowHeight - tooltipHeight - 10, top));
-    left = Math.max(10, Math.min(windowWidth - tooltipWidth - 10, left));
-    
-    return { top: `${top}px`, left: `${left}px`, transform };
+        return {
+          left: '50%',
+          top: '50%',
+          transform: 'translate(-50%, -50%)'
+        };
+    }
   };
 
-  // For debugging - will be removed in production
-  const debugReset = () => {
-    resetTour();
-    window.location.reload();
+  // For spotlight effect
+  const getSpotlightPath = () => {
+    if (!targetElement || tourSteps[currentStep].position === 'center') {
+      return `M0,0 L${windowSize.width},0 L${windowSize.width},${windowSize.height} L0,${windowSize.height}Z`;
+    }
+
+    const padding = 10; // Padding around the spotlighted element
+    const x = targetElement.left - padding;
+    const y = targetElement.top - padding;
+    const width = targetElement.width + (padding * 2);
+    const height = targetElement.height + (padding * 2);
+
+    return `
+      M0,0 L${windowSize.width},0 L${windowSize.width},${windowSize.height} L0,${windowSize.height}Z
+      M${x},${y} L${x + width},${y} L${x + width},${y + height} L${x},${y + height}Z
+    `;
   };
 
-  if (!visible) return null;
+  if (!isVisible) return null;
 
-  const step = tourSteps[currentStep];
-  const position = calculatePosition();
-  const isLastStep = currentStep === tourSteps.length - 1;
+  const position = getPosition();
 
   return (
-    <AnimatePresence>
-      {visible && (
-        <>
-          {/* Darkened overlay with highlight for target element */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 z-40 backdrop-blur-sm pointer-events-auto"
-            onClick={handleSkip}
-          />
-          
-          {/* Tooltip */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.9 }}
-            transition={{ duration: 0.2 }}
-            className="fixed z-50 w-[400px] max-w-[95vw]"
-            style={position}
+    <div className="fixed inset-0 z-[100] pointer-events-none">
+      {/* Backdrop with spotlight */}
+      <svg width="100%" height="100%" className="pointer-events-auto">
+        <defs>
+          <mask id="spotlight-mask">
+            <rect width="100%" height="100%" fill="white" />
+            <rect
+              x={targetElement ? targetElement.left - 10 : windowSize.width / 2 - 150}
+              y={targetElement ? targetElement.top - 10 : windowSize.height / 2 - 150}
+              width={targetElement ? targetElement.width + 20 : 300}
+              height={targetElement ? targetElement.height + 20 : 300}
+              rx="4"
+              fill="black"
+            />
+          </mask>
+        </defs>
+        <rect
+          width="100%"
+          height="100%"
+          fill="rgba(0, 0, 0, 0.7)"
+          mask="url(#spotlight-mask)"
+          className="pointer-events-auto"
+          onClick={closeTour}
+        />
+      </svg>
+
+      {/* Tour tooltip */}
+      <AnimatePresence>
+        <motion.div
+          key={`tour-step-${currentStep}`}
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.8 }}
+          transition={{ duration: 0.2 }}
+          className="absolute pointer-events-auto bg-card border rounded-lg shadow-lg w-[90vw] max-w-sm p-5"
+          style={{
+            left: position.left,
+            top: position.top,
+            transform: position.transform,
+            zIndex: 101
+          }}
+        >
+          <Button
+            size="sm"
+            variant="ghost"
+            className="absolute right-2 top-2 h-8 w-8 p-0"
+            onClick={closeTour}
           >
-            <div className="bg-card border shadow-lg rounded-lg overflow-hidden">
-              {/* Header */}
-              <div className="flex justify-between items-center p-4 border-b bg-muted/30">
-                <div className="flex items-center gap-3">
-                  {step.icon || <Sparkles className="h-5 w-5 text-primary" />}
-                  <h4 className="font-bold text-lg">{tourSteps[currentStep].title}</h4>
-                </div>
-                <Button variant="ghost" size="icon" onClick={handleSkip} className="h-8 w-8">
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-              
-              {/* Content */}
-              <div className="p-6">
-                <p className="text-muted-foreground text-base">{tourSteps[currentStep].content}</p>
-              </div>
-              
-              {/* Footer */}
-              <div className="p-4 border-t flex justify-between items-center">
-                <div className="text-sm text-muted-foreground">
-                  Step {currentStep + 1} of {tourSteps.length}
-                </div>
-                <div className="flex gap-2">
-                  {currentStep > 0 && (
-                    <Button variant="outline" size="sm" onClick={handlePrevious}>
-                      <ChevronLeft className="h-4 w-4 mr-1" />
-                      Back
-                    </Button>
-                  )}
-                  <Button size="sm" onClick={handleNext} className="bg-primary hover:bg-primary/90">
-                    {isLastStep ? 'Finish' : 'Next'}
-                    {!isLastStep && <ChevronRight className="h-4 w-4 ml-1" />}
-                  </Button>
-                </div>
-              </div>
-              
-              {/* Progress indicators */}
-              <div className="flex justify-center gap-1.5 p-2 bg-muted/20">
-                {tourSteps.map((_, index) => (
-                  <div 
-                    key={index}
-                    className={`h-1.5 rounded-full transition-all ${
-                      currentStep === index ? 'w-6 bg-primary' : 'w-2 bg-muted-foreground/30'
-                    }`}
-                  />
-                ))}
-              </div>
+            <X className="h-4 w-4" />
+          </Button>
+
+          <div className="mb-4">
+            <h3 className="text-lg font-semibold mb-1 text-primary">{tourSteps[currentStep]?.title}</h3>
+            <p className="text-sm text-muted-foreground">{tourSteps[currentStep]?.description}</p>
+          </div>
+
+          <div className="flex justify-between items-center">
+            <div className="flex space-x-1">
+              {tourSteps.map((_, idx) => (
+                <div
+                  key={idx}
+                  className={`h-1.5 w-1.5 rounded-full ${
+                    idx === currentStep ? 'bg-primary' : 'bg-muted'
+                  }`}
+                />
+              ))}
             </div>
-          </motion.div>
-        </>
-      )}
-    </AnimatePresence>
+
+            <div className="flex space-x-2">
+              {currentStep > 0 && (
+                <Button size="sm" variant="outline" onClick={prevStep}>
+                  <ChevronLeft className="h-4 w-4 mr-1" /> Back
+                </Button>
+              )}
+              <Button size="sm" onClick={nextStep}>
+                {currentStep < tourSteps.length - 1 ? 'Next' : 'Finish'} 
+                {currentStep < tourSteps.length - 1 && <ChevronRight className="h-4 w-4 ml-1" />}
+              </Button>
+            </div>
+          </div>
+        </motion.div>
+      </AnimatePresence>
+    </div>
   );
 };
 

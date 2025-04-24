@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { toast } from '@/components/ui/use-toast';
 import { useDocumentStore } from '@/store/documentStore';
+import { generateDocumentSummary, generateFlashcards, playNotificationSound } from '@/utils/openRouterUtils';
 
 interface UseAIProps {
   onSuccess?: (data: any) => void;
@@ -16,7 +17,7 @@ interface Flashcard {
 export function useAI({ onSuccess, onError }: UseAIProps = {}) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
-  const { generateSummary: storeSummarize, generateFlashcards: storeGenerateFlashcards } = useDocumentStore();
+  const { setDocumentSummary, saveFlashcards } = useDocumentStore();
 
   const summarizeDocument = async (documentText: string, documentId: string) => {
     setIsLoading(true);
@@ -30,8 +31,11 @@ export function useAI({ onSuccess, onError }: UseAIProps = {}) {
         throw new Error("Document content is too short to summarize");
       }
       
-      // Use the document store instead of making direct API calls
-      const summary = await storeSummarize(documentId, documentText);
+      // Get summary using OpenRouter API
+      const summary = await generateDocumentSummary(documentText);
+      
+      // Save summary to document store
+      await setDocumentSummary(documentId, summary);
       
       console.log("Received summary:", summary);
       
@@ -63,7 +67,7 @@ export function useAI({ onSuccess, onError }: UseAIProps = {}) {
     }
   };
   
-  const generateFlashcards = async (documentText: string, documentId: string): Promise<Flashcard[]> => {
+  const generateDocumentFlashcards = async (documentText: string, documentId: string): Promise<Flashcard[]> => {
     setIsLoading(true);
     setError(null);
     
@@ -75,8 +79,11 @@ export function useAI({ onSuccess, onError }: UseAIProps = {}) {
         throw new Error("Document content is too short to generate flashcards");
       }
       
-      // Use the document store instead of making direct API calls
-      const flashcards = await storeGenerateFlashcards(documentId, documentText);
+      // Generate flashcards using OpenRouter API
+      const flashcards = await generateFlashcards(documentText);
+      
+      // Save flashcards to document store
+      await saveFlashcards(documentId, flashcards);
       
       console.log("Received flashcards:", flashcards);
       
@@ -121,6 +128,6 @@ export function useAI({ onSuccess, onError }: UseAIProps = {}) {
     isLoading,
     error,
     summarizeDocument,
-    generateFlashcards
+    generateFlashcards: generateDocumentFlashcards
   };
 }

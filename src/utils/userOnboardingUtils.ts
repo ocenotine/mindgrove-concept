@@ -1,117 +1,99 @@
 
 /**
- * Mark a new user account for onboarding tour
+ * Handles functions related to user onboarding, tour, and feature discovery
  */
-export const markNewAccount = () => {
-  localStorage.setItem('mindgrove_new_account', 'true');
+
+// Keys for localStorage
+const FIRST_VISIT_KEY = 'mindgrove-first-visit';
+const NEW_ACCOUNT_KEY = 'mindgrove-new-account';
+const TOUR_COMPLETED_KEY = 'mindgrove-tour-completed';
+
+/**
+ * Marks that this is the user's first visit
+ */
+export const markFirstVisit = (): void => {
+  if (!localStorage.getItem(FIRST_VISIT_KEY)) {
+    localStorage.setItem(FIRST_VISIT_KEY, Date.now().toString());
+  }
 };
 
 /**
- * Check if the user has completed the onboarding tour
+ * Checks if this is the user's first visit
  */
-export const hasCompletedTour = (): boolean => {
-  return localStorage.getItem('mindgrove_tour_completed') === 'true';
+export const isFirstVisit = (): boolean => {
+  return !localStorage.getItem(FIRST_VISIT_KEY);
 };
 
 /**
- * Check if this is a new account that should see the tour
+ * Marks that a new account was created
+ */
+export const markNewAccount = (): void => {
+  if (!localStorage.getItem(NEW_ACCOUNT_KEY)) {
+    localStorage.setItem(NEW_ACCOUNT_KEY, Date.now().toString());
+  }
+};
+
+/**
+ * Checks if this is a newly created account
  */
 export const isNewAccount = (): boolean => {
-  return localStorage.getItem('mindgrove_new_account') === 'true';
+  const tourCompletedStr = localStorage.getItem(TOUR_COMPLETED_KEY);
+  if (tourCompletedStr) return false;
+  
+  const newAccountStr = localStorage.getItem(NEW_ACCOUNT_KEY);
+  if (!newAccountStr) return false;
+  
+  // Consider new account status valid for 7 days
+  const newAccountTime = parseInt(newAccountStr, 10);
+  const ONE_WEEK = 7 * 24 * 60 * 60 * 1000;
+  return Date.now() - newAccountTime < ONE_WEEK;
 };
 
 /**
- * Mark the tour as completed
+ * Marks the tour as completed
  */
-export const markTourCompleted = () => {
-  localStorage.setItem('mindgrove_tour_completed', 'true');
+export const markTourComplete = (): void => {
+  localStorage.setItem(TOUR_COMPLETED_KEY, Date.now().toString());
 };
 
 /**
- * Clear the new account flag
+ * Checks if the tour has been completed
  */
-export const clearNewAccountFlag = () => {
-  localStorage.removeItem('mindgrove_new_account');
+export const isTourCompleted = (): boolean => {
+  return !!localStorage.getItem(TOUR_COMPLETED_KEY);
 };
 
 /**
- * Check if the app can be installed as PWA
+ * Resets onboarding state (for testing purposes)
  */
-export const checkPwaInstallable = (): boolean => {
-  // Return true if the app is not in standalone mode and meets PWA criteria
-  return window.matchMedia('(display-mode: browser)').matches && 
-         'serviceWorker' in navigator && 
-         'BeforeInstallPromptEvent' in window;
+export const resetOnboardingState = (): void => {
+  localStorage.removeItem(FIRST_VISIT_KEY);
+  localStorage.removeItem(NEW_ACCOUNT_KEY);
+  localStorage.removeItem(TOUR_COMPLETED_KEY);
 };
 
 /**
- * Mark first time visitor status
+ * Gets the number of days since first visit
  */
-export const markFirstVisit = () => {
-  if (!localStorage.getItem('mindgrove_first_visit')) {
-    localStorage.setItem('mindgrove_first_visit', Date.now().toString());
-  }
+export const daysSinceFirstVisit = (): number => {
+  const firstVisitStr = localStorage.getItem(FIRST_VISIT_KEY);
+  if (!firstVisitStr) return 0;
+  
+  const firstVisit = parseInt(firstVisitStr, 10);
+  const ONE_DAY = 24 * 60 * 60 * 1000;
+  return Math.floor((Date.now() - firstVisit) / ONE_DAY);
 };
 
 /**
- * Check if user is a returning visitor 
+ * Shows a feature tip if it hasn't been dismissed
  */
-export const isReturningUser = (): boolean => {
-  return !!localStorage.getItem('mindgrove_first_visit');
+export const shouldShowFeatureTip = (featureKey: string): boolean => {
+  return !localStorage.getItem(`mindgrove-feature-${featureKey}-dismissed`);
 };
 
 /**
- * Show tour again (for testing/debugging)
+ * Dismisses a feature tip
  */
-export const resetTour = () => {
-  localStorage.removeItem('mindgrove_tour_completed');
-  localStorage.setItem('mindgrove_new_account', 'true');
-};
-
-/**
- * Track onboarding step completion
- */
-export const trackOnboardingStep = (stepName: string) => {
-  const completedSteps = getCompletedOnboardingSteps();
-  if (!completedSteps.includes(stepName)) {
-    completedSteps.push(stepName);
-    localStorage.setItem('mindgrove_onboarding_steps', JSON.stringify(completedSteps));
-  }
-};
-
-/**
- * Get array of completed onboarding steps
- */
-export const getCompletedOnboardingSteps = (): string[] => {
-  const steps = localStorage.getItem('mindgrove_onboarding_steps');
-  return steps ? JSON.parse(steps) : [];
-};
-
-/**
- * Clear onboarding progress
- */
-export const clearOnboardingProgress = () => {
-  localStorage.removeItem('mindgrove_onboarding_steps');
-};
-
-/**
- * Check if a specific onboarding step has been completed
- */
-export const hasCompletedStep = (stepName: string): boolean => {
-  return getCompletedOnboardingSteps().includes(stepName);
-};
-
-/**
- * Save user preferences for tour display
- */
-export const setTourPreferences = (preferences: { showOnLogin: boolean }) => {
-  localStorage.setItem('mindgrove_tour_preferences', JSON.stringify(preferences));
-};
-
-/**
- * Get saved tour preferences
- */
-export const getTourPreferences = () => {
-  const prefs = localStorage.getItem('mindgrove_tour_preferences');
-  return prefs ? JSON.parse(prefs) : { showOnLogin: true };
+export const dismissFeatureTip = (featureKey: string): void => {
+  localStorage.setItem(`mindgrove-feature-${featureKey}-dismissed`, 'true');
 };

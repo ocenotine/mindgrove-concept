@@ -45,16 +45,25 @@ const Flashcard = ({ flashcard, onComplete }: FlashcardProps) => {
         layout
       >
         <motion.div
-          className={`w-full h-full rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 transform-style-3d relative ${isFlipped ? 'rotate-y-180' : ''}`}
+          className={`w-full h-full rounded-xl shadow-lg transition-all duration-500 transform ${
+            isFlipped ? '[transform:rotateY(180deg)]' : ''
+          } preserve-3d`}
           onClick={handleFlip}
           layout
         >
           {/* Front side */}
           <motion.div
             className="absolute w-full h-full rounded-xl bg-gradient-to-br from-primary/5 to-primary/20 border border-primary/10 p-6 backface-hidden"
-            style={{ transformStyle: 'preserve-3d' }}
-            animate={{ opacity: isFlipped ? 0 : 1 }}
-            transition={{ duration: 0.2 }}
+            initial={false}
+            animate={{ 
+              opacity: isFlipped ? 0 : 1,
+              rotateY: isFlipped ? 180 : 0
+            }}
+            transition={{ duration: 0.5 }}
+            style={{ 
+              backfaceVisibility: 'hidden',
+              WebkitBackfaceVisibility: 'hidden'
+            }}
           >
             <div className="flex flex-col h-full justify-between">
               <div>
@@ -62,17 +71,24 @@ const Flashcard = ({ flashcard, onComplete }: FlashcardProps) => {
               </div>
               <div className="flex items-center justify-center mt-4 opacity-70 group-hover:opacity-100 transition-opacity">
                 <ChevronDown className="h-6 w-6 animate-bounce" />
-                <span className="text-sm">Tap to flip</span>
+                <span className="text-sm ml-1">Tap to flip</span>
               </div>
             </div>
           </motion.div>
           
           {/* Back side */}
           <motion.div
-            className="absolute w-full h-full rounded-xl bg-gradient-to-br from-primary/10 to-primary/30 border border-primary/20 p-6 backface-hidden rotate-y-180"
-            style={{ transformStyle: 'preserve-3d' }}
-            animate={{ opacity: isFlipped ? 1 : 0 }}
-            transition={{ duration: 0.2 }}
+            className="absolute w-full h-full rounded-xl bg-gradient-to-br from-primary/10 to-primary/30 border border-primary/20 p-6 backface-hidden [transform:rotateY(180deg)]"
+            initial={false}
+            animate={{ 
+              opacity: isFlipped ? 1 : 0,
+              rotateY: isFlipped ? 0 : -180
+            }}
+            transition={{ duration: 0.5 }}
+            style={{ 
+              backfaceVisibility: 'hidden',
+              WebkitBackfaceVisibility: 'hidden'
+            }}
           >
             <div className="flex flex-col h-full justify-between">
               <div>
@@ -85,9 +101,33 @@ const Flashcard = ({ flashcard, onComplete }: FlashcardProps) => {
             </div>
           </motion.div>
         </motion.div>
+        
+        {/* Swipe indicators */}
+        <motion.div
+          className="absolute top-1/2 left-2 -translate-y-1/2 opacity-0 group-hover:opacity-60"
+          animate={{ x: [-5, 0, -5], opacity: exitX === 0 ? [0, 0.6, 0] : 0 }}
+          transition={{ repeat: Infinity, duration: 1.5 }}
+        >
+          <div className="h-10 w-10 rounded-full bg-background/80 flex items-center justify-center shadow-md">
+            <ArrowLeft className="h-5 w-5" />
+          </div>
+        </motion.div>
+        
+        <motion.div
+          className="absolute top-1/2 right-2 -translate-y-1/2 opacity-0 group-hover:opacity-60"
+          animate={{ x: [5, 0, 5], opacity: exitX === 0 ? [0, 0.6, 0] : 0 }}
+          transition={{ repeat: Infinity, duration: 1.5 }}
+        >
+          <div className="h-10 w-10 rounded-full bg-background/80 flex items-center justify-center shadow-md">
+            <ArrowRight className="h-5 w-5" />
+          </div>
+        </motion.div>
       </motion.div>
     </AnimatePresence>
   );
 };
+
+// Need to import the arrow icons
+import { ArrowLeft, ArrowRight } from 'lucide-react';
 
 export default Flashcard;

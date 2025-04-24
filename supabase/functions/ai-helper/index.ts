@@ -20,18 +20,21 @@ serve(async (req) => {
   try {
     const body = await req.json();
     console.log("Request body:", body);
-    const { task, content } = body;
+    const { task, content, api_key } = body;
     
     if (!task) {
       throw new Error("Task parameter is required");
     }
+    
+    // Use provided API key or fall back to default
+    const openRouterKey = api_key || API_KEY;
     
     // Always attempt to process even with minimal content
     const inputContent = content || "This document appears to have minimal content.";
     console.log(`Processing task: ${task} with content length: ${inputContent.length}`);
     
     if (task === 'summarize') {
-      const summary = await summarizeText(inputContent);
+      const summary = await summarizeText(inputContent, openRouterKey);
       console.log("Summary generated successfully");
       return new Response(
         JSON.stringify({ result: summary }),
@@ -40,10 +43,24 @@ serve(async (req) => {
     }
     
     if (task === 'flashcards') {
-      const flashcards = await generateFlashcards(inputContent);
+      const flashcards = await generateFlashcards(inputContent, openRouterKey);
       console.log("Flashcards generated successfully");
       return new Response(
         JSON.stringify({ result: flashcards }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    if (task === 'chat') {
+      const { document_content, user_message } = body;
+      if (!user_message) {
+        throw new Error("User message is required for chat task");
+      }
+      
+      const chatResponse = await generateChatResponse(document_content || inputContent, user_message, openRouterKey);
+      console.log("Chat response generated successfully");
+      return new Response(
+        JSON.stringify({ result: chatResponse }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -65,7 +82,7 @@ serve(async (req) => {
   }
 });
 
-async function summarizeText(text: string): Promise<string> {
+async function summarizeText(text: string, apiKey: string): Promise<string> {
   console.log("Summarizing text with OpenRouter API");
   try {
     // Allow even very short texts to be summarized
@@ -74,7 +91,7 @@ async function summarizeText(text: string): Promise<string> {
     const response = await fetch(OPEN_ROUTER_API_ENDPOINT, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${API_KEY}`,
+        'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
         'HTTP-Referer': 'https://mindgrove.app',
         'X-Title': 'MindGrove Document Summarization'
@@ -125,7 +142,7 @@ async function summarizeText(text: string): Promise<string> {
   }
 }
 
-async function generateFlashcards(text: string): Promise<string> {
+async function generateFlashcards(text: string, apiKey: string): Promise<string> {
   console.log("Generating flashcards with OpenRouter API");
   try {
     // Allow even very short texts to generate basic flashcards
@@ -134,7 +151,7 @@ async function generateFlashcards(text: string): Promise<string> {
     const response = await fetch(OPEN_ROUTER_API_ENDPOINT, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${API_KEY}`,
+        'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json',
         'HTTP-Referer': 'https://mindgrove.app',
         'X-Title': 'MindGrove Flashcard Generation'
@@ -226,6 +243,69 @@ async function generateFlashcards(text: string): Promise<string> {
     }
   } catch (error) {
     console.error("Error in generateFlashcards:", error);
+    throw error;
+  }
+}
+
+async function generateChatResponse(documentContent: string, userMessage: string, apiKey: string): Promise<string> {
+  console.log("Generating chat response with OpenRouter API");
+  try {
+    // Use a portion of the document to avoid token limits
+    const contextText = documentContent.substring(0, 10000);
+    
+    const response = await fetch(OPEN_ROUTER_API_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://mindgrove.app',
+        'X-Title': 'MindGrove Document Chat'
+      },
+      body: JSON.stringify({
+        model: DEFAULT_MODEL,
+        messages: [
+          {
+            role: "system",
+            content: `You are an AI research assistant helping a user understand a document. Answer questions based on the document content. If the document doesn't contain information needed to answer a question, say so politely and suggest what might be helpful instead.
+            
+DOCUMENT CONTENT:
+${contextText}`
+          },
+          {
+            role: "user",
+            content: userMessage
+          }
+        ],
+        temperature: 0.2,
+        max_tokens: 800
+      })
+    });
+    
+    const responseText = await response.text();
+    console.log("OpenRouter API response for chat:", responseText);
+    
+    if (!response.ok) {
+      console.error(`API Error (${response.status}):`, responseText);
+      throw new Error(`OpenRouter API returned status: ${response.status}`);
+    }
+    
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (e) {
+      console.error("Error parsing JSON response:", e);
+      throw new Error("Invalid response from OpenRouter API");
+    }
+    
+    const chatResponse = data.choices[0]?.message?.content;
+    
+    if (!chatResponse) {
+      throw new Error("Failed to extract chat response from API response");
+    }
+    
+    return chatResponse;
+  } catch (error) {
+    console.error("Error in generateChatResponse:", error);
     throw error;
   }
 }

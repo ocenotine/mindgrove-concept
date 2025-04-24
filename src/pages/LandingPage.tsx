@@ -1,4 +1,3 @@
-
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { BookOpen, Brain, Users, FileText, Star, PenTool, ChevronDown, LayoutDashboard, Sparkles } from 'lucide-react';
@@ -6,6 +5,9 @@ import Button from '@/components/common/Button';
 import BookAnimation from '@/components/animations/BookAnimation';
 import BackgroundAnimation from '@/components/animations/BackgroundAnimation';
 import { useEffect, useState } from 'react';
+import React, { lazy } from 'react';
+
+const TestimonialsCarousel = React.lazy(() => import('@/components/landing/TestimonialsCarousel'));
 
 const LandingPage = () => {
   const [isVisible, setIsVisible] = useState({
@@ -274,7 +276,7 @@ const LandingPage = () => {
             initial={{ opacity: 0 }}
             animate={isVisible.testimonials ? { opacity: 1 } : {}}
             transition={{ duration: 0.5 }}
-            className="text-center mb-16"
+            className="text-center mb-8"
           >
             <h2 className="text-3xl font-bold mb-4">What Students & Researchers Say</h2>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
@@ -282,42 +284,9 @@ const LandingPage = () => {
             </p>
           </motion.div>
 
-          <div className="grid md:grid-cols-3 gap-8">
-            {[
-              {
-                quote: "MindGrove has revolutionized my research workflow. I can process academic papers in minutes instead of hours, with summaries that capture all the key points.",
-                author: "Jurua Sebastian",
-                role: "PhD Student, Computer Science"
-              },
-              {
-                quote: "The flashcard feature is incredible! It helped me ace my medical exams by automatically identifying key concepts and creating effective study materials.",
-                author: "Asiime Blessing",
-                role: "Medical Student"
-              },
-              {
-                quote: "As a professor, I recommend MindGrove to all my students. The AI-powered summaries help them grasp complex topics faster and engage more meaningfully in class discussions.",
-                author: "Dr. Naomi Wekesa",
-                role: "Associate Professor, Economics"
-              }
-            ].map((testimonial, index) => (
-              <motion.div
-                key={index}
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={isVisible.testimonials ? { opacity: 1, scale: 1 } : {}}
-                transition={{ duration: 0.5, delay: index * 0.1 }}
-                className="bg-card border rounded-lg p-6 hover:shadow-md transition-shadow relative"
-              >
-                <div className="absolute top-6 left-6 text-primary/20 text-6xl font-serif">❝</div>
-                <div className="relative z-10">
-                  <p className="text-lg mb-6">{testimonial.quote}</p>
-                  <div>
-                    <p className="font-semibold">{testimonial.author}</p>
-                    <p className="text-sm text-muted-foreground">{testimonial.role}</p>
-                  </div>
-                </div>
-              </motion.div>
-            ))}
-          </div>
+          <React.Suspense fallback={<div className="h-[320px] flex items-center justify-center">Loading testimonials...</div>}>
+            <TestimonialsCarousel />
+          </React.Suspense>
         </div>
       </section>
 

@@ -1,4 +1,3 @@
-
 import { useEffect } from 'react';
 import MainLayout from '@/components/layout/MainLayout';
 import DashboardHeader from '@/components/dashboard/DashboardHeader';
@@ -7,7 +6,7 @@ import { useAuthStore } from '@/store/authStore';
 import { useDocuments } from '@/hooks/useDocuments';
 import DocumentCard from '@/components/dashboard/DocumentCard';
 import { motion } from 'framer-motion';
-import { Plus, Rocket, BookOpen, BrainCircuit } from 'lucide-react';
+import { Plus, Rocket, BookOpen, BrainCircuit, ChartLine, Clock } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import ContactForm from '@/components/common/ContactForm';
 
@@ -50,26 +49,56 @@ const Dashboard = () => {
             transition={{ duration: 0.3 }}
             className="col-span-2 bg-background/30 backdrop-blur-md rounded-2xl p-6 h-full border border-white/10 shadow-lg"
           >
-            <h2 className="text-2xl font-semibold mb-4 text-foreground">Welcome, {user?.name}</h2>
-            <p className="text-muted-foreground mb-6">
-              Track your progress, manage your documents and create flashcards to enhance your learning.
-            </p>
-            
-            <div className="flex items-center mb-4">
-              <StreakCounter />
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-semibold text-foreground">Welcome, {user?.name}</h2>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">Last login: Today, 10:30 AM</span>
+                <Clock className="h-4 w-4 text-muted-foreground" />
+              </div>
             </div>
             
+            <div className="bg-primary/5 rounded-xl p-4 mb-6 border border-primary/10">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="font-medium text-lg mb-1">Your Progress</h3>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    Keep up the momentum with your research and study goals
+                  </p>
+                </div>
+                <div className="flex items-center">
+                  <ChartLine className="h-6 w-6 text-primary mr-2" />
+                  <StreakCounter />
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-2">
+                <div className="bg-background/60 rounded-lg p-3 border border-white/5 shadow-sm">
+                  <h4 className="font-medium text-sm text-muted-foreground">Documents</h4>
+                  <p className="text-2xl font-bold">{documents.length || 0}</p>
+                </div>
+                <div className="bg-background/60 rounded-lg p-3 border border-white/5 shadow-sm">
+                  <h4 className="font-medium text-sm text-muted-foreground">Flashcards</h4>
+                  <p className="text-2xl font-bold">{user?.flashcardCount || 0}</p>
+                </div>
+                <div className="bg-background/60 rounded-lg p-3 border border-white/5 shadow-sm">
+                  <h4 className="font-medium text-sm text-muted-foreground">Study Streak</h4>
+                  <p className="text-2xl font-bold">{user?.streak || 0} days</p>
+                </div>
+              </div>
+            </div>
+            
+            <h3 className="text-lg font-medium mb-4">Quick Actions</h3>
             <motion.div 
               variants={container}
               initial="hidden"
               animate="show"
-              className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-8"
+              className="grid grid-cols-1 sm:grid-cols-3 gap-4"
             >
               <Link to="/document/upload">
                 <motion.div 
                   variants={item}
                   whileHover={{ y: -5, scale: 1.02 }}
-                  className="bg-background/40 backdrop-blur-md rounded-xl p-4 text-center transition-all duration-300 h-full border border-white/10"
+                  className="bg-background/40 backdrop-blur-md rounded-xl p-4 text-center transition-all duration-300 h-full border border-white/10 hover:border-primary/20 hover:shadow-md hover:bg-background/50"
                 >
                   <div className="bg-primary/10 h-12 w-12 rounded-full flex items-center justify-center mx-auto mb-3 shadow-lg">
                     <Plus className="h-6 w-6 text-primary" />
@@ -83,7 +112,7 @@ const Dashboard = () => {
                 <motion.div 
                   variants={item}
                   whileHover={{ y: -5, scale: 1.02 }}
-                  className="bg-background/40 backdrop-blur-md rounded-xl p-4 text-center transition-all duration-300 h-full border border-white/10"
+                  className="bg-background/40 backdrop-blur-md rounded-xl p-4 text-center transition-all duration-300 h-full border border-white/10 hover:border-primary/20 hover:shadow-md hover:bg-background/50"
                 >
                   <div className="bg-primary/10 h-12 w-12 rounded-full flex items-center justify-center mx-auto mb-3 shadow-lg">
                     <BookOpen className="h-6 w-6 text-primary" />
@@ -97,7 +126,7 @@ const Dashboard = () => {
                 <motion.div 
                   variants={item}
                   whileHover={{ y: -5, scale: 1.02 }}
-                  className="bg-background/40 backdrop-blur-md rounded-xl p-4 text-center transition-all duration-300 h-full border border-white/10"
+                  className="bg-background/40 backdrop-blur-md rounded-xl p-4 text-center transition-all duration-300 h-full border border-white/10 hover:border-primary/20 hover:shadow-md hover:bg-background/50"
                 >
                   <div className="bg-primary/10 h-12 w-12 rounded-full flex items-center justify-center mx-auto mb-3 shadow-lg">
                     <BrainCircuit className="h-6 w-6 text-primary" />

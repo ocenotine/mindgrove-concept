@@ -13,6 +13,8 @@ import DocumentAI from '@/components/document/DocumentAI';
 import { Document } from '@/utils/mockData';
 import { downloadDocument, getDocumentThumbnail, generateDocumentPreview } from '@/utils/documentUtils';
 import FlashcardDeck from '@/components/flashcards/FlashcardDeck';
+import DocumentChat from '@/components/document/DocumentChat';
+import { motion } from 'framer-motion';
 
 const DocumentView = () => {
   const { id } = useParams<{ id: string }>();
@@ -93,10 +95,26 @@ const DocumentView = () => {
     return (
       <MainLayout>
         <div className="flex justify-center items-center h-full py-16">
-          <div className="animate-pulse flex flex-col items-center">
-            <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="flex flex-col items-center"
+          >
+            <svg className="stroke-primary" viewBox="0 0 57 57" width="60" height="60" xmlns="http://www.w3.org/2000/svg">
+              <motion.g
+                fill="none"
+                strokeWidth="2"
+                initial={{ pathLength: 0, opacity: 0 }}
+                animate={{ pathLength: 1, opacity: 1 }}
+                transition={{ duration: 1.5, ease: "easeInOut", repeat: Infinity }}
+              >
+                <path d="M28.5,1.5 L28.5,55.5" />
+                <path d="M1.5,28.5 L55.5,28.5" />
+                <motion.circle cx="28.5" cy="28.5" r="27" />
+              </motion.g>
+            </svg>
             <p className="mt-4 text-sm text-muted-foreground">Loading document...</p>
-          </div>
+          </motion.div>
         </div>
       </MainLayout>
     );
@@ -159,7 +177,7 @@ const DocumentView = () => {
           </TabsList>
           
           <TabsContent value="document" className="space-y-6">
-            <div className="bg-card border rounded-lg p-4 md:p-6">
+            <div className="bg-card border rounded-lg p-4 md:p-6 hover:shadow-md transition-shadow">
               <div className="aspect-video bg-muted rounded-md overflow-hidden mb-6 flex items-center justify-center">
                 <img 
                   src={getDocumentThumbnail(document.fileType)} 
@@ -188,16 +206,28 @@ const DocumentView = () => {
             />
             
             {flashcards.length > 0 && (
-              <div className="mt-8">
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5 }}
+                className="mt-8"
+              >
                 <h3 className="text-xl font-semibold mb-4">Generated Flashcards</h3>
                 <FlashcardDeck 
                   flashcards={flashcards} 
                   documentTitle={document.title}
                 />
-              </div>
+              </motion.div>
             )}
           </TabsContent>
         </Tabs>
+        
+        {/* Document Chat component */}
+        <DocumentChat 
+          documentText={documentText}
+          documentId={id || ''}
+          documentTitle={document.title}
+        />
       </PageTransition>
     </MainLayout>
   );

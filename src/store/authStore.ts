@@ -1,458 +1,212 @@
 
 import { create } from 'zustand';
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from '@/components/ui/use-toast';
 
 export interface User {
   id: string;
-  name: string;
   email: string;
-  avatar_url?: string;
-  streakCount: number;
-  lastActive: string;
-  // Added missing properties from profile
-  bio?: string;
-  createdAt?: string;
-  documentCount?: number;
+  name: string;
+  avatarUrl?: string;
+  streak?: number;
   flashcardCount?: number;
-  studyHours?: number;
+  lastActive?: string;
 }
 
-export interface Session {
-  access_token: string;
-  refresh_token: string;
-  expires_at?: number;
-  user: User;
-}
-
-// Interface to match our database structure for profiles
-interface ProfileData {
-  id: string;
-  name: string;
-  email: string;
-  avatar_url?: string;
-  bio?: string;
-  created_at?: string;
-  updated_at?: string;
-  document_count?: number;
-  flashcard_count?: number;
-  study_hours?: number;
-  last_active?: string;
-  streak_count?: number;
-}
-
-interface AuthState {
+export interface AuthState {
   user: User | null;
-  session: Session | null;
+  token: string | null;
   isAuthenticated: boolean;
-  isLoading: boolean;
+  loading: boolean;
   error: string | null;
-  login: (email: string, password: string) => Promise<void>;
-  loginWithGoogle: () => Promise<void>;
-  logout: () => Promise<void>;
+  
+  // Add method signatures for authentication
+  signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, name: string) => Promise<void>;
-  updateStreak: () => void;
-  fetchUserProfile: () => Promise<void>;
-  updateProfile: (data: Partial<User>) => Promise<void>;
-  resetPassword: (email: string) => Promise<void>;
+  signOut: () => Promise<void>;
+  updateProfile: (data: Partial<User>) => void;
+
+  initialize: () => Promise<void>;
+  getSession: () => Promise<boolean>;
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
-  session: null,
+  token: null,
   isAuthenticated: false,
-  isLoading: true,
+  loading: true,
   error: null,
-
-  fetchUserProfile: async () => {
+  
+  // Initialize the auth store
+  initialize: async () => {
+    set({ loading: true });
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      if (!user) return;
-      
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
-      
-      if (profile) {
-        // Check if it's a new day (24 hours) since last login
-        const lastActive = profile.last_active ? new Date(profile.last_active) : null;
-        const now = new Date();
-        const isNewDay = lastActive ? 
-          (now.getTime() - lastActive.getTime()) > (24 * 60 * 60 * 1000) : true;
-        
-        set({
-          user: {
-            id: user.id,
-            name: profile.name || user.email?.split('@')[0] || '',
-            email: profile.email || user.email || '',
-            avatar_url: profile.avatar_url,
-            bio: profile.bio,
-            streakCount: profile.streak_count || 0,
-            lastActive: profile.last_active || new Date().toISOString(),
-            createdAt: profile.created_at,
-            documentCount: profile.document_count,
-            flashcardCount: profile.flashcard_count,
-            studyHours: profile.study_hours
-          },
-          isAuthenticated: true,
-          isLoading: false
-        });
-      }
+      const authenticated = await get().getSession();
+      set({ isAuthenticated: authenticated, loading: false });
     } catch (error) {
-      console.error('Error fetching user profile:', error);
-      set({ isLoading: false });
+      console.error('Error initializing auth:', error);
+      set({ error: 'Failed to initialize authentication', loading: false });
     }
   },
 
-  login: async (email: string, password: string) => {
-    set({ isLoading: true, error: null });
+  // Get the current session
+  getSession: async () => {
+    try {
+      const { data, error } = await supabase.auth.getSession();
+      if (error) throw error;
+      
+      if (data?.session) {
+        const user = data.session.user;
+        
+        // Get user profile data
+        const { data: profileData } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single();
+          
+        set({ 
+          user: { 
+            id: user.id,
+            email: user.email || '',
+            name: profileData?.full_name || 'User',
+            avatarUrl: profileData?.avatar_url,
+            streak: profileData?.streak_count || 0,
+            flashcardCount: profileData?.flashcard_count || 0,
+            lastActive: profileData?.last_active
+          },
+          token: data.session.access_token,
+          isAuthenticated: true 
+        });
+        return true;
+      } else {
+        set({ user: null, token: null, isAuthenticated: false });
+        return false;
+      }
+    } catch (error) {
+      console.error('Session error:', error);
+      set({ user: null, token: null, isAuthenticated: false });
+      return false;
+    }
+  },
+
+  // Sign in a user
+  signIn: async (email, password) => {
+    set({ loading: true, error: null });
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
-
-      if (error) {
-        throw error;
-      }
-
-      if (!data.user || !data.session) {
-        throw new Error('Invalid credentials');
-      }
-
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', data.user.id)
-        .single();
-
-      if (!profile) {
-        throw new Error('User profile not found');
-      }
-
-      // Check if it's a new day (24 hours) since last login
-      const lastActive = profile.last_active ? new Date(profile.last_active) : null;
-      const now = new Date();
-      const isNewDay = lastActive ? 
-        (now.getTime() - lastActive.getTime()) > (24 * 60 * 60 * 1000) : true;
       
-      // Update the last_active timestamp and streak count in the database
-      if (isNewDay) {
-        await supabase
+      if (error) throw error;
+      
+      if (data?.user) {
+        // Get user profile data
+        const { data: profileData } = await supabase
           .from('profiles')
-          .update({ 
-            last_active: now.toISOString(),
-            streak_count: (profile.streak_count || 0) + 1
-          })
-          .eq('id', data.user.id);
-      } else {
-        // Just update the last_active timestamp without incrementing the streak
-        await supabase
-          .from('profiles')
-          .update({ 
-            last_active: now.toISOString()
-          })
-          .eq('id', data.user.id);
-      }
-
-      set({ 
-        user: {
-          id: data.user.id,
-          name: profile.name || data.user.email?.split('@')[0] || '',
-          email: profile.email || data.user.email || '',
-          avatar_url: profile.avatar_url,
-          bio: profile.bio,
-          streakCount: isNewDay ? (profile.streak_count || 0) + 1 : (profile.streak_count || 0),
-          lastActive: now.toISOString(),
-          createdAt: profile.created_at,
-          documentCount: profile.document_count,
-          flashcardCount: profile.flashcard_count,
-          studyHours: profile.study_hours
-        },
-        session: {
-          access_token: data.session.access_token,
-          refresh_token: data.session.refresh_token,
-          expires_at: data.session.expires_at,
-          user: {
+          .select('*')
+          .eq('id', data.user.id)
+          .single();
+          
+        set({ 
+          user: { 
             id: data.user.id,
-            name: profile.name || data.user.email?.split('@')[0] || '',
-            email: profile.email || data.user.email || '',
-            avatar_url: profile.avatar_url,
-            streakCount: isNewDay ? (profile.streak_count || 0) + 1 : (profile.streak_count || 0),
-            lastActive: now.toISOString(),
-            createdAt: profile.created_at,
-            documentCount: profile.document_count,
-            flashcardCount: profile.flashcard_count,
-            studyHours: profile.study_hours
-          }
-        },
-        isAuthenticated: true,
-        isLoading: false 
-      });
-    } catch (error) {
-      set({ 
-        error: error instanceof Error ? error.message : 'Invalid email or password', 
-        isLoading: false 
-      });
-      toast({
-        title: "Authentication failed",
-        description: error instanceof Error ? error.message : 'Invalid email or password',
-        variant: "destructive"
-      });
-    }
-  },
-
-  loginWithGoogle: async () => {
-    set({ isLoading: true, error: null });
-    try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: `${window.location.origin}/dashboard`,
-          queryParams: {
-            access_type: 'offline',
-            prompt: 'consent',
-          }
-        }
-      });
-
-      if (error) {
-        throw error;
+            email: data.user.email || '',
+            name: profileData?.full_name || 'User',
+            avatarUrl: profileData?.avatar_url,
+            streak: profileData?.streak_count || 0,
+            flashcardCount: profileData?.flashcard_count || 0,
+            lastActive: profileData?.last_active
+          },
+          token: data.session?.access_token || null,
+          isAuthenticated: true,
+          loading: false
+        });
       }
-      
-      // Auth state will be handled by the listener in the store
     } catch (error) {
+      console.error('Sign in error:', error);
       set({ 
-        error: error instanceof Error ? error.message : 'Failed to login with Google', 
-        isLoading: false 
+        error: error instanceof Error ? error.message : 'Failed to sign in', 
+        loading: false 
       });
-      toast({
-        title: "Authentication failed",
-        description: error instanceof Error ? error.message : 'Failed to login with Google',
-        variant: "destructive"
-      });
+      throw error;
     }
   },
 
-  logout: async () => {
-    set({ isLoading: true });
-    try {
-      await supabase.auth.signOut();
-      set({ 
-        user: null, 
-        session: null,
-        isAuthenticated: false,
-        isLoading: false
-      });
-      // Add success toast notification
-      toast({
-        title: "Logged out successfully",
-        description: "You have been logged out of your account.",
-      });
-    } catch (error) {
-      console.error('Error during logout:', error);
-      set({ isLoading: false });
-      // Add error toast notification
-      toast({
-        title: "Logout failed",
-        description: error instanceof Error ? error.message : "Error during logout",
-        variant: "destructive"
-      });
-    }
-  },
-
-  signUp: async (email: string, password: string, name: string) => {
-    set({ isLoading: true, error: null });
+  // Sign up a new user
+  signUp: async (email, password, name) => {
+    set({ loading: true, error: null });
     try {
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: {
-            name: name,
-          }
-        }
-      });
-
-      if (error) {
-        throw error;
-      }
-
-      if (data.user) {
-        set({ 
-          user: {
-            id: data.user.id,
-            name,
-            email,
-            streakCount: 0,
-            lastActive: new Date().toISOString(),
-            documentCount: 0,
-            flashcardCount: 0,
-            studyHours: 0
+            full_name: name,
           },
-          session: data.session ? {
-            access_token: data.session.access_token,
-            refresh_token: data.session.refresh_token,
-            expires_at: data.session.expires_at,
-            user: {
-              id: data.user.id,
-              name,
-              email,
-              streakCount: 0,
-              lastActive: new Date().toISOString(),
-              documentCount: 0,
-              flashcardCount: 0,
-              studyHours: 0
-            }
-          } : null,
-          isAuthenticated: !!data.session,
-          isLoading: false 
-        });
-      }
-    } catch (error) {
-      set({ 
-        error: error instanceof Error ? error.message : 'Failed to sign up', 
-        isLoading: false 
-      });
-    }
-  },
-
-  updateStreak: () => {
-    const state = get();
-    if (!state.user) return;
-    
-    // Only update streak if it's been more than 24 hours since last login
-    const lastActive = new Date(state.user.lastActive);
-    const now = new Date();
-    const diffHours = (now.getTime() - lastActive.getTime()) / (1000 * 60 * 60);
-    
-    if (diffHours >= 24) {
-      set({
-        user: {
-          ...state.user,
-          streakCount: state.user.streakCount + 1,
-          lastActive: now.toISOString()
-        }
+        },
       });
       
-      // Update the database too
-      supabase
-        .from('profiles')
-        .update({ 
-          last_active: now.toISOString(),
-          streak_count: state.user.streakCount + 1
-        })
-        .eq('id', state.user.id)
-        .then(({ error }) => {
-          if (error) console.error('Error updating streak:', error);
+      if (error) throw error;
+      
+      if (data?.user) {
+        // Create a profile for the user
+        await supabase.from('profiles').upsert({
+          id: data.user.id,
+          full_name: name,
+          email: email,
+          updated_at: new Date().toISOString(),
+          streak_count: 1,
+          last_active: new Date().toISOString()
         });
+        
+        set({ 
+          user: { 
+            id: data.user.id, 
+            email: email,
+            name: name,
+            streak: 1,
+            flashcardCount: 0,
+            lastActive: new Date().toISOString()
+          },
+          token: data.session?.access_token || null,
+          isAuthenticated: true,
+          loading: false
+        });
+      }
+    } catch (error) {
+      console.error('Sign up error:', error);
+      set({ 
+        error: error instanceof Error ? error.message : 'Failed to sign up', 
+        loading: false 
+      });
+      throw error;
     }
   },
 
-  updateProfile: async (data: Partial<User>) => {
-    set({ isLoading: true });
+  // Sign out the current user
+  signOut: async () => {
     try {
-      const state = get();
-      if (!state.user) {
-        throw new Error('You must be logged in to update your profile');
-      }
-
-      // Map User properties to profile table fields
-      const profileData: Partial<ProfileData> = {
-        name: data.name,
-        bio: data.bio,
-        updated_at: new Date().toISOString(),
-        streak_count: data.streakCount,
-        last_active: data.lastActive
-      };
-
-      const { error } = await supabase
-        .from('profiles')
-        .update(profileData)
-        .eq('id', state.user.id);
-
-      if (error) {
-        throw error;
-      }
-
-      set({
-        user: {
-          ...state.user,
-          ...data,
-        },
-        isLoading: false
-      });
-
-      toast({
-        title: "Profile updated",
-        description: "Your profile has been updated successfully",
-      });
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      set({ user: null, token: null, isAuthenticated: false });
     } catch (error) {
-      set({ isLoading: false });
-      toast({
-        title: "Update failed",
-        description: error instanceof Error ? error.message : 'Failed to update profile',
-        variant: "destructive"
-      });
+      console.error('Sign out error:', error);
+      set({ error: 'Failed to sign out' });
+      throw error;
     }
   },
 
-  resetPassword: async (email: string) => {
-    set({ isLoading: true });
-    try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`,
-      });
-
-      if (error) {
-        throw error;
+  // Update user profile
+  updateProfile: (data) => {
+    const currentUser = get().user;
+    if (!currentUser) return;
+    
+    set({
+      user: {
+        ...currentUser,
+        ...data
       }
-
-      set({ isLoading: false });
-      toast({
-        title: "Password reset email sent",
-        description: "Please check your email for the password reset link",
-      });
-    } catch (error) {
-      set({ isLoading: false });
-      toast({
-        title: "Reset failed",
-        description: error instanceof Error ? error.message : 'Failed to send reset email',
-        variant: "destructive"
-      });
-    }
+    });
   }
 }));
-
-// Setup auth state listener
-if (typeof window !== 'undefined') {
-  // Check for existing session
-  supabase.auth.getSession().then(({ data: { session } }) => {
-    if (session) {
-      useAuthStore.getState().fetchUserProfile();
-    } else {
-      useAuthStore.setState({ isLoading: false });
-    }
-  });
-
-  // Listen for auth changes
-  supabase.auth.onAuthStateChange((_event, session) => {
-    const state = useAuthStore.getState();
-    
-    if (session) {
-      if (!state.isAuthenticated) {
-        state.fetchUserProfile();
-      }
-    } else {
-      useAuthStore.setState({ 
-        user: null, 
-        session: null, 
-        isAuthenticated: false,
-        isLoading: false
-      });
-    }
-  });
-}

@@ -6,6 +6,7 @@ import { BookOpen, PenTool, Sparkles, Loader } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from '@/components/ui/use-toast';
 import ApiKeyReminder from './ApiKeyReminder';
+import ApiKeySettings from './ApiKeySettings';
 import { motion } from 'framer-motion';
 import { generateDocumentSummary, generateFlashcards as generateFlashcardsUtil } from '@/utils/openRouterUtils';
 
@@ -92,6 +93,7 @@ const DocumentAI = ({ documentText, documentId, onSummaryGenerated, onFlashcards
   return (
     <div className="space-y-6 ai-tools">
       <ApiKeyReminder />
+      <ApiKeySettings />
       
       <Card>
         <CardHeader>

@@ -1,12 +1,14 @@
-
-import { toast } from "@/components/ui/use-toast";
-
 // OpenRouter API endpoint
 const OPEN_ROUTER_API_ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
+
+// Use the provided API key directly
 const API_KEY = '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';
 
 // Default model to use for requests
 const DEFAULT_MODEL = 'openai/gpt-3.5-turbo';
+
+// Local storage key for API key
+const API_KEY_STORAGE = 'mindgrove_openrouter_api_key';
 
 interface OpenRouterResponse {
   choices: {
@@ -17,11 +19,30 @@ interface OpenRouterResponse {
 }
 
 /**
+ * Get the stored OpenRouter API key
+ */
+export const getOpenRouterApiKey = (): string => {
+  return API_KEY; // Always return the hardcoded API key as requested
+};
+
+/**
+ * Set the OpenRouter API key in local storage
+ */
+export const setOpenRouterApiKey = (apiKey: string): void => {
+  // We'll keep this function for backward compatibility,
+  // but we'll only use the hardcoded API key as requested
+  localStorage.setItem(API_KEY_STORAGE, apiKey);
+};
+
+/**
  * Generate a document summary using OpenRouter API
  */
 export const generateDocumentSummary = async (text: string): Promise<string> => {
   console.log("Calling OpenRouter API for summary...");
   try {
+    // Play notification sound
+    playNotificationSound();
+    
     // Even if text is minimal, we'll attempt to summarize it
     const inputText = text.trim() || "This document appears to be empty or contains minimal content.";
     
@@ -50,13 +71,12 @@ export const generateDocumentSummary = async (text: string): Promise<string> => 
       })
     });
     
-    console.log("OpenRouter API response status:", response.status);
+    // Handle non-JSON response
     const responseText = await response.text();
-    console.log("OpenRouter API response preview:", responseText.substring(0, 200));
     
     if (!response.ok) {
       console.error("API Error:", responseText);
-      throw new Error(`API returned status: ${response.status} - ${JSON.parse(responseText)?.error?.message || 'Unknown error'}`);
+      throw new Error(`API returned status: ${response.status} - ${getErrorMessage(responseText)}`);
     }
     
     let data;
@@ -72,12 +92,6 @@ export const generateDocumentSummary = async (text: string): Promise<string> => 
     return summary;
   } catch (error) {
     console.error('Error generating summary:', error);
-    toast({
-      title: "Summary generation failed",
-      description: "Could not connect to AI service. Please try again later.",
-      variant: "destructive"
-    });
-    
     throw error;
   }
 };
@@ -88,6 +102,9 @@ export const generateDocumentSummary = async (text: string): Promise<string> => 
 export const generateFlashcards = async (text: string): Promise<Array<{question: string, answer: string}>> => {
   console.log("Calling OpenRouter API for flashcards...");
   try {
+    // Play notification sound
+    playNotificationSound();
+    
     // Even if text is minimal, we'll try to generate flashcards
     const inputText = text.trim() || "This document appears to be empty or contains minimal content.";
     
@@ -116,13 +133,12 @@ export const generateFlashcards = async (text: string): Promise<Array<{question:
       })
     });
     
-    console.log("OpenRouter API response status for flashcards:", response.status);
+    // Handle non-JSON response
     const responseText = await response.text();
-    console.log("OpenRouter API flashcard response preview:", responseText.substring(0, 200));
     
     if (!response.ok) {
       console.error("API Error:", responseText);
-      throw new Error(`API returned status: ${response.status} - ${JSON.parse(responseText)?.error?.message || 'Unknown error'}`);
+      throw new Error(`API returned status: ${response.status} - ${getErrorMessage(responseText)}`);
     }
     
     let data;
@@ -134,7 +150,6 @@ export const generateFlashcards = async (text: string): Promise<Array<{question:
     }
     
     const content = data.choices?.[0]?.message?.content || "[]";
-    console.log("Content received:", content.substring(0, 200));
     
     try {
       // First try to parse the content as JSON directly
@@ -176,26 +191,7 @@ export const generateFlashcards = async (text: string): Promise<Array<{question:
       }));
     } catch (jsonError) {
       console.error("Error parsing flashcard JSON:", jsonError);
-      
-      // Extract with regex as fallback
-      try {
-        const cardMatches = content.match(/question["\s:]+([^"]+)["\s,]+answer["\s:]+([^"]+)/gi);
-        
-        if (cardMatches && cardMatches.length > 0) {
-          return cardMatches.map(match => {
-            const questionMatch = match.match(/question["\s:]+([^",]+)/i);
-            const answerMatch = match.match(/answer["\s:]+([^",]+)/i);
-            return {
-              question: questionMatch ? questionMatch[1].trim() : "Question not found",
-              answer: answerMatch ? answerMatch[1].trim() : "Answer not found"
-            };
-          });
-        }
-      } catch (e) {
-        console.error("Regex extraction failed:", e);
-      }
-      
-      // Last resort: return basic flashcards
+      // Return fallback flashcards
       return [
         { question: "What is this document about?", answer: "This document contains academic or educational content." },
         { question: "How can I use flashcards for studying?", answer: "Flashcards help with active recall and spaced repetition, improving memory retention." }
@@ -203,50 +199,100 @@ export const generateFlashcards = async (text: string): Promise<Array<{question:
     }
   } catch (error) {
     console.error('Error generating flashcards:', error);
-    toast({
-      title: "Flashcard generation failed",
-      description: "Could not connect to AI service. Please try again later.",
-      variant: "destructive"
-    });
-    
     throw error;
   }
 };
 
 /**
- * Extract text from a PDF document
+ * Generate an AI chat response related to document content
  */
-export const extractTextFromPDF = async (file: File): Promise<string> => {
+export const generateDocumentChatResponse = async (
+  documentText: string, 
+  userMessage: string
+): Promise<string> => {
+  console.log("Calling OpenRouter API for chat response...");
   try {
-    const arrayBuffer = await file.arrayBuffer();
+    // Play notification sound for new message
+    playNotificationSound();
     
-    // Use pdfjs to extract text
-    const pdfjsLib = await import('pdfjs-dist');
+    // Prepare document context (use first 8000 chars to avoid token limits)
+    const contextText = documentText.trim().substring(0, 8000); 
     
-    // Initialize PDF.js worker if needed
-    if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
-      pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+    const response = await fetch(OPEN_ROUTER_API_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${API_KEY}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://mindgrove.app',
+        'X-Title': 'MindGrove Document Chat'
+      },
+      body: JSON.stringify({
+        model: DEFAULT_MODEL,
+        messages: [
+          {
+            role: "system",
+            content: `You are an AI research assistant helping a user understand a document. Answer questions based on the document content. If the document doesn't contain information needed to answer a question, say so politely and suggest what might be helpful instead.
+            
+DOCUMENT CONTENT:
+${contextText}`
+          },
+          {
+            role: "user",
+            content: userMessage
+          }
+        ],
+        temperature: 0.3,
+        max_tokens: 800
+      })
+    });
+    
+    // Handle potential errors
+    const responseText = await response.text();
+    
+    if (!response.ok) {
+      console.error("API Error:", responseText);
+      throw new Error(`API returned status: ${response.status} - ${getErrorMessage(responseText)}`);
     }
     
-    const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
-    const pdf = await loadingTask.promise;
-    
-    let fullText = '';
-    const totalPages = pdf.numPages;
-    
-    for (let i = 1; i <= totalPages; i++) {
-      const page = await pdf.getPage(i);
-      const textContent = await page.getTextContent();
-      const pageText = textContent.items
-        .map((item: any) => item.str)
-        .join(' ');
-      
-      fullText += pageText + '\n\n';
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (e) {
+      console.error("Error parsing JSON response:", e);
+      throw new Error("Invalid response format from OpenRouter API");
     }
     
-    return fullText || "No text content could be extracted from this PDF.";
+    const chatResponse = data.choices?.[0]?.message?.content || 
+      "I'm sorry, I wasn't able to generate a response. Please try asking a different question.";
+    
+    return chatResponse;
   } catch (error) {
-    console.error('Error extracting text from PDF:', error);
-    return "Error extracting text from PDF. Please try a different file.";
+    console.error('Error generating chat response:', error);
+    throw error;
+  }
+};
+
+/**
+ * Helper function to extract error message from API response
+ */
+const getErrorMessage = (responseText: string): string => {
+  try {
+    const errorObj = JSON.parse(responseText);
+    return errorObj?.error?.message || 'Unknown error';
+  } catch (e) {
+    return 'Unable to parse error details';
+  }
+};
+
+/**
+ * Play notification sound for important events
+ */
+export const playNotificationSound = () => {
+  try {
+    const audio = new Audio('/sounds/notification.mp3');
+    audio.volume = 0.3; // Set volume to 30%
+    audio.play().catch(err => console.log('Audio play prevented by browser policy:', err));
+  } catch (error) {
+    console.log('Could not play notification sound:', error);
   }
 };

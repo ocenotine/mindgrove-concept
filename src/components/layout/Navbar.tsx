@@ -34,8 +34,15 @@ const Navbar = () => {
       >
         <div className="container mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Link to="/dashboard" className="flex items-center gap-2">
+            <div className="flex items-center gap-2">
+              <Link to="/dashboard" className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white">
+                  <img 
+                    src="/lovable-uploads/65960bde-d697-478f-82ae-b981a1ed9307.png"
+                    alt="MindGrove"
+                    className="w-8 h-8 rounded-full object-cover"
+                  />
+                </div>
                 <span className="text-xl font-brand hidden sm:inline-block">MindGrove</span>
               </Link>
             </div>
