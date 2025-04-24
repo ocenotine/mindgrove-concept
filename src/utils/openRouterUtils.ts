@@ -20,6 +20,7 @@ interface OpenRouterResponse {
  * Generate a document summary using OpenRouter API
  */
 export const generateDocumentSummary = async (text: string): Promise<string> => {
+  console.log("Calling OpenRouter API for summary...");
   try {
     // Even if text is minimal, we'll attempt to summarize it
     const inputText = text.trim() || "This document appears to be empty or contains minimal content.";
@@ -49,14 +50,24 @@ export const generateDocumentSummary = async (text: string): Promise<string> => 
       })
     });
     
+    console.log("OpenRouter API response status:", response.status);
+    const responseText = await response.text();
+    console.log("OpenRouter API response preview:", responseText.substring(0, 200));
+    
     if (!response.ok) {
-      const errorData = await response.json();
-      console.error("API Error:", errorData);
-      throw new Error(`API returned status: ${response.status} - ${errorData?.error?.message || 'Unknown error'}`);
+      console.error("API Error:", responseText);
+      throw new Error(`API returned status: ${response.status} - ${JSON.parse(responseText)?.error?.message || 'Unknown error'}`);
     }
     
-    const data = await response.json() as OpenRouterResponse;
-    const summary = data.choices[0]?.message?.content || "Failed to generate summary.";
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (e) {
+      console.error("Error parsing JSON response:", e);
+      throw new Error("Invalid response format from OpenRouter API");
+    }
+    
+    const summary = data.choices?.[0]?.message?.content || "Failed to generate summary.";
     
     return summary;
   } catch (error) {
@@ -67,7 +78,7 @@ export const generateDocumentSummary = async (text: string): Promise<string> => 
       variant: "destructive"
     });
     
-    throw new Error("Failed to generate summary. Please try again later.");
+    throw error;
   }
 };
 
@@ -75,6 +86,7 @@ export const generateDocumentSummary = async (text: string): Promise<string> => 
  * Generate flashcards from document text using OpenRouter API
  */
 export const generateFlashcards = async (text: string): Promise<Array<{question: string, answer: string}>> => {
+  console.log("Calling OpenRouter API for flashcards...");
   try {
     // Even if text is minimal, we'll try to generate flashcards
     const inputText = text.trim() || "This document appears to be empty or contains minimal content.";
@@ -96,7 +108,7 @@ export const generateFlashcards = async (text: string): Promise<Array<{question:
           },
           {
             role: "user",
-            content: `Create flashcards in JSON format from the following text. Each flashcard should have a 'question' and 'answer' property. If the text is very short, create fewer but relevant flashcards based on what's available:\n\n${inputText}\n\nResponse must be valid JSON in this format: [{"question": "Question text?", "answer": "Answer text"}]`
+            content: `Create flashcards in JSON format from the following text. Each flashcard should have a 'question' and 'answer' property. Format as a valid JSON array. If the text is very short, create fewer but relevant flashcards based on what's available:\n\n${inputText}\n\nResponse must be valid JSON in this format: [{"question": "Question text?", "answer": "Answer text"}]`
           }
         ],
         temperature: 0.3,
@@ -104,44 +116,58 @@ export const generateFlashcards = async (text: string): Promise<Array<{question:
       })
     });
     
+    console.log("OpenRouter API response status for flashcards:", response.status);
+    const responseText = await response.text();
+    console.log("OpenRouter API flashcard response preview:", responseText.substring(0, 200));
+    
     if (!response.ok) {
-      const errorData = await response.json();
-      console.error("API Error:", errorData);
-      throw new Error(`API returned status: ${response.status} - ${errorData?.error?.message || 'Unknown error'}`);
+      console.error("API Error:", responseText);
+      throw new Error(`API returned status: ${response.status} - ${JSON.parse(responseText)?.error?.message || 'Unknown error'}`);
     }
     
-    const data = await response.json() as OpenRouterResponse;
-    const content = data.choices[0]?.message?.content || "{}";
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (e) {
+      console.error("Error parsing JSON response:", e);
+      throw new Error("Invalid response format from OpenRouter API");
+    }
+    
+    const content = data.choices?.[0]?.message?.content || "[]";
+    console.log("Content received:", content.substring(0, 200));
     
     try {
-      // Parse the JSON from the content
-      let parsedData;
+      // First try to parse the content as JSON directly
+      let parsedContent;
       try {
-        parsedData = JSON.parse(content);
+        parsedContent = JSON.parse(content);
       } catch (e) {
-        // If it fails to parse directly, try to extract JSON from the string
+        // If that fails, try to extract JSON from the string using regex
         const jsonMatch = content.match(/\[[\s\S]*\]/);
         if (jsonMatch) {
-          parsedData = JSON.parse(jsonMatch[0]);
+          parsedContent = JSON.parse(jsonMatch[0]);
         } else {
-          throw e;
+          throw e; // Re-throw if we can't find JSON
         }
       }
       
-      // Extract the flashcards array
-      const flashcards = Array.isArray(parsedData) 
-        ? parsedData
-        : parsedData.flashcards || parsedData.cards || [];
-        
+      // Check if the response is already an array or if it has a flashcards property
+      const flashcards = Array.isArray(parsedContent) 
+        ? parsedContent 
+        : parsedContent.flashcards || parsedContent.cards || [];
+      
       if (!flashcards.length) {
         // If no flashcards were generated, provide default ones based on document type
-        return [{
-          question: "What is the main topic of this document?",
-          answer: "This document contains information that may require more context to summarize effectively."
-        }, {
-          question: "How can I use the information in this document?",
-          answer: "The document can be used as a reference for studying or understanding related concepts."
-        }];
+        return [
+          {
+            question: "What is the main topic of this document?",
+            answer: "This document contains information that may require more context to summarize effectively."
+          }, 
+          {
+            question: "How can I use the information in this document?",
+            answer: "The document can be used as a reference for studying or understanding related concepts."
+          }
+        ];
       }
       
       return flashcards.map((card: any) => ({
@@ -149,17 +175,30 @@ export const generateFlashcards = async (text: string): Promise<Array<{question:
         answer: card.answer || "Answer not found"
       }));
     } catch (jsonError) {
-      console.error("Error parsing flashcard JSON:", jsonError, content);
-      // Return basic fallback flashcards if JSON parsing fails
-      return [
-        {
-          question: "What is this document about?",
-          answer: "This document contains academic or educational content."
-        },
-        {
-          question: "How can I use flashcards for studying?",
-          answer: "Flashcards help with active recall and spaced repetition, improving memory retention."
+      console.error("Error parsing flashcard JSON:", jsonError);
+      
+      // Extract with regex as fallback
+      try {
+        const cardMatches = content.match(/question["\s:]+([^"]+)["\s,]+answer["\s:]+([^"]+)/gi);
+        
+        if (cardMatches && cardMatches.length > 0) {
+          return cardMatches.map(match => {
+            const questionMatch = match.match(/question["\s:]+([^",]+)/i);
+            const answerMatch = match.match(/answer["\s:]+([^",]+)/i);
+            return {
+              question: questionMatch ? questionMatch[1].trim() : "Question not found",
+              answer: answerMatch ? answerMatch[1].trim() : "Answer not found"
+            };
+          });
         }
+      } catch (e) {
+        console.error("Regex extraction failed:", e);
+      }
+      
+      // Last resort: return basic flashcards
+      return [
+        { question: "What is this document about?", answer: "This document contains academic or educational content." },
+        { question: "How can I use flashcards for studying?", answer: "Flashcards help with active recall and spaced repetition, improving memory retention." }
       ];
     }
   } catch (error) {
@@ -170,7 +209,7 @@ export const generateFlashcards = async (text: string): Promise<Array<{question:
       variant: "destructive"
     });
     
-    throw new Error("Failed to generate flashcards. Please try again later.");
+    throw error;
   }
 };
 

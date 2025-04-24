@@ -29,8 +29,11 @@ const DocumentAI = ({ documentText, documentId, onSummaryGenerated, onFlashcards
     
     setIsGeneratingSummary(true);
     try {
-      // Use our OpenRouter utility
+      console.log("Starting summary generation with text length:", textToProcess.length);
+      
+      // Use our OpenRouter utility directly
       const result = await generateDocumentSummary(textToProcess);
+      console.log("Summary generation successful, length:", result.length);
       setSummary(result);
       
       if (onSummaryGenerated) {
@@ -59,8 +62,11 @@ const DocumentAI = ({ documentText, documentId, onSummaryGenerated, onFlashcards
     
     setIsGeneratingFlashcards(true);
     try {
-      // Use our OpenRouter utility
+      console.log("Starting flashcard generation with text length:", textToProcess.length);
+      
+      // Use our OpenRouter utility directly
       const result = await generateFlashcardsUtil(textToProcess);
+      console.log("Flashcard generation successful, count:", result.length);
       setFlashcards(result);
       
       if (onFlashcardsGenerated) {

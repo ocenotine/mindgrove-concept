@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { X, ChevronRight, ChevronLeft } from 'lucide-react';
+import { X, ChevronRight, ChevronLeft, Sparkles } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import confetti from 'canvas-confetti';
 import { hasCompletedTour, isNewAccount, clearNewAccountFlag, markTourCompleted } from '@/utils/userOnboardingUtils';
@@ -12,38 +12,44 @@ interface TourStep {
   title: string;
   content: string;
   position: 'top' | 'bottom' | 'left' | 'right';
+  icon?: React.ReactNode;
 }
 
 const tourSteps: TourStep[] = [
   {
     target: '.navbar',
     title: 'Welcome to MindGrove',
-    content: 'This is your learning companion for organizing and understanding documents. Let me show you around!',
-    position: 'bottom'
+    content: 'Your AI-powered tutor and research assistant. Let me show you around!',
+    position: 'bottom',
+    icon: <Sparkles className="h-6 w-6 text-primary" />
   },
   {
     target: '.sidebar',
     title: 'Navigation',
     content: 'Use the sidebar to navigate between different sections of the app like Dashboard, Documents, and Flashcards.',
-    position: 'right'
-  },
-  {
-    target: '.search-input',
-    title: 'Search',
-    content: 'Search through all your documents and find information across your library.',
-    position: 'bottom'
+    position: 'right',
+    icon: <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary"><path d="m22 8-6 4 6 4V8Z"/><rect x="2" y="6" width="14" height="12" rx="2"/><path d="M6 12h.01"/><path d="M10 12h.01"/></svg>
   },
   {
     target: '.document-upload-button',
     title: 'Upload Documents',
     content: 'Upload your PDFs, documents, and text files here. MindGrove will help you organize and learn from them.',
-    position: 'bottom'
+    position: 'bottom',
+    icon: <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><path d="M12 12v6"/><path d="m15 15-3-3-3 3"/></svg>
   },
   {
     target: '.ai-tools',
     title: 'AI Tools',
     content: 'Generate summaries and flashcards from your documents to help you study more effectively.',
-    position: 'top'
+    position: 'top',
+    icon: <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+  },
+  {
+    target: '.dashboard-stats',
+    title: 'Track Your Progress',
+    content: 'Monitor your learning journey with streak counters, statistics, and personalized insights.',
+    position: 'bottom',
+    icon: <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
   }
 ];
 
@@ -88,6 +94,9 @@ const TourGuide: React.FC = () => {
       
       if (target) {
         setTargetElement(target.getBoundingClientRect());
+      } else {
+        // If target not found, use fallback position
+        setTargetElement(null);
       }
     }
   }, [currentStep, visible]);
@@ -125,40 +134,52 @@ const TourGuide: React.FC = () => {
   };
 
   const calculatePosition = () => {
-    if (!targetElement) return { top: '50%', left: '50%' };
+    if (!targetElement) {
+      // Fallback position if element not found
+      return { top: '50%', left: '50%', transform: 'translate(-50%, -50%)' };
+    }
     
     const step = tourSteps[currentStep];
     const windowWidth = window.innerWidth;
     const windowHeight = window.innerHeight;
     
-    let top, left;
+    let top, left, transform = '';
     
     switch (step.position) {
       case 'top':
         top = targetElement.top - 10 - 200 + window.scrollY;
-        left = targetElement.left + targetElement.width / 2 - 200;
+        left = targetElement.left + targetElement.width / 2;
+        transform = 'translateX(-50%)';
         break;
       case 'bottom':
         top = targetElement.bottom + 10 + window.scrollY;
-        left = targetElement.left + targetElement.width / 2 - 200;
+        left = targetElement.left + targetElement.width / 2;
+        transform = 'translateX(-50%)';
         break;
       case 'left':
-        top = targetElement.top + targetElement.height / 2 - 100 + window.scrollY;
-        left = targetElement.left - 400 - 10;
+        top = targetElement.top + targetElement.height / 2 + window.scrollY;
+        left = targetElement.left - 420;
+        transform = 'translateY(-50%)';
         break;
       case 'right':
-        top = targetElement.top + targetElement.height / 2 - 100 + window.scrollY;
+        top = targetElement.top + targetElement.height / 2 + window.scrollY;
         left = targetElement.right + 10;
+        transform = 'translateY(-50%)';
         break;
       default:
         top = '50%';
         left = '50%';
+        transform = 'translate(-50%, -50%)';
     } 
     
-    top = Math.max(10, Math.min(windowHeight - 210, top));
-    left = Math.max(10, Math.min(windowWidth - 410, left));
+    // Ensure the tooltip stays within viewport
+    const tooltipWidth = 400;
+    const tooltipHeight = 250;
     
-    return { top: `${top}px`, left: `${left}px` };
+    top = Math.max(10, Math.min(windowHeight - tooltipHeight - 10, top));
+    left = Math.max(10, Math.min(windowWidth - tooltipWidth - 10, left));
+    
+    return { top: `${top}px`, left: `${left}px`, transform };
   };
 
   if (!visible) return null;
@@ -176,30 +197,39 @@ const TourGuide: React.FC = () => {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 z-40"
+            className="fixed inset-0 bg-black/50 z-40 backdrop-blur-sm"
           />
           
+          {/* Tooltip */}
           <motion.div
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.9 }}
             transition={{ duration: 0.2 }}
-            className="fixed z-50"
-            style={calculatePosition()}
+            className="fixed z-50 w-[400px] max-w-[95vw]"
+            style={position}
           >
-            <div className="bg-card border shadow-lg rounded-lg w-[400px]">
-              <div className="flex justify-between items-center p-4 border-b">
-                <h4 className="font-bold text-lg">{tourSteps[currentStep].title}</h4>
-                <Button variant="ghost" size="icon" onClick={handleSkip}>
+            <div className="bg-card border shadow-lg rounded-lg overflow-hidden">
+              {/* Header */}
+              <div className="flex justify-between items-center p-4 border-b bg-muted/30">
+                <div className="flex items-center gap-3">
+                  {step.icon || <Sparkles className="h-5 w-5 text-primary" />}
+                  <h4 className="font-bold text-lg">{tourSteps[currentStep].title}</h4>
+                </div>
+                <Button variant="ghost" size="icon" onClick={handleSkip} className="h-8 w-8">
                   <X className="h-4 w-4" />
                 </Button>
               </div>
+              
+              {/* Content */}
               <div className="p-6">
                 <p className="text-muted-foreground text-base">{tourSteps[currentStep].content}</p>
               </div>
+              
+              {/* Footer */}
               <div className="p-4 border-t flex justify-between items-center">
                 <div className="text-sm text-muted-foreground">
-                  {currentStep + 1} / {tourSteps.length}
+                  Step {currentStep + 1} of {tourSteps.length}
                 </div>
                 <div className="flex gap-2">
                   {currentStep > 0 && (
@@ -208,11 +238,23 @@ const TourGuide: React.FC = () => {
                       Back
                     </Button>
                   )}
-                  <Button size="sm" onClick={handleNext}>
-                    {currentStep === tourSteps.length - 1 ? 'Finish' : 'Next'}
-                    {currentStep !== tourSteps.length - 1 && <ChevronRight className="h-4 w-4 ml-1" />}
+                  <Button size="sm" onClick={handleNext} className="bg-primary hover:bg-primary/90">
+                    {isLastStep ? 'Finish' : 'Next'}
+                    {!isLastStep && <ChevronRight className="h-4 w-4 ml-1" />}
                   </Button>
                 </div>
+              </div>
+              
+              {/* Progress indicators */}
+              <div className="flex justify-center gap-1.5 p-2 bg-muted/20">
+                {tourSteps.map((_, index) => (
+                  <div 
+                    key={index}
+                    className={`h-1.5 rounded-full transition-all ${
+                      currentStep === index ? 'w-6 bg-primary' : 'w-2 bg-muted-foreground/30'
+                    }`}
+                  />
+                ))}
               </div>
             </div>
           </motion.div>

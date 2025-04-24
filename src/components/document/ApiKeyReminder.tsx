@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 
 const ApiKeyReminder = () => {
   return (
-    <Alert className="mb-4 border border-blue-200 bg-blue-50 dark:bg-blue-900 dark:border-blue-800">
+    <Alert className="mb-4 border border-blue-200 bg-background dark:bg-background dark:border-blue-800">
       <div className="flex items-start">
         <AlertCircle className="h-5 w-5 mt-0.5 mr-2 text-blue-500" />
         <div className="flex-1">

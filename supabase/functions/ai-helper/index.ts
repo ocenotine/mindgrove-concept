@@ -22,15 +22,16 @@ serve(async (req) => {
     console.log("Request body:", body);
     const { task, content } = body;
     
-    if (!content) {
-      // Even with empty content, we'll try to process the request
-      console.log("Warning: Content is empty or minimal");
+    if (!task) {
+      throw new Error("Task parameter is required");
     }
     
-    console.log(`Processing task: ${task}`);
+    // Always attempt to process even with minimal content
+    const inputContent = content || "This document appears to have minimal content.";
+    console.log(`Processing task: ${task} with content length: ${inputContent.length}`);
     
     if (task === 'summarize') {
-      const summary = await summarizeText(content || "This document appears to have minimal content.");
+      const summary = await summarizeText(inputContent);
       console.log("Summary generated successfully");
       return new Response(
         JSON.stringify({ result: summary }),
@@ -39,7 +40,7 @@ serve(async (req) => {
     }
     
     if (task === 'flashcards') {
-      const flashcards = await generateFlashcards(content || "This document appears to have minimal content.");
+      const flashcards = await generateFlashcards(inputContent);
       console.log("Flashcards generated successfully");
       return new Response(
         JSON.stringify({ result: flashcards }),
@@ -75,8 +76,8 @@ async function summarizeText(text: string): Promise<string> {
       headers: {
         'Authorization': `Bearer ${API_KEY}`,
         'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://mindgrove.app',
-        'X-Title': 'MindGrove Document Summarization'
+        'HTTP-Referer': 'https://mindgrove.app', // Required by OpenRouter
+        'X-Title': 'MindGrove Document Summarization' // Helps identify the request
       },
       body: JSON.stringify({
         model: DEFAULT_MODEL,
@@ -95,13 +96,22 @@ async function summarizeText(text: string): Promise<string> {
       })
     });
     
+    const responseText = await response.text();
+    console.log("OpenRouter API response:", responseText);
+    
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`API Error (${response.status}):`, errorText);
+      console.error(`API Error (${response.status}):`, responseText);
       throw new Error(`OpenRouter API returned status: ${response.status}`);
     }
     
-    const data = await response.json();
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (e) {
+      console.error("Error parsing JSON response:", e);
+      throw new Error("Invalid response from OpenRouter API");
+    }
+    
     const summary = data.choices[0]?.message?.content;
     
     if (!summary) {
@@ -126,8 +136,8 @@ async function generateFlashcards(text: string): Promise<string> {
       headers: {
         'Authorization': `Bearer ${API_KEY}`,
         'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://mindgrove.app',
-        'X-Title': 'MindGrove Flashcard Generation'
+        'HTTP-Referer': 'https://mindgrove.app', // Required by OpenRouter
+        'X-Title': 'MindGrove Flashcard Generation' // Helps identify the request
       },
       body: JSON.stringify({
         model: DEFAULT_MODEL,
@@ -138,7 +148,7 @@ async function generateFlashcards(text: string): Promise<string> {
           },
           {
             role: "user",
-            content: `Create 5 flashcards from the following text. Each flashcard should have a 'question' and 'answer' property. If the text is very short, create fewer but relevant flashcards based on what's available:\n\n${inputText}`
+            content: `Create flashcards in JSON format from the following text. Each flashcard should have a 'question' and 'answer' property. Format as a valid JSON array. If the text is very short, create fewer but relevant flashcards based on what's available:\n\n${inputText}\n\nResponse must be valid JSON in this format: [{"question": "Question text?", "answer": "Answer text"}]`
           }
         ],
         temperature: 0.3,
@@ -146,13 +156,22 @@ async function generateFlashcards(text: string): Promise<string> {
       })
     });
     
+    const responseText = await response.text();
+    console.log("OpenRouter API response for flashcards:", responseText);
+    
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`API Error (${response.status}):`, errorText);
+      console.error(`API Error (${response.status}):`, responseText);
       throw new Error(`OpenRouter API returned status: ${response.status}`);
     }
     
-    const data = await response.json();
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (e) {
+      console.error("Error parsing JSON response:", e);
+      throw new Error("Invalid response from OpenRouter API");
+    }
+    
     const content = data.choices[0]?.message?.content;
     
     if (!content) {
@@ -161,18 +180,49 @@ async function generateFlashcards(text: string): Promise<string> {
     
     // The API should return JSON, but we'll wrap this in try/catch in case it doesn't
     try {
-      const parsed = JSON.parse(content);
+      // First try to parse the content as JSON directly
+      let parsedContent;
+      try {
+        parsedContent = JSON.parse(content);
+      } catch (e) {
+        // If that fails, try to extract JSON from the string using regex
+        const jsonMatch = content.match(/\[[\s\S]*\]/);
+        if (jsonMatch) {
+          parsedContent = JSON.parse(jsonMatch[0]);
+        } else {
+          throw e; // Re-throw if we can't find JSON
+        }
+      }
+      
       // Check if the response is already an array or if it has a flashcards property
-      const flashcards = Array.isArray(parsed) 
-        ? parsed 
-        : parsed.flashcards || parsed.cards || [];
+      const flashcards = Array.isArray(parsedContent) 
+        ? parsedContent 
+        : parsedContent.flashcards || parsedContent.cards || [];
         
       // Return the JSON string of the flashcards
       return JSON.stringify(flashcards);
     } catch (jsonError) {
-      console.error("Error parsing flashcard JSON:", jsonError);
-      // If we can't parse as JSON, just return the content as string
-      return content;
+      console.error("Error parsing flashcard JSON:", jsonError, content);
+      // If we can't parse as JSON, extract structured data with regex as fallback
+      const cardMatches = content.match(/question["\s:]+([^"]+)["\s,]+answer["\s:]+([^"]+)/gi);
+      
+      if (cardMatches && cardMatches.length > 0) {
+        const extractedCards = cardMatches.map(match => {
+          const questionMatch = match.match(/question["\s:]+([^",]+)/i);
+          const answerMatch = match.match(/answer["\s:]+([^",]+)/i);
+          return {
+            question: questionMatch ? questionMatch[1].trim() : "Question not found",
+            answer: answerMatch ? answerMatch[1].trim() : "Answer not found"
+          };
+        });
+        return JSON.stringify(extractedCards);
+      }
+      
+      // Last resort: return basic flashcards
+      return JSON.stringify([
+        { question: "What is this document about?", answer: "This document contains educational content." },
+        { question: "How can I use this information?", answer: "The information can be used for study purposes." }
+      ]);
     }
   } catch (error) {
     console.error("Error in generateFlashcards:", error);

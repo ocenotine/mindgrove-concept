@@ -23,6 +23,7 @@ import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TourGuide from "./components/onboarding/TourGuide";
 import LoadingAnimation from "./components/animations/LoadingAnimation";
 import { getDocumentThumbnail } from "./utils/documentUtils";
+import { markFirstVisit } from "./utils/userOnboardingUtils";
 
 // Initialize Three.js for better performance
 import * as THREE from 'three';
@@ -63,10 +64,23 @@ const PublicRoute = ({ children }: { children: React.ReactNode }) => {
 const AppRoutes = () => {
   const { isAuthenticated } = useAuthStore();
   
-  // Check for stored auth on first load
+  // Check for stored auth on first load and mark first visit for analytics
   useEffect(() => {
-    // This would typically check localStorage or cookies for auth tokens
-    // For demo purposes, we'll use our mock auth in the store
+    markFirstVisit();
+    
+    // Register service worker for PWA
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/register-sw.js').then(
+          registration => {
+            console.log('ServiceWorker registration successful with scope: ', registration.scope);
+          },
+          err => {
+            console.log('ServiceWorker registration failed: ', err);
+          }
+        );
+      });
+    }
   }, []);
   
   return (

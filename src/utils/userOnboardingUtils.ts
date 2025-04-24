@@ -33,3 +33,29 @@ export const markTourCompleted = () => {
 export const clearNewAccountFlag = () => {
   localStorage.removeItem('mindgrove_new_account');
 };
+
+/**
+ * Check if the app can be installed as PWA
+ */
+export const checkPwaInstallable = (): boolean => {
+  // Return true if the app is not in standalone mode and meets PWA criteria
+  return window.matchMedia('(display-mode: browser)').matches && 
+         'serviceWorker' in navigator && 
+         'BeforeInstallPromptEvent' in window;
+};
+
+/**
+ * Mark first time visitor status
+ */
+export const markFirstVisit = () => {
+  if (!localStorage.getItem('mindgrove_first_visit')) {
+    localStorage.setItem('mindgrove_first_visit', Date.now().toString());
+  }
+};
+
+/**
+ * Check if user is a returning visitor 
+ */
+export const isReturningUser = (): boolean => {
+  return !!localStorage.getItem('mindgrove_first_visit');
+};
