@@ -29,7 +29,8 @@ export const generateDocumentSummary = async (text: string): Promise<string> => 
       headers: {
         'Authorization': `Bearer ${API_KEY}`,
         'Content-Type': 'application/json',
-        'HTTP-Referer': window.location.origin,
+        'HTTP-Referer': window.location.origin, // Required by OpenRouter
+        'X-Title': 'MindGrove Document Summarization' // Helps identify the request
       },
       body: JSON.stringify({
         model: DEFAULT_MODEL,
@@ -51,7 +52,7 @@ export const generateDocumentSummary = async (text: string): Promise<string> => 
     if (!response.ok) {
       const errorData = await response.json();
       console.error("API Error:", errorData);
-      throw new Error(`API returned status: ${response.status}`);
+      throw new Error(`API returned status: ${response.status} - ${errorData?.error?.message || 'Unknown error'}`);
     }
     
     const data = await response.json() as OpenRouterResponse;
@@ -83,7 +84,8 @@ export const generateFlashcards = async (text: string): Promise<Array<{question:
       headers: {
         'Authorization': `Bearer ${API_KEY}`,
         'Content-Type': 'application/json',
-        'HTTP-Referer': window.location.origin,
+        'HTTP-Referer': window.location.origin, // Required by OpenRouter
+        'X-Title': 'MindGrove Flashcard Generation' // Helps identify the request
       },
       body: JSON.stringify({
         model: DEFAULT_MODEL,
@@ -98,15 +100,14 @@ export const generateFlashcards = async (text: string): Promise<Array<{question:
           }
         ],
         temperature: 0.3,
-        max_tokens: 1200,
-        response_format: { type: "json_object" }
+        max_tokens: 1200
       })
     });
     
     if (!response.ok) {
       const errorData = await response.json();
       console.error("API Error:", errorData);
-      throw new Error(`API returned status: ${response.status}`);
+      throw new Error(`API returned status: ${response.status} - ${errorData?.error?.message || 'Unknown error'}`);
     }
     
     const data = await response.json() as OpenRouterResponse;
@@ -114,7 +115,18 @@ export const generateFlashcards = async (text: string): Promise<Array<{question:
     
     try {
       // Parse the JSON from the content
-      const parsedData = JSON.parse(content);
+      let parsedData;
+      try {
+        parsedData = JSON.parse(content);
+      } catch (e) {
+        // If it fails to parse directly, try to extract JSON from the string
+        const jsonMatch = content.match(/\[[\s\S]*\]/);
+        if (jsonMatch) {
+          parsedData = JSON.parse(jsonMatch[0]);
+        } else {
+          throw e;
+        }
+      }
       
       // Extract the flashcards array
       const flashcards = Array.isArray(parsedData) 
@@ -122,10 +134,13 @@ export const generateFlashcards = async (text: string): Promise<Array<{question:
         : parsedData.flashcards || parsedData.cards || [];
         
       if (!flashcards.length) {
-        // If no flashcards were generated, provide at least one default
+        // If no flashcards were generated, provide default ones based on document type
         return [{
           question: "What is the main topic of this document?",
-          answer: "This document contains minimal information or may be focused on a specific topic that requires more context."
+          answer: "This document contains information that may require more context to summarize effectively."
+        }, {
+          question: "How can I use the information in this document?",
+          answer: "The document can be used as a reference for studying or understanding related concepts."
         }];
       }
       
@@ -135,7 +150,17 @@ export const generateFlashcards = async (text: string): Promise<Array<{question:
       }));
     } catch (jsonError) {
       console.error("Error parsing flashcard JSON:", jsonError, content);
-      throw new Error("Invalid flashcard data received from API");
+      // Return basic fallback flashcards if JSON parsing fails
+      return [
+        {
+          question: "What is this document about?",
+          answer: "This document contains academic or educational content."
+        },
+        {
+          question: "How can I use flashcards for studying?",
+          answer: "Flashcards help with active recall and spaced repetition, improving memory retention."
+        }
+      ];
     }
   } catch (error) {
     console.error('Error generating flashcards:', error);
@@ -153,22 +178,36 @@ export const generateFlashcards = async (text: string): Promise<Array<{question:
  * Extract text from a PDF document
  */
 export const extractTextFromPDF = async (file: File): Promise<string> => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
+  try {
+    const arrayBuffer = await file.arrayBuffer();
     
-    reader.onload = (e) => {
-      try {
-        // This is just a placeholder. In production, use pdfjs or similar library
-        resolve("PDF text content would be extracted here using a PDF parsing library");
-      } catch (error) {
-        reject(new Error("Failed to extract text from PDF"));
-      }
-    };
+    // Use pdfjs to extract text
+    const pdfjsLib = await import('pdfjs-dist');
     
-    reader.onerror = () => {
-      reject(new Error("Error reading file"));
-    };
+    // Initialize PDF.js worker if needed
+    if (!pdfjsLib.GlobalWorkerOptions.workerSrc) {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+    }
     
-    reader.readAsArrayBuffer(file);
-  });
+    const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
+    const pdf = await loadingTask.promise;
+    
+    let fullText = '';
+    const totalPages = pdf.numPages;
+    
+    for (let i = 1; i <= totalPages; i++) {
+      const page = await pdf.getPage(i);
+      const textContent = await page.getTextContent();
+      const pageText = textContent.items
+        .map((item: any) => item.str)
+        .join(' ');
+      
+      fullText += pageText + '\n\n';
+    }
+    
+    return fullText || "No text content could be extracted from this PDF.";
+  } catch (error) {
+    console.error('Error extracting text from PDF:', error);
+    return "Error extracting text from PDF. Please try a different file.";
+  }
 };

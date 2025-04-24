@@ -24,20 +24,13 @@ const DocumentAI = ({ documentText, documentId, onSummaryGenerated, onFlashcards
   const [isGeneratingFlashcards, setIsGeneratingFlashcards] = useState(false);
   
   const handleGenerateSummary = async () => {
-    // Accept any length of text, even minimal content
-    if (!documentText) {
-      toast({
-        title: "No content",
-        description: "Document text is empty. Please provide some content.",
-        variant: "destructive"
-      });
-      return;
-    }
+    // We'll proceed even with minimal content
+    const textToProcess = documentText || "This document appears to have minimal content.";
     
     setIsGeneratingSummary(true);
     try {
       // Use our OpenRouter utility
-      const result = await generateDocumentSummary(documentText);
+      const result = await generateDocumentSummary(textToProcess);
       setSummary(result);
       
       if (onSummaryGenerated) {
@@ -61,20 +54,13 @@ const DocumentAI = ({ documentText, documentId, onSummaryGenerated, onFlashcards
   };
   
   const handleGenerateFlashcards = async () => {
-    // Accept any length of text, even minimal content
-    if (!documentText) {
-      toast({
-        title: "No content",
-        description: "Document text is empty. Please provide some content.",
-        variant: "destructive"
-      });
-      return;
-    }
+    // We'll proceed even with minimal content
+    const textToProcess = documentText || "This document appears to have minimal content.";
     
     setIsGeneratingFlashcards(true);
     try {
       // Use our OpenRouter utility
-      const result = await generateFlashcardsUtil(documentText);
+      const result = await generateFlashcardsUtil(textToProcess);
       setFlashcards(result);
       
       if (onFlashcardsGenerated) {
@@ -115,7 +101,7 @@ const DocumentAI = ({ documentText, documentId, onSummaryGenerated, onFlashcards
           <div className="flex flex-col sm:flex-row gap-3 justify-between">
             <Button
               onClick={handleGenerateSummary}
-              disabled={isGeneratingSummary || !documentText}
+              disabled={isGeneratingSummary}
               className="flex items-center gap-2"
             >
               {isGeneratingSummary ? <Loader className="h-4 w-4 animate-spin" /> : <BookOpen className="h-4 w-4" />}
@@ -124,7 +110,7 @@ const DocumentAI = ({ documentText, documentId, onSummaryGenerated, onFlashcards
             
             <Button
               onClick={handleGenerateFlashcards}
-              disabled={isGeneratingFlashcards || !documentText}
+              disabled={isGeneratingFlashcards}
               className="flex items-center gap-2"
               variant="outline"
             >

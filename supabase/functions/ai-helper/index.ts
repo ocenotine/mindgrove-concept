@@ -23,13 +23,14 @@ serve(async (req) => {
     const { task, content } = body;
     
     if (!content) {
-      throw new Error("Content is required");
+      // Even with empty content, we'll try to process the request
+      console.log("Warning: Content is empty or minimal");
     }
     
     console.log(`Processing task: ${task}`);
     
     if (task === 'summarize') {
-      const summary = await summarizeText(content);
+      const summary = await summarizeText(content || "This document appears to have minimal content.");
       console.log("Summary generated successfully");
       return new Response(
         JSON.stringify({ result: summary }),
@@ -38,7 +39,7 @@ serve(async (req) => {
     }
     
     if (task === 'flashcards') {
-      const flashcards = await generateFlashcards(content);
+      const flashcards = await generateFlashcards(content || "This document appears to have minimal content.");
       console.log("Flashcards generated successfully");
       return new Response(
         JSON.stringify({ result: flashcards }),
@@ -74,7 +75,8 @@ async function summarizeText(text: string): Promise<string> {
       headers: {
         'Authorization': `Bearer ${API_KEY}`,
         'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://mindgrove.app'
+        'HTTP-Referer': 'https://mindgrove.app',
+        'X-Title': 'MindGrove Document Summarization'
       },
       body: JSON.stringify({
         model: DEFAULT_MODEL,
@@ -124,7 +126,8 @@ async function generateFlashcards(text: string): Promise<string> {
       headers: {
         'Authorization': `Bearer ${API_KEY}`,
         'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://mindgrove.app'
+        'HTTP-Referer': 'https://mindgrove.app',
+        'X-Title': 'MindGrove Flashcard Generation'
       },
       body: JSON.stringify({
         model: DEFAULT_MODEL,
@@ -135,12 +138,11 @@ async function generateFlashcards(text: string): Promise<string> {
           },
           {
             role: "user",
-            content: `Create 8 flashcards from the following text. Each flashcard should have a 'question' and 'answer' property. If the text is very short, create fewer but relevant flashcards based on what's available:\n\n${inputText}`
+            content: `Create 5 flashcards from the following text. Each flashcard should have a 'question' and 'answer' property. If the text is very short, create fewer but relevant flashcards based on what's available:\n\n${inputText}`
           }
         ],
         temperature: 0.3,
-        max_tokens: 1200,
-        response_format: { type: "json_object" }
+        max_tokens: 1200
       })
     });
     

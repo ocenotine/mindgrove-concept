@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 
 const ApiKeyReminder = () => {
   return (
-    <Alert className="mb-4 border border-blue-200 bg-blue-50 dark:bg-blue-950 dark:border-blue-800">
+    <Alert className="mb-4 border border-blue-200 bg-blue-50 dark:bg-blue-900 dark:border-blue-800">
       <div className="flex items-start">
         <AlertCircle className="h-5 w-5 mt-0.5 mr-2 text-blue-500" />
         <div className="flex-1">
@@ -19,7 +19,7 @@ const ApiKeyReminder = () => {
           </div>
           <AlertDescription className="text-muted-foreground">
             <p className="mb-2">
-              AI features are powered by OpenRouter. The system will generate accurate summaries and flashcards when you upload documents.
+              AI features are powered by OpenRouter. The system is configured to generate accurate summaries and flashcards from your documents.
             </p>
             <div className="flex flex-wrap gap-2 mt-3">
               <Button 
