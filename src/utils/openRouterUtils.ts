@@ -30,8 +30,8 @@ export const generateDocumentSummary = async (text: string): Promise<string> => 
       headers: {
         'Authorization': `Bearer ${API_KEY}`,
         'Content-Type': 'application/json',
-        'HTTP-Referer': window.location.origin, // Required by OpenRouter
-        'X-Title': 'MindGrove Document Summarization' // Helps identify the request
+        'HTTP-Referer': 'https://mindgrove.app',
+        'X-Title': 'MindGrove Document Summarization'
       },
       body: JSON.stringify({
         model: DEFAULT_MODEL,
@@ -96,8 +96,8 @@ export const generateFlashcards = async (text: string): Promise<Array<{question:
       headers: {
         'Authorization': `Bearer ${API_KEY}`,
         'Content-Type': 'application/json',
-        'HTTP-Referer': window.location.origin, // Required by OpenRouter
-        'X-Title': 'MindGrove Flashcard Generation' // Helps identify the request
+        'HTTP-Referer': 'https://mindgrove.app',
+        'X-Title': 'MindGrove Flashcard Generation'
       },
       body: JSON.stringify({
         model: DEFAULT_MODEL,

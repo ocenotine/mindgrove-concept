@@ -76,8 +76,8 @@ async function summarizeText(text: string): Promise<string> {
       headers: {
         'Authorization': `Bearer ${API_KEY}`,
         'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://mindgrove.app', // Required by OpenRouter
-        'X-Title': 'MindGrove Document Summarization' // Helps identify the request
+        'HTTP-Referer': 'https://mindgrove.app',
+        'X-Title': 'MindGrove Document Summarization'
       },
       body: JSON.stringify({
         model: DEFAULT_MODEL,
@@ -136,8 +136,8 @@ async function generateFlashcards(text: string): Promise<string> {
       headers: {
         'Authorization': `Bearer ${API_KEY}`,
         'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://mindgrove.app', // Required by OpenRouter
-        'X-Title': 'MindGrove Flashcard Generation' // Helps identify the request
+        'HTTP-Referer': 'https://mindgrove.app',
+        'X-Title': 'MindGrove Flashcard Generation'
       },
       body: JSON.stringify({
         model: DEFAULT_MODEL,

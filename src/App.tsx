@@ -23,17 +23,31 @@ import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TourGuide from "./components/onboarding/TourGuide";
 import LoadingAnimation from "./components/animations/LoadingAnimation";
 import { getDocumentThumbnail } from "./utils/documentUtils";
-import { markFirstVisit } from "./utils/userOnboardingUtils";
+import { markFirstVisit, markNewAccount } from "./utils/userOnboardingUtils";
 
 // Initialize Three.js for better performance
 import * as THREE from 'three';
 THREE.ColorManagement.enabled = true;
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      staleTime: 5 * 60 * 1000, // 5 minutes
+    },
+  },
+});
 
 // Protected route component
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { isAuthenticated, isLoading } = useAuthStore();
+  
+  useEffect(() => {
+    // Mark as new account when user first logs in
+    if (isAuthenticated) {
+      markNewAccount();
+    }
+  }, [isAuthenticated]);
   
   if (isLoading) {
     return <LoadingAnimation />;
@@ -81,6 +95,14 @@ const AppRoutes = () => {
         );
       });
     }
+    
+    // Check if the app can be installed as a PWA
+    window.addEventListener('beforeinstallprompt', (e) => {
+      // Prevent Chrome 67 and earlier from automatically showing the prompt
+      e.preventDefault();
+      // Store the event so it can be triggered later
+      (window as any).deferredPrompt = e;
+    });
   }, []);
   
   return (

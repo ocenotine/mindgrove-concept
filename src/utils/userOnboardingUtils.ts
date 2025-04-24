@@ -59,3 +59,59 @@ export const markFirstVisit = () => {
 export const isReturningUser = (): boolean => {
   return !!localStorage.getItem('mindgrove_first_visit');
 };
+
+/**
+ * Show tour again (for testing/debugging)
+ */
+export const resetTour = () => {
+  localStorage.removeItem('mindgrove_tour_completed');
+  localStorage.setItem('mindgrove_new_account', 'true');
+};
+
+/**
+ * Track onboarding step completion
+ */
+export const trackOnboardingStep = (stepName: string) => {
+  const completedSteps = getCompletedOnboardingSteps();
+  if (!completedSteps.includes(stepName)) {
+    completedSteps.push(stepName);
+    localStorage.setItem('mindgrove_onboarding_steps', JSON.stringify(completedSteps));
+  }
+};
+
+/**
+ * Get array of completed onboarding steps
+ */
+export const getCompletedOnboardingSteps = (): string[] => {
+  const steps = localStorage.getItem('mindgrove_onboarding_steps');
+  return steps ? JSON.parse(steps) : [];
+};
+
+/**
+ * Clear onboarding progress
+ */
+export const clearOnboardingProgress = () => {
+  localStorage.removeItem('mindgrove_onboarding_steps');
+};
+
+/**
+ * Check if a specific onboarding step has been completed
+ */
+export const hasCompletedStep = (stepName: string): boolean => {
+  return getCompletedOnboardingSteps().includes(stepName);
+};
+
+/**
+ * Save user preferences for tour display
+ */
+export const setTourPreferences = (preferences: { showOnLogin: boolean }) => {
+  localStorage.setItem('mindgrove_tour_preferences', JSON.stringify(preferences));
+};
+
+/**
+ * Get saved tour preferences
+ */
+export const getTourPreferences = () => {
+  const prefs = localStorage.getItem('mindgrove_tour_preferences');
+  return prefs ? JSON.parse(prefs) : { showOnLogin: true };
+};

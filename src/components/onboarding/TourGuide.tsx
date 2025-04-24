@@ -2,10 +2,10 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import { X, ChevronRight, ChevronLeft, Sparkles } from 'lucide-react';
+import { X, ChevronRight, ChevronLeft, BookOpen, Brain, FileText, Users, LayoutDashboard, Sparkles } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import confetti from 'canvas-confetti';
-import { hasCompletedTour, isNewAccount, clearNewAccountFlag, markTourCompleted } from '@/utils/userOnboardingUtils';
+import { hasCompletedTour, isNewAccount, clearNewAccountFlag, markTourCompleted, resetTour } from '@/utils/userOnboardingUtils';
 
 interface TourStep {
   target: string;
@@ -19,37 +19,37 @@ const tourSteps: TourStep[] = [
   {
     target: '.navbar',
     title: 'Welcome to MindGrove',
-    content: 'Your AI-powered tutor and research assistant. Let me show you around!',
+    content: 'Your AI-powered tutor and research assistant. Let me show you around our powerful features!',
     position: 'bottom',
     icon: <Sparkles className="h-6 w-6 text-primary" />
   },
   {
     target: '.sidebar',
-    title: 'Navigation',
-    content: 'Use the sidebar to navigate between different sections of the app like Dashboard, Documents, and Flashcards.',
+    title: 'Smart Navigation',
+    content: 'Access your documents, flashcards, and learning dashboard from this intuitive sidebar menu.',
     position: 'right',
-    icon: <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary"><path d="m22 8-6 4 6 4V8Z"/><rect x="2" y="6" width="14" height="12" rx="2"/><path d="M6 12h.01"/><path d="M10 12h.01"/></svg>
+    icon: <LayoutDashboard className="h-6 w-6 text-primary" />
   },
   {
     target: '.document-upload-button',
     title: 'Upload Documents',
-    content: 'Upload your PDFs, documents, and text files here. MindGrove will help you organize and learn from them.',
+    content: 'Quickly add your study materials here. We support PDFs and will extract all the valuable content automatically.',
     position: 'bottom',
-    icon: <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/><path d="M12 12v6"/><path d="m15 15-3-3-3 3"/></svg>
+    icon: <FileText className="h-6 w-6 text-primary" />
   },
   {
     target: '.ai-tools',
-    title: 'AI Tools',
-    content: 'Generate summaries and flashcards from your documents to help you study more effectively.',
+    title: 'AI-Powered Learning',
+    content: 'Generate comprehensive summaries and effective flashcards with just one click. Our AI identifies key concepts and helps you master them.',
     position: 'top',
-    icon: <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+    icon: <Brain className="h-6 w-6 text-primary" />
   },
   {
     target: '.dashboard-stats',
     title: 'Track Your Progress',
-    content: 'Monitor your learning journey with streak counters, statistics, and personalized insights.',
+    content: 'Monitor your learning journey with detailed statistics, streak counters, and personalized insights to stay motivated.',
     position: 'bottom',
-    icon: <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+    icon: <BookOpen className="h-6 w-6 text-primary" />
   }
 ];
 
@@ -76,7 +76,8 @@ const TourGuide: React.FC = () => {
       confetti({
         particleCount: 100,
         spread: 70,
-        origin: { y: 0.6 }
+        origin: { y: 0.6 },
+        colors: ['#9b87f5', '#7E69AB', '#33C3F0']
       });
       
       // Show tour after a short delay
@@ -147,7 +148,7 @@ const TourGuide: React.FC = () => {
     
     switch (step.position) {
       case 'top':
-        top = targetElement.top - 10 - 200 + window.scrollY;
+        top = targetElement.top - 10 - 250 + window.scrollY;
         left = targetElement.left + targetElement.width / 2;
         transform = 'translateX(-50%)';
         break;
@@ -182,6 +183,12 @@ const TourGuide: React.FC = () => {
     return { top: `${top}px`, left: `${left}px`, transform };
   };
 
+  // For debugging - will be removed in production
+  const debugReset = () => {
+    resetTour();
+    window.location.reload();
+  };
+
   if (!visible) return null;
 
   const step = tourSteps[currentStep];
@@ -192,12 +199,13 @@ const TourGuide: React.FC = () => {
     <AnimatePresence>
       {visible && (
         <>
-          {/* Darkened overlay */}
+          {/* Darkened overlay with highlight for target element */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/50 z-40 backdrop-blur-sm"
+            className="fixed inset-0 bg-black/50 z-40 backdrop-blur-sm pointer-events-auto"
+            onClick={handleSkip}
           />
           
           {/* Tooltip */}

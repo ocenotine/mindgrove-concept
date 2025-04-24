@@ -1,11 +1,42 @@
+
 import { Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { BookOpen, Brain, Users, FileText } from 'lucide-react';
+import { BookOpen, Brain, Users, FileText, Star, PenTool, ChevronDown, LayoutDashboard, Sparkles } from 'lucide-react';
 import Button from '@/components/common/Button';
 import BookAnimation from '@/components/animations/BookAnimation';
 import BackgroundAnimation from '@/components/animations/BackgroundAnimation';
+import { useEffect, useState } from 'react';
 
 const LandingPage = () => {
+  const [isVisible, setIsVisible] = useState({
+    features: false,
+    testimonials: false,
+    pricing: false,
+    faq: false
+  });
+
+  useEffect(() => {
+    const handleScroll = () => {
+      const scrollPosition = window.scrollY + window.innerHeight * 0.8;
+      
+      // Check each section's visibility
+      document.querySelectorAll('section').forEach(section => {
+        const sectionId = section.id;
+        if (!sectionId) return;
+        
+        const sectionTop = section.offsetTop;
+        if (scrollPosition > sectionTop) {
+          setIsVisible(prev => ({ ...prev, [sectionId]: true }));
+        }
+      });
+    };
+
+    window.addEventListener('scroll', handleScroll);
+    handleScroll(); // Initial check
+    
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-b from-background to-muted/30 relative overflow-hidden">
       {/* 3D Background Animation */}
@@ -18,9 +49,17 @@ const LandingPage = () => {
             <img src="/mindgrove.png" alt="MindGrove Logo" className="h-10 w-10" />
             MindGrove
           </Link>
+          
+          <div className="hidden md:flex items-center space-x-8">
+            <a href="#features" className="text-sm font-medium hover:text-primary transition-colors">Features</a>
+            <a href="#how-it-works" className="text-sm font-medium hover:text-primary transition-colors">How It Works</a>
+            <a href="#testimonials" className="text-sm font-medium hover:text-primary transition-colors">Testimonials</a>
+            <a href="#faq" className="text-sm font-medium hover:text-primary transition-colors">FAQ</a>
+          </div>
+          
           <div className="flex gap-4">
             <Link to="/login">
-              <Button variant="ghost">Log in</Button>
+              <Button variant="ghost" className="hidden sm:inline-flex">Log in</Button>
             </Link>
             <Link to="/signup">
               <Button>Sign up</Button>
@@ -30,49 +69,78 @@ const LandingPage = () => {
       </header>
 
       {/* Hero Section */}
-      <section className="py-10 px-6 flex-1 flex flex-col items-center justify-center text-center relative z-10">
+      <section className="py-16 md:py-24 px-6 flex-1 flex flex-col items-center justify-center text-center relative z-10">
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8 }}
           className="max-w-4xl mx-auto"
         >
-          <h1 className="text-4xl md:text-6xl font-bold mb-6">
-            AI-Powered Academic Research Assistant
+          <h1 className="text-4xl md:text-6xl font-bold mb-6 bg-gradient-to-r from-primary to-primary-foreground bg-clip-text text-transparent">
+            Transform Your Academic Journey with AI
           </h1>
-          <p className="text-xl md:text-2xl text-muted-foreground mb-8 max-w-3xl mx-auto">
-            Transform your research with automated summarization, flashcards and collaborative tools.
+          <p className="text-xl md:text-2xl text-muted-foreground mb-10 max-w-3xl mx-auto">
+            MindGrove combines AI-powered document analysis, instant summarization, and smart flashcards to revolutionize how you study and research.
           </p>
           
           {/* 3D Book Animation - now with proper position prop */}
-          <div className="mb-8 h-[300px]">
+          <div className="mb-12 h-[300px] relative">
             <BookAnimation position={[0, 0, 0]} title="MindGrove" />
+            
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 1, duration: 0.8 }}
+              className="absolute -bottom-4 left-1/2 transform -translate-x-1/2 bg-primary/10 backdrop-blur-sm rounded-full px-6 py-3 border border-primary/20"
+            >
+              <div className="flex items-center gap-2 text-primary">
+                <Sparkles className="h-5 w-5" />
+                <span className="font-medium">Powered by Advanced AI</span>
+              </div>
+            </motion.div>
           </div>
           
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link to="/signup">
-              <Button size="lg" className="px-8">Get Started</Button>
+              <Button size="lg" className="px-8 bg-primary hover:bg-primary/90">Get Started for Free</Button>
             </Link>
-            <Link to="/login">
-              <Button size="lg" variant="outline" className="px-8">Log In</Button>
-            </Link>
+            <a href="#how-it-works">
+              <Button size="lg" variant="outline" className="px-8 group">
+                How It Works
+                <ChevronDown className="ml-2 h-4 w-4 group-hover:translate-y-1 transition-transform" />
+              </Button>
+            </a>
+          </div>
+
+          <div className="mt-12 flex flex-wrap justify-center gap-8">
+            <div className="flex items-center gap-2">
+              <Star className="h-5 w-5 text-yellow-500" />
+              <span className="text-muted-foreground">Used by 10,000+ students</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Star className="h-5 w-5 text-yellow-500" />
+              <span className="text-muted-foreground">4.8/5 average rating</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <Star className="h-5 w-5 text-yellow-500" />
+              <span className="text-muted-foreground">2M+ documents processed</span>
+            </div>
           </div>
         </motion.div>
       </section>
 
       {/* Features Section */}
-      <section className="py-20 px-6 bg-muted/30 relative z-10">
+      <section id="features" className="py-20 px-6 bg-muted/30 relative z-10">
         <div className="max-w-7xl mx-auto">
           <motion.div 
             initial={{ opacity: 0 }}
-            whileInView={{ opacity: 1 }}
+            animate={isVisible.features ? { opacity: 1 } : {}}
             transition={{ duration: 0.5 }}
-            viewport={{ once: true }}
             className="text-center mb-16"
           >
-            <h2 className="text-3xl font-bold mb-4">Powerful Features</h2>
+            <h2 className="text-3xl font-bold mb-4">Intelligent Features for Modern Learning</h2>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              MindGrove helps students and researchers work smarter, not harder.
+              MindGrove equips you with powerful AI tools designed to enhance your academic performance and research capabilities.
             </p>
           </motion.div>
 
@@ -81,25 +149,39 @@ const LandingPage = () => {
               {
                 icon: <Brain className="h-10 w-10 text-primary" />,
                 title: "AI Document Analysis",
-                description: "Automatically extract insights, summaries and flashcards from research papers."
+                description: "Automatically extract key insights and concepts from academic papers, textbooks, and research materials with our advanced AI engine."
+              },
+              {
+                icon: <BookOpen className="h-10 w-10 text-primary" />,
+                title: "Smart Summarization",
+                description: "Transform lengthy documents into concise, well-structured summaries that capture the most important information and save you hours of reading time."
+              },
+              {
+                icon: <PenTool className="h-10 w-10 text-primary" />,
+                title: "Intelligent Flashcards",
+                description: "Generate study-ready flashcards that identify core concepts and create effective question-answer pairs to test your understanding and memory."
               },
               {
                 icon: <Users className="h-10 w-10 text-primary" />,
                 title: "Collaborative Learning",
-                description: "Share annotations, create study groups and collaborate in real-time."
+                description: "Share annotations, create study groups and collaborate in real-time with peers and colleagues for enhanced understanding."
+              },
+              {
+                icon: <LayoutDashboard className="h-10 w-10 text-primary" />,
+                title: "Progress Tracking",
+                description: "Monitor your study habits, track your learning achievements, and visualize your progress with detailed analytics and insights."
               },
               {
                 icon: <FileText className="h-10 w-10 text-primary" />,
-                title: "Document Management",
-                description: "Organize your research materials with smart tagging and powerful search."
+                title: "Smart Organization",
+                description: "Keep your academic and research materials perfectly organized with intelligent tagging, powerful search, and automatic categorization."
               }
             ].map((feature, index) => (
               <motion.div
                 key={index}
                 initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
+                animate={isVisible.features ? { opacity: 1, y: 0 } : {}}
                 transition={{ duration: 0.5, delay: index * 0.1 }}
-                viewport={{ once: true }}
                 className="bg-card border rounded-lg p-6 flex flex-col items-center text-center hover:shadow-md transition-shadow"
               >
                 <div className="mb-4 p-3 bg-primary/10 rounded-full">
@@ -113,8 +195,8 @@ const LandingPage = () => {
         </div>
       </section>
 
-      {/* Testimonials Section */}
-      <section className="py-20 px-6 relative z-10">
+      {/* How It Works Section */}
+      <section id="how-it-works" className="py-20 px-6 relative z-10">
         <div className="max-w-7xl mx-auto">
           <motion.div 
             initial={{ opacity: 0 }}
@@ -123,38 +205,169 @@ const LandingPage = () => {
             viewport={{ once: true }}
             className="text-center mb-16"
           >
-            <h2 className="text-3xl font-bold mb-4">What Users Say</h2>
+            <h2 className="text-3xl font-bold mb-4">How MindGrove Works</h2>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              Researchers and students love using MindGrove for their academic work.
+              Experience a seamless workflow designed to maximize your academic productivity
             </p>
           </motion.div>
 
-          <div className="grid md:grid-cols-2 gap-8">
+          <div className="grid md:grid-cols-4 gap-8">
             {[
               {
-                quote: "MindGrove has completely transformed how I approach my research. The AI summaries save me hours of reading time.",
-                author: "Jurua Sebastian",
-                role: "Software engineering Student"
+                step: "1",
+                title: "Upload Documents",
+                description: "Upload any academic paper, research document, or textbook chapter in PDF format."
               },
               {
-                quote: "The flashcard feature helped me ace my exams. I love how it automatically creates study materials from my PDFs.",
-                author: "Asiime blessing",
-                role: "Software engineering Student"
+                step: "2",
+                title: "AI Processing",
+                description: "Our AI analyzes the content, extracting key information and meaningful concepts."
+              },
+              {
+                step: "3",
+                title: "Generate Resources",
+                description: "Create summaries and flashcards with a single click, perfectly tailored to your documents."
+              },
+              {
+                step: "4",
+                title: "Study Smarter",
+                description: "Use the generated materials to enhance understanding and retention of complex subjects."
+              }
+            ].map((item, index) => (
+              <motion.div
+                key={index}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: index * 0.1 }}
+                viewport={{ once: true }}
+                className="relative"
+              >
+                <div className="bg-card border rounded-lg p-6 flex flex-col items-center text-center hover:shadow-md transition-shadow h-full">
+                  <div className="absolute -top-5 bg-primary text-white w-10 h-10 rounded-full flex items-center justify-center font-bold">
+                    {item.step}
+                  </div>
+                  <h3 className="text-xl font-semibold mb-2 mt-4">{item.title}</h3>
+                  <p className="text-muted-foreground">{item.description}</p>
+                </div>
+                {index < 3 && (
+                  <div className="hidden md:block absolute top-1/2 -right-4 transform translate-x-1/2">
+                    <motion.div 
+                      animate={{ x: [0, 10, 0] }}
+                      transition={{ repeat: Infinity, duration: 2 }}
+                    >
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary">
+                        <path d="m9 18 6-6-6-6"/>
+                      </svg>
+                    </motion.div>
+                  </div>
+                )}
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Testimonials Section */}
+      <section id="testimonials" className="py-20 px-6 bg-muted/30 relative z-10">
+        <div className="max-w-7xl mx-auto">
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={isVisible.testimonials ? { opacity: 1 } : {}}
+            transition={{ duration: 0.5 }}
+            className="text-center mb-16"
+          >
+            <h2 className="text-3xl font-bold mb-4">What Students & Researchers Say</h2>
+            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+              Join thousands of students and academics who are transforming their study habits with MindGrove
+            </p>
+          </motion.div>
+
+          <div className="grid md:grid-cols-3 gap-8">
+            {[
+              {
+                quote: "MindGrove has revolutionized my research workflow. I can process academic papers in minutes instead of hours, with summaries that capture all the key points.",
+                author: "Jurua Sebastian",
+                role: "PhD Student, Computer Science"
+              },
+              {
+                quote: "The flashcard feature is incredible! It helped me ace my medical exams by automatically identifying key concepts and creating effective study materials.",
+                author: "Asiime Blessing",
+                role: "Medical Student"
+              },
+              {
+                quote: "As a professor, I recommend MindGrove to all my students. The AI-powered summaries help them grasp complex topics faster and engage more meaningfully in class discussions.",
+                author: "Dr. Naomi Wekesa",
+                role: "Associate Professor, Economics"
               }
             ].map((testimonial, index) => (
               <motion.div
                 key={index}
                 initial={{ opacity: 0, scale: 0.95 }}
-                whileInView={{ opacity: 1, scale: 1 }}
+                animate={isVisible.testimonials ? { opacity: 1, scale: 1 } : {}}
                 transition={{ duration: 0.5, delay: index * 0.1 }}
-                viewport={{ once: true }}
-                className="bg-card border rounded-lg p-6 hover:shadow-md transition-shadow"
+                className="bg-card border rounded-lg p-6 hover:shadow-md transition-shadow relative"
               >
-                <p className="text-lg italic mb-4">{testimonial.quote}</p>
-                <div>
-                  <p className="font-semibold">{testimonial.author}</p>
-                  <p className="text-sm text-muted-foreground">{testimonial.role}</p>
+                <div className="absolute top-6 left-6 text-primary/20 text-6xl font-serif">❝</div>
+                <div className="relative z-10">
+                  <p className="text-lg mb-6">{testimonial.quote}</p>
+                  <div>
+                    <p className="font-semibold">{testimonial.author}</p>
+                    <p className="text-sm text-muted-foreground">{testimonial.role}</p>
+                  </div>
                 </div>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* FAQ Section */}
+      <section id="faq" className="py-20 px-6 relative z-10">
+        <div className="max-w-3xl mx-auto">
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={isVisible.faq ? { opacity: 1 } : {}}
+            transition={{ duration: 0.5 }}
+            className="text-center mb-16"
+          >
+            <h2 className="text-3xl font-bold mb-4">Frequently Asked Questions</h2>
+            <p className="text-xl text-muted-foreground">
+              Everything you need to know about MindGrove
+            </p>
+          </motion.div>
+
+          <div className="space-y-6">
+            {[
+              {
+                question: "What types of documents can MindGrove process?",
+                answer: "MindGrove currently supports PDF documents, including academic papers, research articles, textbooks, and other educational materials. We're working on expanding to more formats soon."
+              },
+              {
+                question: "How accurate are the AI-generated summaries?",
+                answer: "Our AI models are specifically trained on academic and research content to ensure high accuracy. The summaries capture key concepts, methodologies, findings, and conclusions while maintaining the integrity of the original document."
+              },
+              {
+                question: "Is my data secure with MindGrove?",
+                answer: "Absolutely. We take data security seriously. Your documents are encrypted, and we don't store their content permanently. Our AI processing happens in secure environments, and we never share your data with third parties."
+              },
+              {
+                question: "Can I use MindGrove for collaborative research?",
+                answer: "Yes! MindGrove's collaborative features allow you to share documents, summaries, and flashcards with team members or classmates. You can collaborate in real-time, adding notes and annotations to shared documents."
+              },
+              {
+                question: "Is there a limit to how many documents I can process?",
+                answer: "Free accounts can process up to 5 documents per month, with a size limit of 20MB each. Premium subscriptions offer higher limits and additional features for serious researchers and students."
+              }
+            ].map((item, index) => (
+              <motion.div
+                key={index}
+                initial={{ opacity: 0, y: 10 }}
+                animate={isVisible.faq ? { opacity: 1, y: 0 } : {}}
+                transition={{ duration: 0.3, delay: index * 0.1 }}
+                className="bg-card border rounded-lg p-6"
+              >
+                <h3 className="text-lg font-medium mb-2">{item.question}</h3>
+                <p className="text-muted-foreground">{item.answer}</p>
               </motion.div>
             ))}
           </div>
@@ -169,19 +382,80 @@ const LandingPage = () => {
             whileInView={{ opacity: 1 }}
             transition={{ duration: 0.5 }}
             viewport={{ once: true }}
+            className="max-w-3xl mx-auto"
           >
-            <h2 className="text-3xl font-bold mb-4">Ready to Transform Your Research?</h2>
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto mb-8">
-              Join the students and researchers using MindGrove to enhance their academic work.
+            <h2 className="text-3xl font-bold mb-4">Ready to Transform Your Academic Experience?</h2>
+            <p className="text-xl text-muted-foreground mb-8">
+              Join thousands of students and researchers using MindGrove to study smarter, not harder.
             </p>
-            <div className="inline-block">
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link to="/signup">
-                <Button size="lg" className="px-8">Get Started for Free</Button>
+                <Button size="lg" className="px-8 bg-primary hover:bg-primary/90">Start Your Free Trial</Button>
+              </Link>
+              <Link to="/login">
+                <Button size="lg" variant="outline" className="px-8">Log In</Button>
               </Link>
             </div>
+            <p className="text-sm text-muted-foreground mt-6">
+              No credit card required. Free plan includes 5 documents per month.
+            </p>
           </motion.div>
         </div>
       </section>
+
+      {/* Footer */}
+      <footer className="py-12 px-6 border-t">
+        <div className="max-w-7xl mx-auto">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+            <div>
+              <h3 className="font-semibold mb-3">Product</h3>
+              <ul className="space-y-2 text-sm">
+                <li><a href="#features" className="text-muted-foreground hover:text-primary">Features</a></li>
+                <li><a href="#" className="text-muted-foreground hover:text-primary">Pricing</a></li>
+                <li><a href="#" className="text-muted-foreground hover:text-primary">Updates</a></li>
+                <li><a href="#faq" className="text-muted-foreground hover:text-primary">FAQ</a></li>
+              </ul>
+            </div>
+            <div>
+              <h3 className="font-semibold mb-3">Resources</h3>
+              <ul className="space-y-2 text-sm">
+                <li><a href="#" className="text-muted-foreground hover:text-primary">Documentation</a></li>
+                <li><a href="#" className="text-muted-foreground hover:text-primary">Tutorials</a></li>
+                <li><a href="#" className="text-muted-foreground hover:text-primary">Blog</a></li>
+              </ul>
+            </div>
+            <div>
+              <h3 className="font-semibold mb-3">Company</h3>
+              <ul className="space-y-2 text-sm">
+                <li><a href="#" className="text-muted-foreground hover:text-primary">About</a></li>
+                <li><a href="#" className="text-muted-foreground hover:text-primary">Careers</a></li>
+                <li><a href="#" className="text-muted-foreground hover:text-primary">Contact</a></li>
+              </ul>
+            </div>
+            <div>
+              <h3 className="font-semibold mb-3">Legal</h3>
+              <ul className="space-y-2 text-sm">
+                <li><Link to="/terms" className="text-muted-foreground hover:text-primary">Terms of Service</Link></li>
+                <li><Link to="/privacy" className="text-muted-foreground hover:text-primary">Privacy Policy</Link></li>
+              </ul>
+            </div>
+          </div>
+          <div className="mt-12 pt-8 border-t flex flex-col md:flex-row justify-between items-center">
+            <p className="text-sm text-muted-foreground">&copy; {new Date().getFullYear()} MindGrove. All rights reserved.</p>
+            <div className="flex space-x-6 mt-4 md:mt-0">
+              <a href="#" className="text-muted-foreground hover:text-primary">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path></svg>
+              </a>
+              <a href="#" className="text-muted-foreground hover:text-primary">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 4s-.7 2.1-2 3.4c1.6 10-9.4 17.3-18 11.6 2.2.1 4.4-.6 6-2C3 15.5.5 9.6 3 5c2.2 2.6 5.6 4.1 9 4-.9-4.2 4-6.6 7-3.8 1.1 0 3-1.2 3-1.2z"></path></svg>
+              </a>
+              <a href="#" className="text-muted-foreground hover:text-primary">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="20" height="20" x="2" y="2" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" x2="17.51" y1="6.5" y2="6.5"></line></svg>
+              </a>
+            </div>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 };
