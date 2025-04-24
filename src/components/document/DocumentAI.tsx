@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { toast } from '@/components/ui/use-toast';
 import ApiKeyReminder from './ApiKeyReminder';
 import { motion } from 'framer-motion';
-import { generateDocumentSummary, generateFlashcards as generateFlashcardsUtil } from '@/utils/nlpCloudUtils';
+import { generateDocumentSummary, generateFlashcards as generateFlashcardsUtil } from '@/utils/openRouterUtils';
 
 interface DocumentAIProps {
   documentText: string;
@@ -24,9 +24,18 @@ const DocumentAI = ({ documentText, documentId, onSummaryGenerated, onFlashcards
   const [isGeneratingFlashcards, setIsGeneratingFlashcards] = useState(false);
   
   const handleGenerateSummary = async () => {
+    if (!documentText || documentText.trim().length < 50) {
+      toast({
+        title: "Insufficient content",
+        description: "Document text is too short to generate a meaningful summary.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
     setIsGeneratingSummary(true);
     try {
-      // Use our new NLP utility instead of Supabase function
+      // Use our OpenRouter utility
       const result = await generateDocumentSummary(documentText);
       setSummary(result);
       
@@ -51,9 +60,18 @@ const DocumentAI = ({ documentText, documentId, onSummaryGenerated, onFlashcards
   };
   
   const handleGenerateFlashcards = async () => {
+    if (!documentText || documentText.trim().length < 50) {
+      toast({
+        title: "Insufficient content",
+        description: "Document text is too short to generate meaningful flashcards.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
     setIsGeneratingFlashcards(true);
     try {
-      // Use our new NLP utility instead of Supabase function
+      // Use our OpenRouter utility
       const result = await generateFlashcardsUtil(documentText);
       setFlashcards(result);
       

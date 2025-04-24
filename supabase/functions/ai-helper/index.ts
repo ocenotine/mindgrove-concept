@@ -1,7 +1,9 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
-
+const OPEN_ROUTER_API_ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
+const API_KEY = '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';
+const DEFAULT_MODEL = 'openai/gpt-3.5-turbo';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -11,7 +13,6 @@ const corsHeaders = {
 serve(async (req) => {
   console.log("AI Helper function called");
   
-
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -63,14 +64,46 @@ serve(async (req) => {
 });
 
 async function summarizeText(text: string): Promise<string> {
-  console.log("Summarizing text");
+  console.log("Summarizing text with OpenRouter API");
   try {
-    // Extract first few sentences for the summary
-    const sentences = text.split(/[.!?]/).filter(s => s.trim().length > 0);
-    const importantSentences = sentences.slice(0, 3);
+    // Truncate text if it's too long
+    const truncatedText = text.length > 15000 ? text.substring(0, 15000) + "..." : text;
     
-    // Create a meaningful summary
-    const summary = `This document discusses research methodologies and academic practices. ${importantSentences.join('. ')}.`;
+    const response = await fetch(OPEN_ROUTER_API_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: DEFAULT_MODEL,
+        messages: [
+          {
+            role: "system",
+            content: "You are an AI assistant specialized in creating concise and accurate summaries of academic and research documents. Extract key concepts, methodologies, findings, and conclusions."
+          },
+          {
+            role: "user",
+            content: `Summarize the following text in a well-structured manner, highlighting the main points and preserving key information:\n\n${truncatedText}`
+          }
+        ],
+        temperature: 0.2,
+        max_tokens: 800
+      })
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`API Error (${response.status}):`, errorText);
+      throw new Error(`OpenRouter API returned status: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    const summary = data.choices[0]?.message?.content;
+    
+    if (!summary) {
+      throw new Error("Failed to extract summary from API response");
+    }
     
     return summary;
   } catch (error) {
@@ -80,33 +113,63 @@ async function summarizeText(text: string): Promise<string> {
 }
 
 async function generateFlashcards(text: string): Promise<string> {
-  console.log("Generating flashcards");
+  console.log("Generating flashcards with OpenRouter API");
   try {
-    // Create predefined flashcards based on common research topics
-    const flashcards = [
-      { 
-        question: "What is the main topic of this document?", 
-        answer: "Research methodologies and academic practices."
-      },
-      {
-        question: "What are two areas discussed in this document?",
-        answer: "Data collection techniques and analytical frameworks."
-      },
-      {
-        question: "Why is statistical analysis important according to the document?",
-        answer: "It plays a key role in validating findings and establishing correlations between variables."
-      },
-      {
-        question: "What ensures the validity of research outcomes?",
-        answer: "Peer review and reproducibility."
-      },
-      {
-        question: "What approaches to research are mentioned?",
-        answer: "Qualitative and quantitative approaches."
-      }
-    ];
+    // Truncate text if it's too long
+    const truncatedText = text.length > 12000 ? text.substring(0, 12000) + "..." : text;
     
-    return JSON.stringify(flashcards);
+    const response = await fetch(OPEN_ROUTER_API_ENDPOINT, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: DEFAULT_MODEL,
+        messages: [
+          {
+            role: "system",
+            content: "You are an AI assistant specialized in creating educational flashcards from academic content. Create study-worthy question and answer pairs that test understanding of key concepts."
+          },
+          {
+            role: "user",
+            content: `Create 8 flashcards from the following text. Each flashcard should have a 'question' and 'answer' property. Make questions that test recall of important information and are clear and specific:\n\n${truncatedText}`
+          }
+        ],
+        temperature: 0.3,
+        max_tokens: 1200,
+        response_format: { type: "json_object" }
+      })
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`API Error (${response.status}):`, errorText);
+      throw new Error(`OpenRouter API returned status: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    const content = data.choices[0]?.message?.content;
+    
+    if (!content) {
+      throw new Error("Failed to extract flashcards from API response");
+    }
+    
+    // The API should return JSON, but we'll wrap this in try/catch in case it doesn't
+    try {
+      const parsed = JSON.parse(content);
+      // Check if the response is already an array or if it has a flashcards property
+      const flashcards = Array.isArray(parsed) 
+        ? parsed 
+        : parsed.flashcards || parsed.cards || [];
+        
+      // Return the JSON string of the flashcards
+      return JSON.stringify(flashcards);
+    } catch (jsonError) {
+      console.error("Error parsing flashcard JSON:", jsonError);
+      // If we can't parse as JSON, just return the content as string
+      return content;
+    }
   } catch (error) {
     console.error("Error in generateFlashcards:", error);
     throw error;
