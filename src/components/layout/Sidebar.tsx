@@ -53,7 +53,7 @@ const SidebarItem = ({
       {isActive && (
         <motion.div
           layoutId="activeTab"
-          className="absolute inset-0 bg-white/20 rounded-xl -z-0 shadow-[0_0_15px_rgba(255,255,255,0.3)]"
+          className="absolute inset-0 bg-primary/20 rounded-xl -z-0"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -87,14 +87,14 @@ const Sidebar = ({ isCollapsed = false }: SidebarProps) => {
       <div className="py-6 px-3 border-b border-sidebar-border">
         {!isCollapsed ? (
           <div className="flex items-center gap-2">
-            <div className="h-10 w-10 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center">
+            <div className="h-10 w-10 bg-primary/20 rounded-full flex items-center justify-center">
               <BookOpen className="h-5 w-5 text-white" />
             </div>
             <span className="text-xl font-brand text-sidebar-foreground">MindGrove</span>
           </div>
         ) : (
           <div className="flex justify-center">
-            <div className="h-10 w-10 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center">
+            <div className="h-10 w-10 bg-primary/20 rounded-full flex items-center justify-center">
               <BookOpen className="h-5 w-5 text-white" />
             </div>
           </div>
@@ -139,7 +139,7 @@ const Sidebar = ({ isCollapsed = false }: SidebarProps) => {
         {!isCollapsed ? (
           <Link
             to="/document/upload"
-            className="flex items-center justify-center gap-2 w-full p-3 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl"
+            className="flex items-center justify-center gap-2 w-full p-3 bg-primary/20 hover:bg-primary/30 text-white rounded-xl transition-all duration-200"
           >
             <PlusCircle className="h-4 w-4" />
             <span>Upload Document</span>
@@ -147,7 +147,7 @@ const Sidebar = ({ isCollapsed = false }: SidebarProps) => {
         ) : (
           <Link
             to="/document/upload"
-            className="flex items-center justify-center w-full p-3 bg-white/20 hover:bg-white/30 backdrop-blur-sm text-white rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl"
+            className="flex items-center justify-center w-full p-3 bg-primary/20 hover:bg-primary/30 text-white rounded-xl transition-all duration-200"
           >
             <PlusCircle className="h-4 w-4" />
           </Link>

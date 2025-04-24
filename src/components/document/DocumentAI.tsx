@@ -24,10 +24,11 @@ const DocumentAI = ({ documentText, documentId, onSummaryGenerated, onFlashcards
   const [isGeneratingFlashcards, setIsGeneratingFlashcards] = useState(false);
   
   const handleGenerateSummary = async () => {
-    if (!documentText || documentText.trim().length < 50) {
+    // Accept any length of text, even minimal content
+    if (!documentText) {
       toast({
-        title: "Insufficient content",
-        description: "Document text is too short to generate a meaningful summary.",
+        title: "No content",
+        description: "Document text is empty. Please provide some content.",
         variant: "destructive"
       });
       return;
@@ -60,10 +61,11 @@ const DocumentAI = ({ documentText, documentId, onSummaryGenerated, onFlashcards
   };
   
   const handleGenerateFlashcards = async () => {
-    if (!documentText || documentText.trim().length < 50) {
+    // Accept any length of text, even minimal content
+    if (!documentText) {
       toast({
-        title: "Insufficient content",
-        description: "Document text is too short to generate meaningful flashcards.",
+        title: "No content",
+        description: "Document text is empty. Please provide some content.",
         variant: "destructive"
       });
       return;

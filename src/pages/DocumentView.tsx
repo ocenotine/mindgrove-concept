@@ -117,14 +117,14 @@ const DocumentView = () => {
   return (
     <MainLayout>
       <PageTransition>
-        <div className="mb-6 flex items-center justify-between">
+        <div className="mb-6 flex items-center justify-between flex-wrap gap-3">
           <Button 
             variant="ghost" 
             onClick={() => navigate('/documents')}
             className="gap-2"
           >
             <ArrowLeft className="h-4 w-4" />
-            Back to Documents
+            <span className="hidden sm:inline">Back to Documents</span>
           </Button>
           
           <div className="flex gap-2">
@@ -134,32 +134,32 @@ const DocumentView = () => {
               onClick={handleDownload}
             >
               <Download className="h-4 w-4" />
-              Download
+              <span className="hidden sm:inline">Download</span>
             </Button>
           </div>
         </div>
         
         <div className="mb-6">
-          <h1 className="text-3xl font-bold mb-2">{document.title}</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-2xl md:text-3xl font-bold mb-2">{document.title}</h1>
+          <p className="text-sm text-muted-foreground">
             {document.pages} pages • Last modified {new Date(document.updatedAt).toLocaleDateString()}
           </p>
         </div>
         
-        <Tabs defaultValue="document" value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="mb-6">
+        <Tabs defaultValue="document" value={activeTab} onValueChange={setActiveTab} className="w-full overflow-x-auto">
+          <TabsList className="mb-6 w-full sm:w-auto">
             <TabsTrigger value="document" className="gap-2">
               <FileText className="h-4 w-4" />
-              Document
+              <span className="hidden sm:inline">Document</span>
             </TabsTrigger>
             <TabsTrigger value="ai" className="gap-2">
               <BookOpen className="h-4 w-4" />
-              AI Tools
+              <span className="hidden sm:inline">AI Tools</span>
             </TabsTrigger>
           </TabsList>
           
           <TabsContent value="document" className="space-y-6">
-            <div className="bg-card border rounded-lg p-6">
+            <div className="bg-card border rounded-lg p-4 md:p-6">
               <div className="aspect-video bg-muted rounded-md overflow-hidden mb-6 flex items-center justify-center">
                 <img 
                   src={getDocumentThumbnail(document.fileType)} 
@@ -171,7 +171,7 @@ const DocumentView = () => {
               <DocumentSummary document={document} />
               
               <div className="mt-6 space-y-4">
-                <h3 className="text-xl font-semibold">Document Preview</h3>
+                <h3 className="text-lg md:text-xl font-semibold">Document Preview</h3>
                 <div className="prose dark:prose-invert max-w-none">
                   <p>{documentText}</p>
                 </div>

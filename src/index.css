@@ -1,3 +1,4 @@
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -127,22 +128,6 @@
   background: hsl(var(--muted-foreground) / 0.5);
 }
 
-/* Glassmorphism utilities */
-.glass {
-  @apply backdrop-blur-lg bg-white/20 border border-white/20;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-}
-
-.glass-card {
-  @apply backdrop-blur-md bg-white/30 border border-white/30 shadow-lg;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-}
-
-.glass-dark {
-  @apply backdrop-blur-lg bg-black/20 border border-white/10;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
-}
-
 /* Custom Font Classes */
 .font-title {
   font-family: 'Inter', sans-serif;
@@ -221,6 +206,21 @@
 
 .sidebar-item.active {
   @apply font-medium;
+}
+
+/* Responsive classes */
+@media (max-width: 640px) {
+  .responsive-container {
+    @apply px-4;
+  }
+  
+  .responsive-card {
+    @apply p-4;
+  }
+  
+  .responsive-heading {
+    @apply text-xl;
+  }
 }
 
 /* Card hover animation */

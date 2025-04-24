@@ -21,8 +21,8 @@ interface OpenRouterResponse {
  */
 export const generateDocumentSummary = async (text: string): Promise<string> => {
   try {
-    // Truncate text if it's too long (OpenRouter has token limits)
-    const truncatedText = text.length > 15000 ? text.substring(0, 15000) + "..." : text;
+    // Even if text is minimal, we'll attempt to summarize it
+    const inputText = text.trim() || "This document appears to be empty or contains minimal content.";
     
     const response = await fetch(OPEN_ROUTER_API_ENDPOINT, {
       method: 'POST',
@@ -36,11 +36,11 @@ export const generateDocumentSummary = async (text: string): Promise<string> => 
         messages: [
           {
             role: "system",
-            content: "You are an AI assistant specialized in creating concise and accurate summaries of academic and research documents. Extract key concepts, methodologies, findings, and conclusions."
+            content: "You are an AI assistant specialized in creating concise and accurate summaries of academic and research documents. Extract key concepts, methodologies, findings, and conclusions. If the text is very short, provide a brief overview of what little content is available."
           },
           {
             role: "user",
-            content: `Summarize the following text in a well-structured manner, highlighting the main points and preserving key information:\n\n${truncatedText}`
+            content: `Summarize the following text in a well-structured manner, highlighting the main points and preserving key information. If the text is very short, simply provide a brief overview:\n\n${inputText}`
           }
         ],
         temperature: 0.2,
@@ -66,7 +66,6 @@ export const generateDocumentSummary = async (text: string): Promise<string> => 
       variant: "destructive"
     });
     
-    // Since we're replacing mock data with real AI, we'll throw the error instead of returning fallback text
     throw new Error("Failed to generate summary. Please try again later.");
   }
 };
@@ -76,8 +75,8 @@ export const generateDocumentSummary = async (text: string): Promise<string> => 
  */
 export const generateFlashcards = async (text: string): Promise<Array<{question: string, answer: string}>> => {
   try {
-    // Truncate text if it's too long
-    const truncatedText = text.length > 12000 ? text.substring(0, 12000) + "..." : text;
+    // Even if text is minimal, we'll try to generate flashcards
+    const inputText = text.trim() || "This document appears to be empty or contains minimal content.";
     
     const response = await fetch(OPEN_ROUTER_API_ENDPOINT, {
       method: 'POST',
@@ -91,11 +90,11 @@ export const generateFlashcards = async (text: string): Promise<Array<{question:
         messages: [
           {
             role: "system",
-            content: "You are an AI assistant specialized in creating educational flashcards from academic content. Create study-worthy question and answer pairs that test understanding of key concepts."
+            content: "You are an AI assistant specialized in creating educational flashcards from academic content. Create study-worthy question and answer pairs that test understanding of key concepts. If the content is very minimal, create basic flashcards about the limited information available."
           },
           {
             role: "user",
-            content: `Create 8 flashcards in JSON format from the following text. Each flashcard should have a 'question' and 'answer' property. Make questions that test recall of important information and are clear and specific:\n\n${truncatedText}\n\nResponse must be valid JSON in this format: [{"question": "Question text?", "answer": "Answer text"}]`
+            content: `Create flashcards in JSON format from the following text. Each flashcard should have a 'question' and 'answer' property. If the text is very short, create fewer but relevant flashcards based on what's available:\n\n${inputText}\n\nResponse must be valid JSON in this format: [{"question": "Question text?", "answer": "Answer text"}]`
           }
         ],
         temperature: 0.3,
@@ -123,7 +122,11 @@ export const generateFlashcards = async (text: string): Promise<Array<{question:
         : parsedData.flashcards || parsedData.cards || [];
         
       if (!flashcards.length) {
-        throw new Error("No flashcards found in the response");
+        // If no flashcards were generated, provide at least one default
+        return [{
+          question: "What is the main topic of this document?",
+          answer: "This document contains minimal information or may be focused on a specific topic that requires more context."
+        }];
       }
       
       return flashcards.map((card: any) => ({
@@ -142,15 +145,12 @@ export const generateFlashcards = async (text: string): Promise<Array<{question:
       variant: "destructive"
     });
     
-    // Since we're replacing mock data with real AI, we'll throw the error
     throw new Error("Failed to generate flashcards. Please try again later.");
   }
 };
 
 /**
  * Extract text from a PDF document
- * Note: This is a placeholder. In a production environment,
- * you would use a PDF parsing library or service.
  */
 export const extractTextFromPDF = async (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {
@@ -159,7 +159,6 @@ export const extractTextFromPDF = async (file: File): Promise<string> => {
     reader.onload = (e) => {
       try {
         // This is just a placeholder. In production, use pdfjs or similar library
-        // For now, return a default message
         resolve("PDF text content would be extracted here using a PDF parsing library");
       } catch (error) {
         reject(new Error("Failed to extract text from PDF"));

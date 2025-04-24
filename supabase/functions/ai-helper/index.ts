@@ -66,25 +66,26 @@ serve(async (req) => {
 async function summarizeText(text: string): Promise<string> {
   console.log("Summarizing text with OpenRouter API");
   try {
-    // Truncate text if it's too long
-    const truncatedText = text.length > 15000 ? text.substring(0, 15000) + "..." : text;
+    // Allow even very short texts to be summarized
+    const inputText = text.trim() || "This document appears to be empty or contains minimal content.";
     
     const response = await fetch(OPEN_ROUTER_API_ENDPOINT, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${API_KEY}`,
         'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://mindgrove.app'
       },
       body: JSON.stringify({
         model: DEFAULT_MODEL,
         messages: [
           {
             role: "system",
-            content: "You are an AI assistant specialized in creating concise and accurate summaries of academic and research documents. Extract key concepts, methodologies, findings, and conclusions."
+            content: "You are an AI assistant specialized in creating concise and accurate summaries of academic and research documents. Extract key concepts, methodologies, findings, and conclusions. If the text is very short, provide a brief overview of what little content is available."
           },
           {
             role: "user",
-            content: `Summarize the following text in a well-structured manner, highlighting the main points and preserving key information:\n\n${truncatedText}`
+            content: `Summarize the following text in a well-structured manner, highlighting the main points and preserving key information. If the text is very short, simply provide a brief overview:\n\n${inputText}`
           }
         ],
         temperature: 0.2,
@@ -115,25 +116,26 @@ async function summarizeText(text: string): Promise<string> {
 async function generateFlashcards(text: string): Promise<string> {
   console.log("Generating flashcards with OpenRouter API");
   try {
-    // Truncate text if it's too long
-    const truncatedText = text.length > 12000 ? text.substring(0, 12000) + "..." : text;
+    // Allow even very short texts to generate basic flashcards
+    const inputText = text.trim() || "This document appears to be empty or contains minimal content.";
     
     const response = await fetch(OPEN_ROUTER_API_ENDPOINT, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${API_KEY}`,
         'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://mindgrove.app'
       },
       body: JSON.stringify({
         model: DEFAULT_MODEL,
         messages: [
           {
             role: "system",
-            content: "You are an AI assistant specialized in creating educational flashcards from academic content. Create study-worthy question and answer pairs that test understanding of key concepts."
+            content: "You are an AI assistant specialized in creating educational flashcards from academic content. Create study-worthy question and answer pairs that test understanding of key concepts. If the content is very minimal, create basic flashcards about the limited information available."
           },
           {
             role: "user",
-            content: `Create 8 flashcards from the following text. Each flashcard should have a 'question' and 'answer' property. Make questions that test recall of important information and are clear and specific:\n\n${truncatedText}`
+            content: `Create 8 flashcards from the following text. Each flashcard should have a 'question' and 'answer' property. If the text is very short, create fewer but relevant flashcards based on what's available:\n\n${inputText}`
           }
         ],
         temperature: 0.3,
