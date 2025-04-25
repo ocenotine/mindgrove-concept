@@ -8,6 +8,14 @@ import { toast } from '@/components/ui/use-toast';
 import Typewriter from '@/components/chat/Typewriter';
 import { generateDocumentChatResponse } from '@/utils/openRouterUtils';
 
+// Define global SpeechRecognition types
+declare global {
+  interface Window {
+    SpeechRecognition: typeof SpeechRecognition;
+    webkitSpeechRecognition: typeof SpeechRecognition;
+  }
+}
+
 interface Message {
   id: string;
   content: string;
@@ -29,7 +37,7 @@ const DocumentChat = ({ documentText, documentId, documentTitle }: DocumentChatP
   const [typingComplete, setTypingComplete] = useState<Record<string, boolean>>({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [isListening, setIsListening] = useState(false);
-  const [recognition, setRecognition] = useState<any>(null);
+  const [speechRecognition, setSpeechRecognition] = useState<any>(null);
   const chatContentRef = useRef<HTMLDivElement>(null);
 
   // Initialize chat with greeting
@@ -54,29 +62,27 @@ const DocumentChat = ({ documentText, documentId, documentTitle }: DocumentChatP
 
   // Set up speech recognition if available
   useEffect(() => {
-    // Check if browser supports SpeechRecognition
     if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
-      const SpeechRecognition = window.SpeechRecognition || (window as any).webkitSpeechRecognition;
-      const recognitionInstance = new SpeechRecognition();
+      const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+      const recognition = new SpeechRecognitionAPI();
+      recognition.continuous = false;
+      recognition.interimResults = true;
+      recognition.lang = 'en-US';
       
-      recognitionInstance.continuous = false;
-      recognitionInstance.interimResults = true;
-      recognitionInstance.lang = 'en-US';
-      
-      recognitionInstance.onresult = (event: any) => {
+      recognition.onresult = (event) => {
         const transcript = Array.from(event.results)
-          .map((result: any) => result[0])
-          .map((result: any) => result.transcript)
+          .map(result => result[0])
+          .map(result => result.transcript)
           .join('');
         
         setInputMessage(transcript);
       };
       
-      recognitionInstance.onend = () => {
+      recognition.onend = () => {
         setIsListening(false);
       };
       
-      setRecognition(recognitionInstance);
+      setSpeechRecognition(recognition);
     }
   }, []);
 
@@ -96,7 +102,7 @@ const DocumentChat = ({ documentText, documentId, documentTitle }: DocumentChatP
   };
 
   const toggleSpeechRecognition = () => {
-    if (!recognition) {
+    if (!speechRecognition) {
       toast({
         title: "Speech recognition not supported",
         description: "Your browser doesn't support speech recognition.",
@@ -105,10 +111,10 @@ const DocumentChat = ({ documentText, documentId, documentTitle }: DocumentChatP
     }
 
     if (isListening) {
-      recognition.stop();
+      speechRecognition.stop();
       setIsListening(false);
     } else {
-      recognition.start();
+      speechRecognition.start();
       setIsListening(true);
       toast({
         title: "Listening...",
@@ -176,7 +182,7 @@ const DocumentChat = ({ documentText, documentId, documentTitle }: DocumentChatP
     <div className="document-chat">
       {/* Chat button */}
       <motion.button
-        className="fixed bottom-20 right-4 z-50 flex items-center justify-center w-12 h-12 rounded-full bg-primary text-white shadow-lg hover:bg-primary/90 transition-colors md:bottom-20 md:right-8"
+        className="fixed bottom-20 right-20 z-50 flex items-center justify-center w-12 h-12 rounded-full bg-primary text-white shadow-lg hover:bg-primary/90 transition-colors"
         onClick={toggleChat}
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}

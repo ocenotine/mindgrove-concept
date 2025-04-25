@@ -10,7 +10,6 @@ export interface User {
   streak?: number;
   flashcardCount?: number;
   lastActive?: string;
-  bio?: string;
 }
 
 export interface AuthState {
@@ -73,21 +72,19 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             avatarUrl: profileData?.avatar_url,
             streak: profileData?.streak_count || 0,
             flashcardCount: profileData?.flashcard_count || 0,
-            lastActive: profileData?.last_active,
-            bio: profileData?.bio || ''
+            lastActive: profileData?.last_active
           },
           token: data.session.access_token,
-          isAuthenticated: true,
-          loading: false
+          isAuthenticated: true 
         });
         return true;
       } else {
-        set({ user: null, token: null, isAuthenticated: false, loading: false });
+        set({ user: null, token: null, isAuthenticated: false });
         return false;
       }
     } catch (error) {
       console.error('Session error:', error);
-      set({ user: null, token: null, isAuthenticated: false, loading: false });
+      set({ user: null, token: null, isAuthenticated: false });
       return false;
     }
   },
@@ -119,8 +116,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             avatarUrl: profileData?.avatar_url,
             streak: profileData?.streak_count || 0,
             flashcardCount: profileData?.flashcard_count || 0,
-            lastActive: profileData?.last_active,
-            bio: profileData?.bio || ''
+            lastActive: profileData?.last_active
           },
           token: data.session?.access_token || null,
           isAuthenticated: true,

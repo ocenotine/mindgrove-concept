@@ -10,6 +10,14 @@ const DEFAULT_MODEL = 'openai/gpt-3.5-turbo';
 // Local storage key for API key
 const API_KEY_STORAGE = 'mindgrove_openrouter_api_key';
 
+interface OpenRouterResponse {
+  choices: {
+    message: {
+      content: string;
+    };
+  }[];
+}
+
 /**
  * Get the stored OpenRouter API key
  */

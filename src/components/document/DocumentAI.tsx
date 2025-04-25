@@ -45,11 +45,6 @@ const DocumentAI = ({ documentText, documentId, onSummaryGenerated, onFlashcards
         title: 'Summary generated',
         description: 'Document summary has been created successfully',
       });
-
-      // Automatically generate flashcards after summary is complete
-      if (!flashcards.length) {
-        handleGenerateFlashcards();
-      }
     } catch (error) {
       console.error('Failed to generate summary:', error);
       toast({
