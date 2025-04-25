@@ -1,5 +1,5 @@
 
-import { Document as AppDocument } from '@/utils/mockData';
+import { Document } from '@/utils/mockData';
 import { toast } from '@/components/ui/use-toast';
 
 // File type icons
@@ -22,7 +22,7 @@ export const getDocumentThumbnail = (fileType: string): string => {
   }
 };
 
-export const downloadDocument = async (document: AppDocument): Promise<void> => {
+export const downloadDocument = async (document: Document): Promise<void> => {
   try {
     // In a real implementation, this would fetch the actual file from storage
     // For now, we'll simulate a download by creating a text file with the content
@@ -50,7 +50,7 @@ export const downloadDocument = async (document: AppDocument): Promise<void> => 
   }
 };
 
-export const generateDocumentPreview = (document: AppDocument): string => {
+export const generateDocumentPreview = (document: Document): string => {
   if (!document.content) {
     return "No content available for preview";
   }
@@ -58,7 +58,7 @@ export const generateDocumentPreview = (document: AppDocument): string => {
   return document.content;
 };
 
-export const getDocumentPageCount = (document: AppDocument): number => {
+export const getDocumentPageCount = (document: Document): number => {
   if (!document || !document.content) return 0;
   
   // Get estimated page count based on content length

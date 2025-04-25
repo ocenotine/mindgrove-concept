@@ -11,11 +11,6 @@ export interface User {
   flashcardCount?: number;
   lastActive?: string;
   bio?: string;
-  documentCount?: number;
-  createdAt?: string;
-  subscriptionTier: 'free' | 'weekly' | 'monthly';
-  subscriptionExpiry?: string;
-  isFirstLogin?: boolean;
 }
 
 export interface AuthState {
@@ -23,7 +18,6 @@ export interface AuthState {
   token: string | null;
   isAuthenticated: boolean;
   loading: boolean;
-  isLoading: boolean; // Added for compatibility
   error: string | null;
   
   // Add method signatures for authentication
@@ -31,7 +25,6 @@ export interface AuthState {
   signUp: (email: string, password: string, name: string) => Promise<void>;
   signOut: () => Promise<void>;
   updateProfile: (data: Partial<User>) => void;
-  updateSubscription: (tier: 'free' | 'weekly' | 'monthly', expiryDate?: string) => Promise<void>;
 
   initialize: () => Promise<void>;
   getSession: () => Promise<boolean>;
@@ -42,18 +35,17 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   token: null,
   isAuthenticated: false,
   loading: true,
-  isLoading: true, // Added for compatibility
   error: null,
   
   // Initialize the auth store
   initialize: async () => {
-    set({ loading: true, isLoading: true });
+    set({ loading: true });
     try {
       const authenticated = await get().getSession();
-      set({ isAuthenticated: authenticated, loading: false, isLoading: false });
+      set({ isAuthenticated: authenticated, loading: false });
     } catch (error) {
       console.error('Error initializing auth:', error);
-      set({ error: 'Failed to initialize authentication', loading: false, isLoading: false });
+      set({ error: 'Failed to initialize authentication', loading: false });
     }
   },
 
@@ -77,38 +69,32 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           user: { 
             id: user.id,
             email: user.email || '',
-            name: profileData?.name || user.user_metadata?.full_name || 'User',
+            name: profileData?.full_name || user.user_metadata?.full_name || 'User',
             avatarUrl: profileData?.avatar_url,
             streak: profileData?.streak_count || 0,
             flashcardCount: profileData?.flashcard_count || 0,
             lastActive: profileData?.last_active,
-            bio: profileData?.bio || '',
-            documentCount: profileData?.document_count || 0,
-            createdAt: profileData?.created_at,
-            subscriptionTier: profileData?.subscription_tier || 'free',
-            subscriptionExpiry: profileData?.subscription_expiry,
-            isFirstLogin: profileData?.is_first_login
+            bio: profileData?.bio || ''
           },
           token: data.session.access_token,
           isAuthenticated: true,
-          loading: false,
-          isLoading: false
+          loading: false
         });
         return true;
       } else {
-        set({ user: null, token: null, isAuthenticated: false, loading: false, isLoading: false });
+        set({ user: null, token: null, isAuthenticated: false, loading: false });
         return false;
       }
     } catch (error) {
       console.error('Session error:', error);
-      set({ user: null, token: null, isAuthenticated: false, loading: false, isLoading: false });
+      set({ user: null, token: null, isAuthenticated: false, loading: false });
       return false;
     }
   },
 
   // Sign in a user
   signIn: async (email, password) => {
-    set({ loading: true, isLoading: true, error: null });
+    set({ loading: true, error: null });
     try {
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
@@ -129,30 +115,23 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           user: { 
             id: data.user.id,
             email: data.user.email || '',
-            name: profileData?.name || data.user.user_metadata?.full_name || 'User',
+            name: profileData?.full_name || data.user.user_metadata?.full_name || 'User',
             avatarUrl: profileData?.avatar_url,
             streak: profileData?.streak_count || 0,
             flashcardCount: profileData?.flashcard_count || 0,
             lastActive: profileData?.last_active,
-            bio: profileData?.bio || '',
-            documentCount: profileData?.document_count || 0,
-            createdAt: profileData?.created_at,
-            subscriptionTier: profileData?.subscription_tier || 'free',
-            subscriptionExpiry: profileData?.subscription_expiry,
-            isFirstLogin: profileData?.is_first_login
+            bio: profileData?.bio || ''
           },
           token: data.session?.access_token || null,
           isAuthenticated: true,
-          loading: false,
-          isLoading: false
+          loading: false
         });
       }
     } catch (error) {
       console.error('Sign in error:', error);
       set({ 
         error: error instanceof Error ? error.message : 'Failed to sign in', 
-        loading: false,
-        isLoading: false 
+        loading: false 
       });
       throw error;
     }
@@ -160,7 +139,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   // Sign up a new user
   signUp: async (email, password, name) => {
-    set({ loading: true, isLoading: true, error: null });
+    set({ loading: true, error: null });
     try {
       const { data, error } = await supabase.auth.signUp({
         email,
@@ -178,13 +157,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         // Create a profile for the user
         await supabase.from('profiles').upsert({
           id: data.user.id,
-          name: name,
+          full_name: name,
           email: email,
           updated_at: new Date().toISOString(),
           streak_count: 1,
-          last_active: new Date().toISOString(),
-          is_first_login: true,
-          subscription_tier: 'free'
+          last_active: new Date().toISOString()
         });
         
         set({ 
@@ -194,22 +171,18 @@ export const useAuthStore = create<AuthState>((set, get) => ({
             name: name,
             streak: 1,
             flashcardCount: 0,
-            lastActive: new Date().toISOString(),
-            subscriptionTier: 'free',
-            isFirstLogin: true
+            lastActive: new Date().toISOString()
           },
           token: data.session?.access_token || null,
           isAuthenticated: true,
-          loading: false,
-          isLoading: false
+          loading: false
         });
       }
     } catch (error) {
       console.error('Sign up error:', error);
       set({ 
         error: error instanceof Error ? error.message : 'Failed to sign up', 
-        loading: false,
-        isLoading: false 
+        loading: false 
       });
       throw error;
     }
@@ -239,38 +212,5 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         ...data
       }
     });
-  },
-
-  // Update user subscription
-  updateSubscription: async (tier, expiryDate) => {
-    const currentUser = get().user;
-    if (!currentUser) return;
-    
-    try {
-      // Update the subscription in Supabase
-      const { error } = await supabase
-        .from('profiles')
-        .update({
-          subscription_tier: tier,
-          subscription_expiry: expiryDate || null,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', currentUser.id);
-        
-      if (error) throw error;
-      
-      // Update local state
-      set({
-        user: {
-          ...currentUser,
-          subscriptionTier: tier,
-          subscriptionExpiry: expiryDate
-        }
-      });
-      
-    } catch (error) {
-      console.error('Subscription update error:', error);
-      throw error;
-    }
   }
 }));

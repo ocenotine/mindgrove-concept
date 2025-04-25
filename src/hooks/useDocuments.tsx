@@ -46,7 +46,6 @@ export const useDocuments = () => {
     }
   }, [currentDocument, fetchDocumentById]);
   
-  // Handle search with flexible parameters
   const handleSearch = useCallback(async (query: string): Promise<Document[]> => {
     if (!query.trim()) {
       setSearchResults([]);

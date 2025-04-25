@@ -74,16 +74,24 @@ const TourGuide = () => {
         // Check if this is a first-time login for the user
         const { data: profiles } = await supabase
           .from('profiles')
-          .select('created_at')
+          .select('first_login, created_at')
           .eq('id', user.id)
           .single();
 
-        // For first login, show the tour on dashboard
-        if (profiles && location.pathname === '/dashboard') {
-          // Check if first visit using localStorage
-          const hasTakenTour = localStorage.getItem(`tour-completed-${user.id}`);
-          if (!hasTakenTour) {
+        // If this is their first login or first_login is true, show the tour
+        if (profiles && (profiles.first_login === true || profiles.first_login === null)) {
+          // Only show tour on dashboard
+          if (location.pathname === '/dashboard') {
             setTimeout(() => setIsVisible(true), 1000);
+            
+            // Update the profile to mark tour as seen
+            await supabase
+              .from('profiles')
+              .update({ 
+                first_login: false,
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', user.id);
           }
         }
       } catch (error) {
@@ -130,9 +138,19 @@ const TourGuide = () => {
   const closeTour = async () => {
     setIsVisible(false);
     
-    // Mark tour as completed in localStorage
+    // Also mark tour as completed in the database
     if (user) {
-      localStorage.setItem(`tour-completed-${user.id}`, 'true');
+      try {
+        await supabase
+          .from('profiles')
+          .update({
+            first_login: false,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', user.id);
+      } catch (error) {
+        console.error("Error saving tour completion status:", error);
+      }
     }
   };
 

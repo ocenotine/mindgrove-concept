@@ -8,16 +8,13 @@ import { Card } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, Send, FileText, Code, Sparkles, MessageSquare, ChevronRight } from 'lucide-react';
+import { Loader2, Send, Bot, User, FileText, Code, Sparkles, MessageSquare, ChevronRight } from 'lucide-react';
 import { useAuthStore } from '@/store/authStore';
 import { generateDocumentChatResponse } from '@/utils/openRouterUtils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { hasRemainingAIQueries, recordAIQueryUsage } from '@/services/subscriptionService';
-import FeaturePaywall from '@/components/subscription/FeaturePaywall';
-import { toast } from '@/components/ui/use-toast';
 
 interface Message {
   id: string;
@@ -44,7 +41,6 @@ const AIChat = () => {
   const [isTyping, setIsTyping] = useState(false);
   const [selectedDocument, setSelectedDocument] = useState<DocumentPreview | null>(null);
   const [showDocumentPanel, setShowDocumentPanel] = useState(true);
-  const [canUseAI, setCanUseAI] = useState(true);
   const navigate = useNavigate();
 
   // Fetch user's documents
@@ -54,31 +50,16 @@ const AIChat = () => {
       if (!user) return [];
       const { data, error } = await supabase
         .from('documents')
-        .select('id, title, content, created_at')
+        .select('id, title, extracted_text, created_at')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
         .limit(10);
         
       if (error) throw error;
       
-      return data.map(doc => ({
-        id: doc.id,
-        title: doc.title,
-        extractedText: doc.content,
-        createdAt: doc.created_at
-      })) as DocumentPreview[];
+      return data as DocumentPreview[];
     }
   });
-
-  // Check if user has remaining AI queries when component mounts
-  useEffect(() => {
-    const checkAIAccess = async () => {
-      const hasQueries = await hasRemainingAIQueries();
-      setCanUseAI(hasQueries);
-    };
-    
-    checkAIAccess();
-  }, []);
 
   useEffect(() => {
     // Initialize with welcome message
@@ -98,43 +79,27 @@ const AIChat = () => {
   const handleSendMessage = async () => {
     if (!input.trim()) return;
     
+    // Create user message
+    const userMessage: Message = {
+      id: `user-${Date.now()}`,
+      text: input,
+      sender: 'user',
+      timestamp: new Date(),
+      type: 'text'
+    };
+    
+    // Add document context if a document is selected
+    if (selectedDocument) {
+      userMessage.documentId = selectedDocument.id;
+      userMessage.documentTitle = selectedDocument.title;
+      userMessage.type = 'document';
+    }
+    
+    setMessages(prev => [...prev, userMessage]);
+    setInput('');
+    setIsTyping(true);
+    
     try {
-      // Check if user has remaining AI queries
-      const hasQueries = await hasRemainingAIQueries();
-      
-      if (!hasQueries) {
-        setCanUseAI(false);
-        toast({
-          title: "Daily limit reached",
-          description: "You've reached your daily AI query limit. Upgrade for more queries.",
-          variant: "destructive"
-        });
-        return;
-      }
-      
-      // Create user message
-      const userMessage: Message = {
-        id: `user-${Date.now()}`,
-        text: input,
-        sender: 'user',
-        timestamp: new Date(),
-        type: 'text'
-      };
-      
-      // Add document context if a document is selected
-      if (selectedDocument) {
-        userMessage.documentId = selectedDocument.id;
-        userMessage.documentTitle = selectedDocument.title;
-        userMessage.type = 'document';
-      }
-      
-      setMessages(prev => [...prev, userMessage]);
-      setInput('');
-      setIsTyping(true);
-      
-      // Record AI query usage
-      recordAIQueryUsage();
-      
       let response: string;
       
       if (selectedDocument && selectedDocument.extractedText) {
@@ -191,10 +156,6 @@ const AIChat = () => {
       setMessages(prev => [...prev, errorMessage]);
     } finally {
       setIsTyping(false);
-      
-      // Re-check AI access after sending message
-      const hasQueries = await hasRemainingAIQueries();
-      setCanUseAI(hasQueries);
     }
   };
 
@@ -385,41 +346,22 @@ const AIChat = () => {
                   </AnimatePresence>
                 </div>
                 
-                {canUseAI ? (
-                  <div className="flex gap-2 items-center">
-                    <Input
-                      placeholder="Type your message..."
-                      value={input}
-                      onChange={(e) => setInput(e.target.value)}
-                      onKeyDown={handleKeyPress}
-                      className="flex-1"
-                      disabled={isTyping}
-                    />
-                    <Button 
-                      onClick={handleSendMessage} 
-                      disabled={!input.trim() || isTyping}
-                    >
-                      {isTyping ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="border border-amber-200 bg-amber-50 dark:bg-amber-900/20 p-4 rounded-lg">
-                    <h3 className="font-medium flex items-center gap-2">
-                      <Sparkles className="h-5 w-5 text-amber-500" />
-                      AI Query Limit Reached
-                    </h3>
-                    <p className="text-sm mt-1 mb-3">
-                      You've reached your daily limit of free AI queries. Upgrade to continue chatting.
-                    </p>
-                    <Button 
-                      size="sm" 
-                      onClick={() => navigate('/profile')}
-                      className="gap-1"
-                    >
-                      Upgrade Your Plan <ChevronRight className="h-3 w-3" />
-                    </Button>
-                  </div>
-                )}
+                <div className="flex gap-2 items-center">
+                  <Input
+                    placeholder="Type your message..."
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={handleKeyPress}
+                    className="flex-1"
+                    disabled={isTyping}
+                  />
+                  <Button 
+                    onClick={handleSendMessage} 
+                    disabled={!input.trim() || isTyping}
+                  >
+                    {isTyping ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                  </Button>
+                </div>
               </div>
               
               {/* Document panel - Hidden on mobile unless toggled */}
