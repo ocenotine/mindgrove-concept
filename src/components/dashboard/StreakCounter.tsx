@@ -86,9 +86,9 @@ const StreakCounter: React.FC<StreakCounterProps> = ({ streak: externalStreak })
 
           if (updateError) throw updateError;
           
-          // Update the local store
+          // Update the local store with correct property names
           updateProfile({
-            streakCount: newStreak,
+            streak: newStreak,
             lastActive: currentDate.toISOString()
           });
         }

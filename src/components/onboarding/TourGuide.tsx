@@ -74,12 +74,12 @@ const TourGuide = () => {
         // Check if this is a first-time login for the user
         const { data: profiles } = await supabase
           .from('profiles')
-          .select('first_login, created_at')
+          .select('is_first_login, created_at')
           .eq('id', user.id)
           .single();
 
-        // If this is their first login or first_login is true, show the tour
-        if (profiles && (profiles.first_login === true || profiles.first_login === null)) {
+        // If this is their first login or is_first_login is true, show the tour
+        if (profiles && (profiles.is_first_login === true || profiles.is_first_login === null)) {
           // Only show tour on dashboard
           if (location.pathname === '/dashboard') {
             setTimeout(() => setIsVisible(true), 1000);
@@ -88,7 +88,7 @@ const TourGuide = () => {
             await supabase
               .from('profiles')
               .update({ 
-                first_login: false,
+                is_first_login: false,
                 updated_at: new Date().toISOString()
               })
               .eq('id', user.id);
@@ -144,7 +144,7 @@ const TourGuide = () => {
         await supabase
           .from('profiles')
           .update({
-            first_login: false,
+            is_first_login: false,
             updated_at: new Date().toISOString()
           })
           .eq('id', user.id);

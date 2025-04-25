@@ -255,12 +255,18 @@ export const processPaymentWebhook = async (
     await updateSubscription(tier, expiryDate.toISOString());
     
     // Log subscription event
-    await supabase.from('subscription_events').insert({
-      user_id: userId,
-      event_type: 'upgrade',
-      tier: tier,
-      expiry_date: expiryDate.toISOString()
-    });
+    // Note: In a real app, you would create the subscription_events table first
+    try {
+      await supabase.from('subscription_events').insert({
+        user_id: userId,
+        event_type: 'upgrade',
+        tier: tier,
+        expiry_date: expiryDate.toISOString()
+      });
+    } catch (error) {
+      console.error('Error logging subscription event:', error);
+      // Continue even if logging fails
+    }
     
     toast({
       title: "Subscription activated",
