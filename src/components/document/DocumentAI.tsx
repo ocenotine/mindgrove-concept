@@ -9,6 +9,9 @@ import ApiKeyReminder from './ApiKeyReminder';
 import ApiKeySettings from './ApiKeySettings';
 import { motion } from 'framer-motion';
 import { generateDocumentSummary, generateFlashcards as generateFlashcardsUtil } from '@/utils/openRouterUtils';
+import FeaturePaywall from '@/components/subscription/FeaturePaywall';
+import { canAccessFeature } from '@/services/subscriptionService';
+import { useNavigate } from 'react-router-dom';
 
 interface DocumentAIProps {
   documentText: string;
@@ -23,8 +26,19 @@ const DocumentAI = ({ documentText, documentId, onSummaryGenerated, onFlashcards
   const { isLoading } = useAI();
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
   const [isGeneratingFlashcards, setIsGeneratingFlashcards] = useState(false);
+  const navigate = useNavigate();
   
   const handleGenerateSummary = async () => {
+    // Check if user has access to this premium feature
+    if (!canAccessFeature('documentSummary')) {
+      toast({
+        title: 'Premium feature',
+        description: 'Document summarization requires a paid subscription.',
+        variant: 'destructive'
+      });
+      return;
+    }
+    
     // We'll proceed even with minimal content
     const textToProcess = documentText || "This document appears to have minimal content.";
     
@@ -63,6 +77,16 @@ const DocumentAI = ({ documentText, documentId, onSummaryGenerated, onFlashcards
   };
   
   const handleGenerateFlashcards = async () => {
+    // Check if user has access to this premium feature
+    if (!canAccessFeature('flashcards')) {
+      toast({
+        title: 'Premium feature',
+        description: 'Flashcard generation requires a paid subscription.',
+        variant: 'destructive'
+      });
+      return;
+    }
+    
     // We'll proceed even with minimal content
     const textToProcess = documentText || "This document appears to have minimal content.";
     
@@ -112,25 +136,46 @@ const DocumentAI = ({ documentText, documentId, onSummaryGenerated, onFlashcards
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex flex-col sm:flex-row gap-3 justify-between">
-            <Button
-              onClick={handleGenerateSummary}
-              disabled={isGeneratingSummary}
-              className="flex items-center gap-2"
-            >
-              {isGeneratingSummary ? <Loader className="h-4 w-4 animate-spin" /> : <BookOpen className="h-4 w-4" />}
-              {isGeneratingSummary ? "Generating Summary..." : "Generate Summary"}
-            </Button>
+            <FeaturePaywall featureName="Document Summarization" tierRequired="weekly">
+              <Button
+                onClick={handleGenerateSummary}
+                disabled={isGeneratingSummary}
+                className="flex items-center gap-2 w-full"
+              >
+                {isGeneratingSummary ? <Loader className="h-4 w-4 animate-spin" /> : <BookOpen className="h-4 w-4" />}
+                {isGeneratingSummary ? "Generating Summary..." : "Generate Summary"}
+              </Button>
+            </FeaturePaywall>
             
-            <Button
-              onClick={handleGenerateFlashcards}
-              disabled={isGeneratingFlashcards}
-              className="flex items-center gap-2"
-              variant="outline"
-            >
-              {isGeneratingFlashcards ? <Loader className="h-4 w-4 animate-spin" /> : <PenTool className="h-4 w-4" />}
-              {isGeneratingFlashcards ? "Creating Flashcards..." : "Create Flashcards"}
-            </Button>
+            <FeaturePaywall featureName="Flashcard Generation" tierRequired="weekly">
+              <Button
+                onClick={handleGenerateFlashcards}
+                disabled={isGeneratingFlashcards}
+                className="flex items-center gap-2 w-full"
+                variant="outline"
+              >
+                {isGeneratingFlashcards ? <Loader className="h-4 w-4 animate-spin" /> : <PenTool className="h-4 w-4" />}
+                {isGeneratingFlashcards ? "Creating Flashcards..." : "Create Flashcards"}
+              </Button>
+            </FeaturePaywall>
           </div>
+          
+          {!canAccessFeature('documentSummary') && (
+            <div className="text-sm text-muted-foreground mt-2 bg-muted p-2 rounded">
+              <p className="flex items-center gap-2">
+                <Sparkles className="h-3.5 w-3.5" />
+                <span>Unlock AI-powered document analysis with a premium subscription.</span>
+              </p>
+              <Button 
+                size="sm" 
+                variant="link" 
+                className="p-0 h-auto mt-1" 
+                onClick={() => navigate('/profile')}
+              >
+                View subscription options →
+              </Button>
+            </div>
+          )}
         </CardContent>
         <CardFooter className="text-sm text-muted-foreground">
           AI-powered tools help you study more effectively
