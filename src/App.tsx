@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -21,7 +22,7 @@ import TermsOfService from "./pages/TermsOfService";
 import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TourGuide from "./components/onboarding/TourGuide";
 import LoadingAnimation from "./components/animations/LoadingAnimation";
-import { getDocumentThumbnail } from "./utils/documentUtils";
+import AIChat from "./pages/AIChat";
 import { markFirstVisit, markNewAccount } from "./utils/userOnboardingUtils";
 import { Analytics } from '@vercel/analytics/react';
 
@@ -149,6 +150,11 @@ const AppRoutes = () => {
         <Route path="/profile" element={
           <ProtectedRoute>
             <ProfilePage />
+          </ProtectedRoute>
+        } />
+        <Route path="/chat" element={
+          <ProtectedRoute>
+            <AIChat />
           </ProtectedRoute>
         } />
         <Route path="/terms" element={<PageTransition><TermsOfService /></PageTransition>} />

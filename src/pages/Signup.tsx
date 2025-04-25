@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
@@ -58,6 +59,10 @@ const Signup = () => {
     }
   };
 
+  const handleBackToLanding = () => {
+    navigate('/landing');
+  };
+
   const containerVariants = {
     hidden: { opacity: 0 },
     visible: {
@@ -75,12 +80,12 @@ const Signup = () => {
   
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 bg-opacity-80">
-      <Link 
-        to="/landing" 
-        className="absolute top-6 right-6 p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
+      <button 
+        onClick={handleBackToLanding}
+        className="absolute top-6 left-6 p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
       >
         <ArrowLeft className="h-6 w-6 text-white" />
-      </Link>
+      </button>
       
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute inset-0 z-0 opacity-20">

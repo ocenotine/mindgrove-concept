@@ -5,6 +5,8 @@ import { X, ChevronRight, ChevronLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useLocation } from 'react-router-dom';
 import { isNewAccount, markTourComplete } from '@/utils/userOnboardingUtils';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuthStore } from '@/store/authStore';
 
 interface TourStep {
   title: string;
@@ -23,6 +25,7 @@ const TourGuide = () => {
     height: window.innerHeight
   });
   const location = useLocation();
+  const { user } = useAuthStore();
 
   // Define tour steps for different pages
   const tourSteps: TourStep[] = [
@@ -64,13 +67,32 @@ const TourGuide = () => {
   ];
 
   useEffect(() => {
-    // Check if user is new or returning
-    if (isNewAccount() && location.pathname === '/dashboard') {
-      setTimeout(() => setIsVisible(true), 1000);
-    } else {
-      setIsVisible(false);
-    }
-  }, [location.pathname]);
+    // Only check for new user status if we have a user logged in
+    const checkNewUserStatus = async () => {
+      if (!user) return;
+
+      try {
+        // Check if the user has completed the tour before
+        const { data: userPrefs } = await supabase
+          .from('user_preferences')
+          .select('tour_completed')
+          .eq('user_id', user.id)
+          .single();
+
+        // If there's no record or tour_completed is false, show the tour
+        if (!userPrefs || !userPrefs.tour_completed) {
+          // Show the tour for new users on dashboard
+          if (location.pathname === '/dashboard') {
+            setTimeout(() => setIsVisible(true), 1000);
+          }
+        }
+      } catch (error) {
+        console.error("Error checking tour status:", error);
+      }
+    };
+
+    checkNewUserStatus();
+  }, [user, location.pathname]);
 
   useEffect(() => {
     const handleResize = () => {
@@ -105,9 +127,24 @@ const TourGuide = () => {
     }
   }, [currentStep, isVisible, windowSize]);
 
-  const closeTour = () => {
+  const closeTour = async () => {
     setIsVisible(false);
     markTourComplete();
+
+    // Also mark tour as completed in the database
+    if (user) {
+      try {
+        await supabase
+          .from('user_preferences')
+          .upsert({
+            user_id: user.id,
+            tour_completed: true,
+            updated_at: new Date().toISOString()
+          });
+      } catch (error) {
+        console.error("Error saving tour completion status:", error);
+      }
+    }
   };
 
   const nextStep = () => {

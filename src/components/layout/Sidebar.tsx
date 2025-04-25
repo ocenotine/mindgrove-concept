@@ -1,159 +1,120 @@
 
-import { Link, useLocation } from 'react-router-dom';
-import { cn } from '@/lib/utils';
-import { 
-  Home, 
-  FileText, 
-  Book, 
-  User, 
-  Settings, 
-  ChevronRight,
-  PlusCircle,
-  BookOpen
-} from 'lucide-react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
-import { motion } from 'framer-motion';
+import { Button } from '@/components/ui/button';
+import { Separator } from '@/components/ui/separator';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
+import {
+  Home,
+  FileText,
+  Upload,
+  BookOpen,
+  Settings,
+  LogOut,
+  MessagesSquare,
+} from 'lucide-react';
 
-interface SidebarItemProps {
-  icon: React.ReactNode;
-  label: string;
-  href: string;
-  isActive?: boolean;
-  hasSubItems?: boolean;
-  isCollapsed?: boolean;
-}
-
-const SidebarItem = ({ 
-  icon, 
-  label, 
-  href, 
-  isActive = false,
-  hasSubItems = false,
-  isCollapsed = false 
-}: SidebarItemProps) => {
-  return (
-    <Link
-      to={href}
-      className={cn(
-        'sidebar-item relative',
-        isActive ? 'active' : '',
-        isCollapsed ? 'justify-center' : 'justify-between'
-      )}
-    >
-      <div className="flex items-center gap-3 relative z-10">
-        <span className={isActive ? "text-white" : ""}>
-          {icon}
-        </span>
-        {!isCollapsed && <span className={isActive ? "text-white" : ""}>{label}</span>}
-      </div>
-      {hasSubItems && !isCollapsed && (
-        <ChevronRight className="h-4 w-4" />
-      )}
-      
-      {isActive && (
-        <motion.div
-          layoutId="activeTab"
-          className="absolute inset-0 bg-primary/20 rounded-xl -z-0"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ type: "spring", bounce: 0.2, duration: 0.6 }}
-        />
-      )}
-    </Link>
-  );
-};
-
-interface SidebarProps {
-  isCollapsed?: boolean;
-}
-
-const Sidebar = ({ isCollapsed = false }: SidebarProps) => {
+const Sidebar = () => {
+  const navigate = useNavigate();
   const location = useLocation();
-  const { user } = useAuthStore();
-  const isActive = (path: string) => location.pathname === path;
+  const isMobile = useMediaQuery('(max-width: 768px)');
+  const { signOut } = useAuthStore();
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      navigate('/login');
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
+  };
+
+  const navItems = [
+    {
+      label: 'Dashboard',
+      icon: <Home className="h-5 w-5" />,
+      href: '/dashboard',
+    },
+    {
+      label: 'Documents',
+      icon: <FileText className="h-5 w-5" />,
+      href: '/documents',
+    },
+    {
+      label: 'Upload',
+      icon: <Upload className="h-5 w-5" />,
+      href: '/document/upload',
+    },
+    {
+      label: 'Flashcards',
+      icon: <BookOpen className="h-5 w-5" />,
+      href: '/flashcards',
+    },
+    {
+      label: 'AI Chat',
+      icon: <MessagesSquare className="h-5 w-5" />,
+      href: '/chat',
+    },
+    {
+      label: 'Settings',
+      icon: <Settings className="h-5 w-5" />,
+      href: '/profile',
+    },
+  ];
+
+  if (isMobile) {
+    return null; // Don't render sidebar on mobile - it will be handled by MobileBottomNav
+  }
 
   return (
-    <motion.div 
-      className={cn(
-        "flex flex-col h-full bg-sidebar rounded-r-xl",
-        isCollapsed ? "w-16" : "w-64"
-      )}
-      initial={{ x: -20, opacity: 0 }}
-      animate={{ x: 0, opacity: 1 }}
-      transition={{ duration: 0.3 }}
-    >
-      {/* Sidebar header */}
-      <div className="py-6 px-3 border-b border-sidebar-border">
-        {!isCollapsed ? (
-          <div className="flex items-center gap-2">
-            <div className="h-10 w-10 bg-primary/20 rounded-full flex items-center justify-center">
-              <BookOpen className="h-5 w-5 text-white" />
-            </div>
-            <span className="text-xl font-brand text-sidebar-foreground">MindGrove</span>
-          </div>
-        ) : (
-          <div className="flex justify-center">
-            <div className="h-10 w-10 bg-primary/20 rounded-full flex items-center justify-center">
-              <BookOpen className="h-5 w-5 text-white" />
-            </div>
-          </div>
-        )}
+    <div className="h-screen w-64 bg-card border-r border-border shadow-sm flex flex-col">
+      {/* Logo */}
+      <div className="px-4 py-5 flex items-center">
+        <div className="bg-primary/10 w-10 h-10 rounded-xl flex items-center justify-center mr-3">
+          <img
+            src="/mindgrove.png"
+            alt="MindGrove Logo"
+            className="w-8 h-8"
+          />
+        </div>
+        <div>
+          <h1 className="text-lg font-bold text-foreground">MindGrove</h1>
+          <p className="text-xs text-muted-foreground">Research Assistant</p>
+        </div>
       </div>
 
-      {/* Sidebar content */}
-      <div className="flex-1 py-4 px-3 overflow-y-auto">
-        <SidebarItem
-          icon={<Home className="h-5 w-5" />}
-          label="Dashboard"
-          href="/dashboard"
-          isActive={isActive("/dashboard")}
-          isCollapsed={isCollapsed}
-        />
-        <SidebarItem
-          icon={<FileText className="h-5 w-5" />}
-          label="My Documents"
-          href="/documents"
-          isActive={isActive("/documents")}
-          isCollapsed={isCollapsed}
-        />
-        <SidebarItem
-          icon={<Book className="h-5 w-5" />}
-          label="Flashcards"
-          href="/flashcards"
-          isActive={isActive("/flashcards")}
-          isCollapsed={isCollapsed}
-        />
-        
-        <SidebarItem
-          icon={<User className="h-5 w-5" />}
-          label="Profile"
-          href="/profile"
-          isActive={isActive("/profile")}
-          isCollapsed={isCollapsed}
-        />
-      </div>
+      <Separator />
 
-      {/* Sidebar footer */}
-      <div className="mt-auto border-t border-sidebar-border/50 p-4">
-        {!isCollapsed ? (
-          <Link
-            to="/document/upload"
-            className="flex items-center justify-center gap-2 w-full p-3 bg-primary/20 hover:bg-primary/30 text-white rounded-xl transition-all duration-200"
+      {/* Navigation */}
+      <nav className="flex-1 px-2 py-4 space-y-1">
+        {navItems.map((item) => (
+          <Button
+            key={item.href}
+            variant={location.pathname === item.href ? 'secondary' : 'ghost'}
+            className={`w-full justify-start ${
+              location.pathname === item.href
+                ? 'bg-muted'
+                : ''
+            }`}
+            onClick={() => navigate(item.href)}
           >
-            <PlusCircle className="h-4 w-4" />
-            <span>Upload Document</span>
-          </Link>
-        ) : (
-          <Link
-            to="/document/upload"
-            className="flex items-center justify-center w-full p-3 bg-primary/20 hover:bg-primary/30 text-white rounded-xl transition-all duration-200"
-          >
-            <PlusCircle className="h-4 w-4" />
-          </Link>
-        )}
+            {item.icon}
+            <span className="ml-3">{item.label}</span>
+          </Button>
+        ))}
+      </nav>
+
+      <div className="p-4">
+        <Button
+          variant="outline"
+          className="w-full justify-start text-muted-foreground"
+          onClick={handleSignOut}
+        >
+          <LogOut className="h-5 w-5 mr-3" />
+          Sign Out
+        </Button>
       </div>
-    </motion.div>
+    </div>
   );
 };
 

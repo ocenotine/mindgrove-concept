@@ -51,7 +51,7 @@ export const generateDocumentSummary = async (text: string): Promise<string> => 
       headers: {
         'Authorization': `Bearer ${API_KEY}`,
         'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://mindgrove.app',
+        'HTTP-Referer': window.location.origin,
         'X-Title': 'MindGrove Document Summarization'
       },
       body: JSON.stringify({
@@ -71,22 +71,14 @@ export const generateDocumentSummary = async (text: string): Promise<string> => 
       })
     });
     
-    // Handle non-JSON response
-    const responseText = await response.text();
-    
     if (!response.ok) {
-      console.error("API Error:", responseText);
-      throw new Error(`API returned status: ${response.status} - ${getErrorMessage(responseText)}`);
+      const errorText = await response.text();
+      console.error("API Error:", errorText);
+      throw new Error(`API returned status: ${response.status} - ${getErrorMessage(errorText)}`);
     }
     
-    let data;
-    try {
-      data = JSON.parse(responseText);
-    } catch (e) {
-      console.error("Error parsing JSON response:", e);
-      throw new Error("Invalid response format from OpenRouter API");
-    }
-    
+    // Parse the response
+    const data = await response.json();
     const summary = data.choices?.[0]?.message?.content || "Failed to generate summary.";
     
     return summary;
@@ -113,7 +105,7 @@ export const generateFlashcards = async (text: string): Promise<Array<{question:
       headers: {
         'Authorization': `Bearer ${API_KEY}`,
         'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://mindgrove.app',
+        'HTTP-Referer': window.location.origin,
         'X-Title': 'MindGrove Flashcard Generation'
       },
       body: JSON.stringify({
@@ -133,51 +125,50 @@ export const generateFlashcards = async (text: string): Promise<Array<{question:
       })
     });
     
-    // Handle non-JSON response
-    const responseText = await response.text();
-    
     if (!response.ok) {
-      console.error("API Error:", responseText);
-      throw new Error(`API returned status: ${response.status} - ${getErrorMessage(responseText)}`);
+      const errorText = await response.text();
+      console.error("API Error:", errorText);
+      throw new Error(`API returned status: ${response.status} - ${getErrorMessage(errorText)}`);
     }
     
-    let data;
-    try {
-      data = JSON.parse(responseText);
-    } catch (e) {
-      console.error("Error parsing JSON response:", e);
-      throw new Error("Invalid response format from OpenRouter API");
-    }
-    
+    const data = await response.json();
     const content = data.choices?.[0]?.message?.content || "[]";
     
     try {
-      // First try to parse the content as JSON directly
+      // Try different approaches to parse the JSON content from the response
       let parsedContent;
+      
+      // Direct parsing attempt
       try {
         parsedContent = JSON.parse(content);
-      } catch (e) {
-        // If that fails, try to extract JSON from the string using regex
-        const jsonMatch = content.match(/\[[\s\S]*\]/);
+      } catch (jsonError) {
+        // If that fails, try to extract JSON from the content using regex
+        const jsonMatch = content.match(/\[\s*\{.*\}\s*\]/s);
         if (jsonMatch) {
-          parsedContent = JSON.parse(jsonMatch[0]);
+          try {
+            parsedContent = JSON.parse(jsonMatch[0]);
+          } catch (extractError) {
+            console.error("Error parsing extracted JSON:", extractError);
+            throw new Error("Failed to parse flashcard data");
+          }
         } else {
-          throw e; // Re-throw if we can't find JSON
+          console.error("No JSON array found in response:", content);
+          throw new Error("Invalid response format");
         }
       }
       
-      // Check if the response is already an array or if it has a flashcards property
+      // Ensure we have an array of flashcards
       const flashcards = Array.isArray(parsedContent) 
         ? parsedContent 
-        : parsedContent.flashcards || parsedContent.cards || [];
+        : parsedContent?.flashcards || parsedContent?.cards || [];
       
       if (!flashcards.length) {
-        // If no flashcards were generated, provide default ones based on document type
+        // If no flashcards were generated, provide default ones
         return [
           {
             question: "What is the main topic of this document?",
             answer: "This document contains information that may require more context to summarize effectively."
-          }, 
+          },
           {
             question: "How can I use the information in this document?",
             answer: "The document can be used as a reference for studying or understanding related concepts."
@@ -185,12 +176,13 @@ export const generateFlashcards = async (text: string): Promise<Array<{question:
         ];
       }
       
+      // Ensure each flashcard has the required fields
       return flashcards.map((card: any) => ({
         question: card.question || "Question not found",
         answer: card.answer || "Answer not found"
       }));
     } catch (jsonError) {
-      console.error("Error parsing flashcard JSON:", jsonError);
+      console.error("Error parsing flashcard response:", jsonError, "Response:", content);
       // Return fallback flashcards
       return [
         { question: "What is this document about?", answer: "This document contains academic or educational content." },
@@ -223,7 +215,7 @@ export const generateDocumentChatResponse = async (
       headers: {
         'Authorization': `Bearer ${API_KEY}`,
         'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://mindgrove.app',
+        'HTTP-Referer': window.location.origin,
         'X-Title': 'MindGrove Document Chat'
       },
       body: JSON.stringify({
@@ -246,22 +238,13 @@ ${contextText}`
       })
     });
     
-    // Handle potential errors
-    const responseText = await response.text();
-    
     if (!response.ok) {
-      console.error("API Error:", responseText);
-      throw new Error(`API returned status: ${response.status} - ${getErrorMessage(responseText)}`);
+      const errorText = await response.text();
+      console.error("API Error:", errorText);
+      throw new Error(`API returned status: ${response.status} - ${getErrorMessage(errorText)}`);
     }
     
-    let data;
-    try {
-      data = JSON.parse(responseText);
-    } catch (e) {
-      console.error("Error parsing JSON response:", e);
-      throw new Error("Invalid response format from OpenRouter API");
-    }
-    
+    const data = await response.json();
     const chatResponse = data.choices?.[0]?.message?.content || 
       "I'm sorry, I wasn't able to generate a response. Please try asking a different question.";
     
@@ -280,7 +263,7 @@ const getErrorMessage = (responseText: string): string => {
     const errorObj = JSON.parse(responseText);
     return errorObj?.error?.message || 'Unknown error';
   } catch (e) {
-    return 'Unable to parse error details';
+    return responseText || 'Unable to parse error details';
   }
 };
 

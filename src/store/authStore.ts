@@ -68,7 +68,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           user: { 
             id: user.id,
             email: user.email || '',
-            name: profileData?.full_name || 'User',
+            name: profileData?.full_name || user.user_metadata?.full_name || 'User',
             avatarUrl: profileData?.avatar_url,
             streak: profileData?.streak_count || 0,
             flashcardCount: profileData?.flashcard_count || 0,
@@ -112,7 +112,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
           user: { 
             id: data.user.id,
             email: data.user.email || '',
-            name: profileData?.full_name || 'User',
+            name: profileData?.full_name || data.user.user_metadata?.full_name || 'User',
             avatarUrl: profileData?.avatar_url,
             streak: profileData?.streak_count || 0,
             flashcardCount: profileData?.flashcard_count || 0,

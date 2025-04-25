@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
@@ -8,11 +9,13 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { toast } from '@/components/ui/use-toast';
 import { motion } from 'framer-motion';
 import { Mail, Lock, ArrowRight, Loader2, ArrowLeft } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
 const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const navigate = useNavigate();
   const { signIn } = useAuthStore();
   
@@ -43,6 +46,34 @@ const Login = () => {
     }
   };
 
+  const handleGoogleLogin = async () => {
+    try {
+      setIsGoogleLoading(true);
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: window.location.origin + '/dashboard'
+        }
+      });
+      
+      if (error) throw error;
+      
+      // The redirect happens automatically by Supabase
+    } catch (error) {
+      console.error('Google login error:', error);
+      toast({
+        title: "Google Sign In Failed",
+        description: error instanceof Error ? error.message : 'Failed to sign in with Google',
+        variant: "destructive",
+      });
+      setIsGoogleLoading(false);
+    }
+  };
+
+  const handleBackToLanding = () => {
+    navigate('/landing');
+  };
+
   const containerVariants = {
     hidden: { opacity: 0 },
     visible: {
@@ -60,12 +91,12 @@ const Login = () => {
   
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 bg-opacity-80">
-      <Link 
-        to="/landing" 
-        className="absolute top-6 right-6 p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
+      <button 
+        onClick={handleBackToLanding}
+        className="absolute top-6 left-6 p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
       >
         <ArrowLeft className="h-6 w-6 text-white" />
-      </Link>
+      </button>
       
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute inset-0 z-0 opacity-20">
@@ -98,7 +129,7 @@ const Login = () => {
           >
             <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center p-0.5 shadow-lg shadow-primary/30">
               <img 
-                src="public//mindgrove.png"
+                src="/mindgrove.png"
                 alt="MindGrove"
                 className="w-full h-full rounded-full object-cover"
               />
@@ -179,6 +210,30 @@ const Login = () => {
                       <ArrowRight className="ml-2 h-4 w-4" />
                     </>
                   )}
+                </Button>
+                
+                <div className="relative my-4">
+                  <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t border-gray-600"></span>
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-card px-2 text-gray-400">Or continue with</span>
+                  </div>
+                </div>
+                
+                <Button 
+                  type="button"
+                  variant="outline" 
+                  className="w-full border border-gray-600 hover:bg-white/10"
+                  onClick={handleGoogleLogin}
+                  disabled={isGoogleLoading}
+                >
+                  {isGoogleLoading ? (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  ) : (
+                    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="h-5 w-5 mr-2" />
+                  )}
+                  Sign in with Google
                 </Button>
               </form>
             </CardContent>
