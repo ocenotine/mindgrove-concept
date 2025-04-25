@@ -9,13 +9,13 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/components/ui/use-toast';
 
 const ProfileHeader = () => {
-  const { user, updateProfile, logout } = useAuthStore();
+  const { user, updateProfile, signOut } = useAuthStore();
   const navigate = useNavigate();
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const handleLogout = async () => {
-    await logout();
+    await signOut();
     navigate('/login');
   };
   
@@ -47,7 +47,7 @@ const ProfileHeader = () => {
 
       // Update profile
       await updateProfile({
-        avatar_url: data.publicUrl,
+        avatarUrl: data.publicUrl,
       });
 
       toast({
@@ -83,9 +83,9 @@ const ProfileHeader = () => {
           ) : (
             <div className="group relative">
               <Avatar className="h-24 w-24 border-2 border-primary/20">
-                {user.avatar_url ? (
+                {user.avatarUrl ? (
                   <AvatarImage 
-                    src={user.avatar_url} 
+                    src={user.avatarUrl} 
                     alt={user.name} 
                     className="object-cover"
                   />
@@ -135,7 +135,7 @@ const ProfileHeader = () => {
           </div>
           <div className="flex items-center justify-between">
             <span className="text-sm">Daily Streak</span>
-            <span className="text-sm font-medium">{user.streakCount} days 🔥</span>
+            <span className="text-sm font-medium">{user.streak || 0} days 🔥</span>
           </div>
         </div>
 

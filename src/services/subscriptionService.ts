@@ -254,19 +254,8 @@ export const processPaymentWebhook = async (
     // Update subscription
     await updateSubscription(tier, expiryDate.toISOString());
     
-    // Log subscription event
-    // Note: In a real app, you would create the subscription_events table first
-    try {
-      await supabase.from('subscription_events').insert({
-        user_id: userId,
-        event_type: 'upgrade',
-        tier: tier,
-        expiry_date: expiryDate.toISOString()
-      });
-    } catch (error) {
-      console.error('Error logging subscription event:', error);
-      // Continue even if logging fails
-    }
+    // Log subscription event - using custom function that doesn't rely on subscription_events table
+    logSubscriptionEvent(userId, 'upgrade', tier, expiryDate.toISOString());
     
     toast({
       title: "Subscription activated",
@@ -281,6 +270,23 @@ export const processPaymentWebhook = async (
       variant: "destructive",
     });
   }
+};
+
+// Helper function to log subscription events without using the subscription_events table
+const logSubscriptionEvent = (userId: string, eventType: string, tier: string, expiryDate: string): void => {
+  // Instead of using a DB table, we'll log to console and localStorage for demo
+  console.log(`Subscription event: ${userId} - ${eventType} - ${tier} - ${expiryDate}`);
+  
+  // Save event to localStorage for demo purposes
+  const events = JSON.parse(localStorage.getItem('subscription_events') || '[]');
+  events.push({
+    user_id: userId,
+    event_type: eventType,
+    tier,
+    expiry_date: expiryDate,
+    created_at: new Date().toISOString()
+  });
+  localStorage.setItem('subscription_events', JSON.stringify(events));
 };
 
 // For development purposes only: simulate a payment and upgrade

@@ -46,9 +46,8 @@ export const useDocuments = () => {
     }
   }, [currentDocument, fetchDocumentById]);
   
-  // Ensure the search function accepts either one or two arguments
-  // to match how it's called in DocumentsPage.tsx
-  const handleSearch = useCallback(async (query: string, userId?: string): Promise<Document[]> => {
+  // Handle search with flexible parameters
+  const handleSearch = useCallback(async (query: string): Promise<Document[]> => {
     if (!query.trim()) {
       setSearchResults([]);
       return [];
@@ -56,7 +55,6 @@ export const useDocuments = () => {
     
     setIsSearching(true);
     try {
-      // Use only the first argument if searchDocuments only accepts one argument
       const results = searchDocuments(query);
       setSearchResults(results);
       setIsSearching(false);

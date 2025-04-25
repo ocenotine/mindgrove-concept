@@ -33,13 +33,13 @@ const StreakCounter: React.FC<StreakCounterProps> = ({ streak: externalStreak })
         // Get the user's profile data from Supabase
         const { data: profileData, error } = await supabase
           .from('profiles')
-          .select('streak_count, last_active')
+          .select('streak, last_active')
           .eq('id', user.id)
           .single();
 
         if (error) throw error;
 
-        const currentStreak = profileData?.streak_count || 0;
+        const currentStreak = profileData?.streak || 0;
         const lastActive = profileData?.last_active ? new Date(profileData.last_active) : null;
         const currentDate = new Date();
         
@@ -79,14 +79,14 @@ const StreakCounter: React.FC<StreakCounterProps> = ({ streak: externalStreak })
           const { error: updateError } = await supabase
             .from('profiles')
             .update({
-              streak_count: newStreak,
+              streak: newStreak,
               last_active: currentDate.toISOString()
             })
             .eq('id', user.id);
 
           if (updateError) throw updateError;
           
-          // Update the local store with correct property names
+          // Update the local store with correct property name
           updateProfile({
             streak: newStreak,
             lastActive: currentDate.toISOString()

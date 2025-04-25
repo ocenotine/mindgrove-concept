@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { useAuthStore } from '@/store/authStore';
 import { supabase } from '@/integrations/supabase/client';
@@ -10,7 +11,7 @@ const EditProfileForm = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(user?.avatar_url || null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(user?.avatarUrl || null);
 
   const handleImageSelection = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -81,7 +82,7 @@ const EditProfileForm = () => {
     
     try {
       // Upload avatar first if a new one was selected
-      let avatarUrl = user?.avatar_url;
+      let avatarUrl = user?.avatarUrl;
       if (selectedImage) {
         const uploadedAvatarUrl = await uploadAvatar();
         if (uploadedAvatarUrl) {
@@ -95,7 +96,7 @@ const EditProfileForm = () => {
         .update({ 
           name,
           bio,
-          avatar_url: avatarUrl,
+          avatarUrl,
           updated_at: new Date().toISOString()
         })
         .eq('id', user?.id);
@@ -108,7 +109,7 @@ const EditProfileForm = () => {
       await updateProfile({
         name,
         bio,
-        avatar_url: avatarUrl
+        avatarUrl
       });
       
       toast({
