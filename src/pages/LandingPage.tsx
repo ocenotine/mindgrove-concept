@@ -41,9 +41,7 @@ const LandingPage = () => {
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-b from-background to-muted/30 relative overflow-hidden">
-      {/* 3D Background Animation */}
-      <BackgroundAnimation />
-      
+    
       {/* Header */}
       <header className="border-b py-4 px-6 relative z-10">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
@@ -117,15 +115,15 @@ const LandingPage = () => {
           <div className="mt-12 flex flex-wrap justify-center gap-8">
             <div className="flex items-center gap-2">
               <Star className="h-5 w-5 text-yellow-500" />
-              <span className="text-muted-foreground">Used by 10,000+ students</span>
+              <span className="text-muted-foreground">Used by many learners</span>
             </div>
             <div className="flex items-center gap-2">
               <Star className="h-5 w-5 text-yellow-500" />
-              <span className="text-muted-foreground">4.8/5 average rating</span>
+              <span className="text-muted-foreground">4.3/5 average rating</span>
             </div>
             <div className="flex items-center gap-2">
               <Star className="h-5 w-5 text-yellow-500" />
-              <span className="text-muted-foreground">2M+ documents processed</span>
+              <span className="text-muted-foreground">Multiple documents processed</span>
             </div>
           </div>
         </motion.div>
@@ -366,7 +364,7 @@ const LandingPage = () => {
               </Link>
             </div>
             <p className="text-sm text-muted-foreground mt-6">
-              No credit card required. Free plan includes 5 documents per month.
+             Get started today
             </p>
           </motion.div>
         </div>
@@ -375,53 +373,8 @@ const LandingPage = () => {
       {/* Footer */}
       <footer className="py-12 px-6 border-t">
         <div className="max-w-7xl mx-auto">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-            <div>
-              <h3 className="font-semibold mb-3">Product</h3>
-              <ul className="space-y-2 text-sm">
-                <li><a href="#features" className="text-muted-foreground hover:text-primary">Features</a></li>
-                <li><a href="#" className="text-muted-foreground hover:text-primary">Pricing</a></li>
-                <li><a href="#" className="text-muted-foreground hover:text-primary">Updates</a></li>
-                <li><a href="#faq" className="text-muted-foreground hover:text-primary">FAQ</a></li>
-              </ul>
-            </div>
-            <div>
-              <h3 className="font-semibold mb-3">Resources</h3>
-              <ul className="space-y-2 text-sm">
-                <li><a href="#" className="text-muted-foreground hover:text-primary">Documentation</a></li>
-                <li><a href="#" className="text-muted-foreground hover:text-primary">Tutorials</a></li>
-                <li><a href="#" className="text-muted-foreground hover:text-primary">Blog</a></li>
-              </ul>
-            </div>
-            <div>
-              <h3 className="font-semibold mb-3">Company</h3>
-              <ul className="space-y-2 text-sm">
-                <li><a href="#" className="text-muted-foreground hover:text-primary">About</a></li>
-                <li><a href="#" className="text-muted-foreground hover:text-primary">Careers</a></li>
-                <li><a href="#" className="text-muted-foreground hover:text-primary">Contact</a></li>
-              </ul>
-            </div>
-            <div>
-              <h3 className="font-semibold mb-3">Legal</h3>
-              <ul className="space-y-2 text-sm">
-                <li><Link to="/terms" className="text-muted-foreground hover:text-primary">Terms of Service</Link></li>
-                <li><Link to="/privacy" className="text-muted-foreground hover:text-primary">Privacy Policy</Link></li>
-              </ul>
-            </div>
-          </div>
           <div className="mt-12 pt-8 border-t flex flex-col md:flex-row justify-between items-center">
-            <p className="text-sm text-muted-foreground">&copy; {new Date().getFullYear()} MindGrove. All rights reserved.</p>
-            <div className="flex space-x-6 mt-4 md:mt-0">
-              <a href="#" className="text-muted-foreground hover:text-primary">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path></svg>
-              </a>
-              <a href="#" className="text-muted-foreground hover:text-primary">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 4s-.7 2.1-2 3.4c1.6 10-9.4 17.3-18 11.6 2.2.1 4.4-.6 6-2C3 15.5.5 9.6 3 5c2.2 2.6 5.6 4.1 9 4-.9-4.2 4-6.6 7-3.8 1.1 0 3-1.2 3-1.2z"></path></svg>
-              </a>
-              <a href="#" className="text-muted-foreground hover:text-primary">
-                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect width="20" height="20" x="2" y="2" rx="5" ry="5"></rect><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"></path><line x1="17.5" x2="17.51" y1="6.5" y2="6.5"></line></svg>
-              </a>
-            </div>
+            <p className="text-sm text-muted-foreground">&copy; {new Date().getFullYear()} MindGrove- AI Research Assistant.</p>
           </div>
         </div>
       </footer>

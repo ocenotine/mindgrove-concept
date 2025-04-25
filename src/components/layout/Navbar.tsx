@@ -38,7 +38,7 @@ const Navbar = () => {
               <Link to="/dashboard" className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white">
                   <img 
-                    src="/lovable-uploads/65960bde-d697-478f-82ae-b981a1ed9307.png"
+                    src="public//mindgrove.png"
                     alt="MindGrove"
                     className="w-8 h-8 rounded-full object-cover"
                   />

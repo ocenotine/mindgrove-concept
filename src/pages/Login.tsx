@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
@@ -8,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from '@/components/ui/use-toast';
 import { motion } from 'framer-motion';
-import { Mail, Lock, ArrowRight, Loader2 } from 'lucide-react';
+import { Mail, Lock, ArrowRight, Loader2, ArrowLeft } from 'lucide-react';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -61,6 +60,13 @@ const Login = () => {
   
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 bg-opacity-80">
+      <Link 
+        to="/landing" 
+        className="absolute top-6 right-6 p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
+      >
+        <ArrowLeft className="h-6 w-6 text-white" />
+      </Link>
+      
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute inset-0 z-0 opacity-20">
           <svg width="100%" height="100%" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
@@ -92,7 +98,7 @@ const Login = () => {
           >
             <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center p-0.5 shadow-lg shadow-primary/30">
               <img 
-                src="/lovable-uploads/65960bde-d697-478f-82ae-b981a1ed9307.png"
+                src="public//mindgrove.png"
                 alt="MindGrove"
                 className="w-full h-full rounded-full object-cover"
               />

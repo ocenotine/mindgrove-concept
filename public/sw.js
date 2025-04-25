@@ -4,7 +4,7 @@ const urlsToCache = [
   '/',
   '/index.html',
   '/manifest.json',
-  '/mindgrove.png',
+  '//mindgrove.png',
   '/document-icons/doc-icon.svg',
   '/document-icons/pdf-icon.svg',
   '/document-icons/ppt-icon.svg',
@@ -81,8 +81,8 @@ self.addEventListener('push', (event) => {
   const data = event.data.json();
   const options = {
     body: data.body,
-    icon: '/mindgrove.png',
-    badge: '/mindgrove.png'
+    icon: '//mindgrove.png',
+    badge: '//mindgrove.png'
   };
   
   event.waitUntil(

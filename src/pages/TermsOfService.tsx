@@ -41,7 +41,7 @@ const TermsOfService = () => {
             <p>
               MindGrove is an AI-powered research assistant platform that helps users organize, 
               analyze, and learn from research documents. Our services include document analysis, 
-              summary generation, flashcard creation, intelligent search, and other related features.
+              summary generation, flashcard creation, intelligent search and other related features.
             </p>
             
             <h2>3. Account Registration</h2>
@@ -132,7 +132,7 @@ const TermsOfService = () => {
               If you have any questions about these Terms, please contact us at:
             </p>
             <p>
-              <a href="mailto:support@mindgrove.ai">sjudextine28@gmail.com</a>
+              <a href="mailto:judextine28@gmail.com">judextine28@gmail.com</a>
             </p>
           </div>
         </motion.div>

@@ -1,8 +1,7 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 
 const OPEN_ROUTER_API_ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
-const API_KEY = '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';
+const API_KEY = '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';
 const DEFAULT_MODEL = 'openai/gpt-3.5-turbo';
 
 const corsHeaders = {

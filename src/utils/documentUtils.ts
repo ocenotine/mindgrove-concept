@@ -9,9 +9,6 @@ if (!pdfjs.GlobalWorkerOptions.workerSrc) {
   pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerSrc;
 }
 
-/**
- * Extract text content from a PDF file
- */
 export const extractTextFromPDF = async (file: File): Promise<string> => {
   try {
     // Read the file as ArrayBuffer

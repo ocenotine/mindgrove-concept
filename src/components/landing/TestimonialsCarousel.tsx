@@ -24,38 +24,31 @@ interface Testimonial {
 const testimonials: Testimonial[] = [
   {
     name: "Juruaa Sebastian",
-    role: "PhD Student, Computer Science",
+    role: "Software engineering student",
     quote: "MindGrove has revolutionized my research workflow. I can process academic papers in minutes instead of hours, with summaries that capture all the key points.",
     rating: 5,
     location: "Uganda"
   },
   {
     name: "Asiime Blessing",
-    role: "Medical Student",
-    quote: "The flashcard feature is incredible! It helped me ace my medical exams by automatically identifying key concepts and creating effective study materials.",
+    role: "Software engineering student",
+    quote: "The flashcard feature is incredible! It helped me with my tests by automatically identifying key concepts and creating effective study materials.",
     rating: 5,
-    location: "Kenya"
+    location: "Uganda"
   },
   {
-    name: "Dr. Naomi Wekesa",
-    role: "Associate Professor, Economics",
-    quote: "As a professor, I recommend MindGrove to all my students. The AI-powered summaries help them grasp complex topics faster and engage more meaningfully in class discussions.",
-    rating: 4,
-    location: "Tanzania"
-  },
-  {
-    name: "Michael Okonkwo",
-    role: "Graduate Student, Biology",
-    quote: "The document chat feature feels like having a personal tutor for every paper I read. It's transformed how I absorb complex scientific literature.",
+    name: "Nimungu saviour Jude",
+    role: "Electronics engineering student",
+    quote: "I recommend MindGrove to all students. The AI-powered summaries help them grasp complex topics faster and engage more meaningfully in class discussions.",
     rating: 5,
-    location: "Nigeria"
+    location: "Uganda"
   },
   {
-    name: "Priya Shah",
-    role: "Undergraduate, Engineering",
-    quote: "Finally a study tool that actually helps me learn rather than just organize! The AI-generated flashcards saved me hours of preparation time.",
-    rating: 4,
-    location: "India"
+    name: "Abaasa",
+    role: "Software engineering student",
+    quote: "The document chat feature feels like having a personal tutor for every paper I read. It's transformed how I absorb complex topics.",
+    rating: 5,
+    location: "Uganda"
   }
 ];
 

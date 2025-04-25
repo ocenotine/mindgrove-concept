@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -24,8 +23,8 @@ import TourGuide from "./components/onboarding/TourGuide";
 import LoadingAnimation from "./components/animations/LoadingAnimation";
 import { getDocumentThumbnail } from "./utils/documentUtils";
 import { markFirstVisit, markNewAccount } from "./utils/userOnboardingUtils";
+import { Analytics } from '@vercel/analytics/react';
 
-// Initialize Three.js for better performance
 import * as THREE from 'three';
 THREE.ColorManagement.enabled = true;
 
@@ -43,7 +42,6 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const { isAuthenticated, isLoading } = useAuthStore();
   
   useEffect(() => {
-    // Mark as new account when user first logs in
     if (isAuthenticated) {
       markNewAccount();
     }
@@ -108,6 +106,7 @@ const AppRoutes = () => {
   return (
     <>
       <TourGuide />
+      <Analytics />
       
       <Routes>
         <Route path="/" element={<PageTransition><Navigate to={isAuthenticated ? "/dashboard" : "/landing"} /></PageTransition>} />

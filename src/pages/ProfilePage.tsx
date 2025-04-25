@@ -15,7 +15,7 @@ const ProfilePage = () => {
   const [activeTab, setActiveTab] = useState('profile');
   
   if (!user) {
-    return null; // or loading state
+    return null; 
   }
   
   return (
