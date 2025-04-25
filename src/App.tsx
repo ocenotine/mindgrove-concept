@@ -23,7 +23,7 @@ import PrivacyPolicy from "./pages/PrivacyPolicy";
 import TourGuide from "./components/onboarding/TourGuide";
 import LoadingAnimation from "./components/animations/LoadingAnimation";
 import AIChat from "./pages/AIChat";
-import { markFirstVisit, markNewAccount } from "./utils/userOnboardingUtils";
+import { markFirstVisit } from "./utils/userOnboardingUtils";
 import { Analytics } from '@vercel/analytics/react';
 
 import * as THREE from 'three';
@@ -40,15 +40,9 @@ const queryClient = new QueryClient({
 
 // Protected route component
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { isAuthenticated, isLoading } = useAuthStore();
+  const { isAuthenticated, loading } = useAuthStore();
   
-  useEffect(() => {
-    if (isAuthenticated) {
-      markNewAccount();
-    }
-  }, [isAuthenticated]);
-  
-  if (isLoading) {
+  if (loading) {
     return <LoadingAnimation />;
   }
   
@@ -61,9 +55,9 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 
 // Public route that redirects to dashboard if already authenticated
 const PublicRoute = ({ children }: { children: React.ReactNode }) => {
-  const { isAuthenticated, isLoading } = useAuthStore();
+  const { isAuthenticated, loading } = useAuthStore();
   
-  if (isLoading) {
+  if (loading) {
     return <LoadingAnimation />;
   }
   

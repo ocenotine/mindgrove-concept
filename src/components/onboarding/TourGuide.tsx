@@ -4,7 +4,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, ChevronRight, ChevronLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useLocation } from 'react-router-dom';
-import { isNewAccount, markTourComplete } from '@/utils/userOnboardingUtils';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/store/authStore';
 
@@ -72,18 +71,27 @@ const TourGuide = () => {
       if (!user) return;
 
       try {
-        // Check if the user has completed the tour before
-        const { data: userPrefs } = await supabase
-          .from('user_preferences')
-          .select('tour_completed')
-          .eq('user_id', user.id)
+        // Check if this is a first-time login for the user
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('first_login, created_at')
+          .eq('id', user.id)
           .single();
 
-        // If there's no record or tour_completed is false, show the tour
-        if (!userPrefs || !userPrefs.tour_completed) {
-          // Show the tour for new users on dashboard
+        // If this is their first login or first_login is true, show the tour
+        if (profiles && (profiles.first_login === true || profiles.first_login === null)) {
+          // Only show tour on dashboard
           if (location.pathname === '/dashboard') {
             setTimeout(() => setIsVisible(true), 1000);
+            
+            // Update the profile to mark tour as seen
+            await supabase
+              .from('profiles')
+              .update({ 
+                first_login: false,
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', user.id);
           }
         }
       } catch (error) {
@@ -129,18 +137,17 @@ const TourGuide = () => {
 
   const closeTour = async () => {
     setIsVisible(false);
-    markTourComplete();
-
+    
     // Also mark tour as completed in the database
     if (user) {
       try {
         await supabase
-          .from('user_preferences')
-          .upsert({
-            user_id: user.id,
-            tour_completed: true,
+          .from('profiles')
+          .update({
+            first_login: false,
             updated_at: new Date().toISOString()
-          });
+          })
+          .eq('id', user.id);
       } catch (error) {
         console.error("Error saving tour completion status:", error);
       }
@@ -173,6 +180,17 @@ const TourGuide = () => {
 
     const step = tourSteps[currentStep];
     const padding = 20; // Space between target and tooltip
+    const isMobile = window.innerWidth < 640;
+    
+    // Adjust position for mobile screens
+    if (isMobile) {
+      return {
+        left: '50%',
+        top: step.position === 'bottom' ? 'auto' : '50%',
+        bottom: step.position === 'bottom' ? '80px' : 'auto',
+        transform: 'translateX(-50%)'
+      };
+    }
 
     switch (step.position) {
       case 'top':
@@ -270,6 +288,7 @@ const TourGuide = () => {
           style={{
             left: position.left,
             top: position.top,
+            bottom: position.bottom,
             transform: position.transform,
             zIndex: 101
           }}

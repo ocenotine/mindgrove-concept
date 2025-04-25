@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
+import MainLayout from '@/components/layout/MainLayout';
 import { PageTransition } from '@/components/animations/PageTransition';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -198,235 +199,237 @@ const AIChat = () => {
   };
 
   return (
-    <PageTransition>
-      <div className="h-full flex flex-col">
-        <div className="container mx-auto px-4 py-6 flex-1 flex flex-col">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h1 className="text-2xl font-bold flex items-center">
-                <MessageSquare className="h-6 w-6 mr-2 text-primary" />
-                AI Chat Assistant
-              </h1>
-              <p className="text-muted-foreground">
-                Chat with your documents or ask general questions
-              </p>
-            </div>
-            
-            <div className="flex items-center">
-              {selectedDocument && (
-                <Badge variant="outline" className="flex items-center gap-1.5 mr-4 py-1.5">
-                  <FileText className="h-3.5 w-3.5" /> 
-                  {selectedDocument.title.length > 20 
-                    ? selectedDocument.title.substring(0, 20) + '...' 
-                    : selectedDocument.title}
-                  <button className="ml-1" onClick={clearSelectedDocument}>
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                </Badge>
-              )}
-              
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="md:hidden"
-                onClick={toggleDocumentPanel}
-              >
-                {showDocumentPanel ? 'Hide Documents' : 'Show Documents'}
-              </Button>
-            </div>
-          </div>
-          
-          <div className="flex flex-1 gap-4 overflow-hidden">
-            {/* Main chat area */}
-            <div className="flex-1 flex flex-col">
-              <div className="flex-1 overflow-y-auto mb-4 space-y-4 p-4 border rounded-lg bg-card/50">
-                <AnimatePresence>
-                  {messages.map((message) => (
-                    <motion.div
-                      key={message.id}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.2 }}
-                      className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
-                    >
-                      <div className="flex gap-2 max-w-[85%]">
-                        {message.sender === 'ai' && (
-                          <Avatar className="h-8 w-8 mt-1">
-                            <AvatarFallback className="bg-primary text-primary-foreground">AI</AvatarFallback>
-                            <AvatarImage src="/mindgrove.png" />
-                          </Avatar>
-                        )}
-                        
-                        <div>
-                          {message.type === 'document' && message.documentTitle && (
-                            <div className="text-xs text-muted-foreground mb-1 flex items-center">
-                              <FileText className="h-3 w-3 mr-1" /> 
-                              About: {message.documentTitle}
-                            </div>
-                          )}
-                          
-                          <div 
-                            className={`rounded-lg p-4 ${
-                              message.sender === 'user' 
-                                ? 'bg-primary text-primary-foreground ml-auto' 
-                                : 'bg-muted border'
-                            }`}
-                          >
-                            {message.type === 'code' ? (
-                              <div className="overflow-auto">
-                                <div className="text-xs text-muted-foreground mb-2">
-                                  <Code className="h-3 w-3 inline mr-1" /> 
-                                  {message.codeLanguage || 'Code'}
-                                </div>
-                                <pre className="p-2 bg-black/10 rounded-md overflow-x-auto">
-                                  <code>{message.text.replace(/```[a-zA-Z]*\n|```/g, '')}</code>
-                                </pre>
-                              </div>
-                            ) : (
-                              <div className="whitespace-pre-wrap">{message.text}</div>
-                            )}
-                            
-                            <div className="text-xs opacity-70 mt-2 text-right">
-                              {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                            </div>
-                          </div>
-                        </div>
-                        
-                        {message.sender === 'user' && (
-                          <Avatar className="h-8 w-8 mt-1">
-                            <AvatarFallback className="bg-muted text-muted-foreground">
-                              {user?.name?.charAt(0) || 'U'}
-                            </AvatarFallback>
-                            <AvatarImage src={user?.avatarUrl || ''} />
-                          </Avatar>
-                        )}
-                      </div>
-                    </motion.div>
-                  ))}
-                  
-                  {isTyping && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="flex justify-start"
-                    >
-                      <div className="flex gap-2 max-w-[85%]">
-                        <Avatar className="h-8 w-8">
-                          <AvatarFallback className="bg-primary text-primary-foreground">AI</AvatarFallback>
-                          <AvatarImage src="/mindgrove.png" />
-                        </Avatar>
-                        
-                        <div className="rounded-lg p-4 bg-muted border">
-                          <div className="flex items-center gap-1.5">
-                            <div className="flex space-x-1 items-center">
-                              <motion.div 
-                                animate={{ y: [0, -4, 0] }} 
-                                transition={{ duration: 0.6, repeat: Infinity, repeatDelay: 0.1 }}
-                                className="h-1.5 w-1.5 rounded-full bg-primary"
-                              />
-                              <motion.div 
-                                animate={{ y: [0, -4, 0] }} 
-                                transition={{ duration: 0.6, repeat: Infinity, repeatDelay: 0.2, delay: 0.2 }}
-                                className="h-1.5 w-1.5 rounded-full bg-primary"
-                              />
-                              <motion.div 
-                                animate={{ y: [0, -4, 0] }} 
-                                transition={{ duration: 0.6, repeat: Infinity, repeatDelay: 0.3, delay: 0.4 }}
-                                className="h-1.5 w-1.5 rounded-full bg-primary"
-                              />
-                            </div>
-                            <span className="text-sm text-muted-foreground">Thinking...</span>
-                          </div>
-                        </div>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+    <MainLayout>
+      <PageTransition>
+        <div className="h-full flex flex-col">
+          <div className="container mx-auto px-4 py-6 flex-1 flex flex-col">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h1 className="text-2xl font-bold flex items-center">
+                  <MessageSquare className="h-6 w-6 mr-2 text-primary" />
+                  AI Chat Assistant
+                </h1>
+                <p className="text-muted-foreground">
+                  Chat with your documents or ask general questions
+                </p>
               </div>
               
-              <div className="flex gap-2 items-center">
-                <Input
-                  placeholder="Type your message..."
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={handleKeyPress}
-                  className="flex-1"
-                  disabled={isTyping}
-                />
+              <div className="flex items-center">
+                {selectedDocument && (
+                  <Badge variant="outline" className="flex items-center gap-1.5 mr-4 py-1.5">
+                    <FileText className="h-3.5 w-3.5" /> 
+                    {selectedDocument.title.length > 20 
+                      ? selectedDocument.title.substring(0, 20) + '...' 
+                      : selectedDocument.title}
+                    <button className="ml-1" onClick={clearSelectedDocument}>
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </Badge>
+                )}
+                
                 <Button 
-                  onClick={handleSendMessage} 
-                  disabled={!input.trim() || isTyping}
+                  variant="outline" 
+                  size="sm" 
+                  className="md:hidden"
+                  onClick={toggleDocumentPanel}
                 >
-                  {isTyping ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                  {showDocumentPanel ? 'Hide Documents' : 'Show Documents'}
                 </Button>
               </div>
             </div>
             
-            {/* Document panel - Hidden on mobile unless toggled */}
-            <AnimatePresence>
-              {showDocumentPanel && (
-                <motion.div 
-                  className="w-[300px] hidden md:block lg:flex-none"
-                  initial={{ opacity: 0, width: 0 }}
-                  animate={{ opacity: 1, width: 300 }}
-                  exit={{ opacity: 0, width: 0 }}
-                  transition={{ duration: 0.3 }}
-                >
-                  <Card className="p-4 h-full">
-                    <h3 className="font-medium text-lg mb-4 flex items-center">
-                      <FileText className="h-4 w-4 mr-2 text-muted-foreground" />
-                      Your Documents
-                    </h3>
-                    
-                    {loadingDocuments ? (
-                      <div className="flex justify-center py-8">
-                        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                      </div>
-                    ) : documents && documents.length > 0 ? (
-                      <div className="space-y-2">
-                        {documents.map((doc) => (
-                          <div
-                            key={doc.id}
-                            className={`p-2 rounded-md cursor-pointer hover:bg-accent transition-colors ${
-                              selectedDocument?.id === doc.id ? 'bg-accent' : ''
-                            }`}
-                            onClick={() => selectDocument(doc)}
-                          >
-                            <h4 className="font-medium text-sm truncate">{doc.title}</h4>
-                            <p className="text-xs text-muted-foreground">
-                              {new Date(doc.createdAt).toLocaleDateString()}
-                            </p>
+            <div className="flex flex-1 gap-4 overflow-hidden">
+              {/* Main chat area */}
+              <div className="flex-1 flex flex-col">
+                <div className="flex-1 overflow-y-auto mb-4 space-y-4 p-4 border rounded-lg bg-card/50">
+                  <AnimatePresence>
+                    {messages.map((message) => (
+                      <motion.div
+                        key={message.id}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.2 }}
+                        className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
+                      >
+                        <div className="flex gap-2 max-w-[85%]">
+                          {message.sender === 'ai' && (
+                            <Avatar className="h-8 w-8 mt-1">
+                              <AvatarFallback className="bg-primary text-primary-foreground">AI</AvatarFallback>
+                              <AvatarImage src="/mindgrove.png" />
+                            </Avatar>
+                          )}
+                          
+                          <div>
+                            {message.type === 'document' && message.documentTitle && (
+                              <div className="text-xs text-muted-foreground mb-1 flex items-center">
+                                <FileText className="h-3 w-3 mr-1" /> 
+                                About: {message.documentTitle}
+                              </div>
+                            )}
+                            
+                            <div 
+                              className={`rounded-lg p-4 ${
+                                message.sender === 'user' 
+                                  ? 'bg-primary text-primary-foreground ml-auto' 
+                                  : 'bg-muted border'
+                              }`}
+                            >
+                              {message.type === 'code' ? (
+                                <div className="overflow-auto">
+                                  <div className="text-xs text-muted-foreground mb-2">
+                                    <Code className="h-3 w-3 inline mr-1" /> 
+                                    {message.codeLanguage || 'Code'}
+                                  </div>
+                                  <pre className="p-2 bg-black/10 rounded-md overflow-x-auto">
+                                    <code>{message.text.replace(/```[a-zA-Z]*\n|```/g, '')}</code>
+                                  </pre>
+                                </div>
+                              ) : (
+                                <div className="whitespace-pre-wrap">{message.text}</div>
+                              )}
+                              
+                              <div className="text-xs opacity-70 mt-2 text-right">
+                                {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </div>
+                            </div>
                           </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-center py-8 text-muted-foreground">
-                        <FileText className="h-10 w-10 mx-auto mb-2 opacity-30" />
-                        <p className="text-sm">No documents found</p>
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          className="mt-4"
-                          onClick={() => navigate('/document/upload')}
-                        >
-                          Upload Document
-                        </Button>
-                      </div>
+                          
+                          {message.sender === 'user' && (
+                            <Avatar className="h-8 w-8 mt-1">
+                              <AvatarFallback className="bg-muted text-muted-foreground">
+                                {user?.name?.charAt(0) || 'U'}
+                              </AvatarFallback>
+                              <AvatarImage src={user?.avatarUrl || ''} />
+                            </Avatar>
+                          )}
+                        </div>
+                      </motion.div>
+                    ))}
+                    
+                    {isTyping && (
+                      <motion.div
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="flex justify-start"
+                      >
+                        <div className="flex gap-2 max-w-[85%]">
+                          <Avatar className="h-8 w-8">
+                            <AvatarFallback className="bg-primary text-primary-foreground">AI</AvatarFallback>
+                            <AvatarImage src="/mindgrove.png" />
+                          </Avatar>
+                          
+                          <div className="rounded-lg p-4 bg-muted border">
+                            <div className="flex items-center gap-1.5">
+                              <div className="flex space-x-1 items-center">
+                                <motion.div 
+                                  animate={{ y: [0, -4, 0] }} 
+                                  transition={{ duration: 0.6, repeat: Infinity, repeatDelay: 0.1 }}
+                                  className="h-1.5 w-1.5 rounded-full bg-primary"
+                                />
+                                <motion.div 
+                                  animate={{ y: [0, -4, 0] }} 
+                                  transition={{ duration: 0.6, repeat: Infinity, repeatDelay: 0.2, delay: 0.2 }}
+                                  className="h-1.5 w-1.5 rounded-full bg-primary"
+                                />
+                                <motion.div 
+                                  animate={{ y: [0, -4, 0] }} 
+                                  transition={{ duration: 0.6, repeat: Infinity, repeatDelay: 0.3, delay: 0.4 }}
+                                  className="h-1.5 w-1.5 rounded-full bg-primary"
+                                />
+                              </div>
+                              <span className="text-sm text-muted-foreground">Thinking...</span>
+                            </div>
+                          </div>
+                        </div>
+                      </motion.div>
                     )}
-                  </Card>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-          
-          <div className="mt-6 text-center text-xs text-muted-foreground">
-            <p>
-              Powered by MindGrove AI · <Button variant="link" size="sm" className="p-0 h-auto">Report Issues</Button>
-            </p>
+                  </AnimatePresence>
+                </div>
+                
+                <div className="flex gap-2 items-center">
+                  <Input
+                    placeholder="Type your message..."
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={handleKeyPress}
+                    className="flex-1"
+                    disabled={isTyping}
+                  />
+                  <Button 
+                    onClick={handleSendMessage} 
+                    disabled={!input.trim() || isTyping}
+                  >
+                    {isTyping ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                  </Button>
+                </div>
+              </div>
+              
+              {/* Document panel - Hidden on mobile unless toggled */}
+              <AnimatePresence>
+                {showDocumentPanel && (
+                  <motion.div 
+                    className="w-[300px] hidden md:block lg:flex-none"
+                    initial={{ opacity: 0, width: 0 }}
+                    animate={{ opacity: 1, width: 300 }}
+                    exit={{ opacity: 0, width: 0 }}
+                    transition={{ duration: 0.3 }}
+                  >
+                    <Card className="p-4 h-full">
+                      <h3 className="font-medium text-lg mb-4 flex items-center">
+                        <FileText className="h-4 w-4 mr-2 text-muted-foreground" />
+                        Your Documents
+                      </h3>
+                      
+                      {loadingDocuments ? (
+                        <div className="flex justify-center py-8">
+                          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                        </div>
+                      ) : documents && documents.length > 0 ? (
+                        <div className="space-y-2">
+                          {documents.map((doc) => (
+                            <div
+                              key={doc.id}
+                              className={`p-2 rounded-md cursor-pointer hover:bg-accent transition-colors ${
+                                selectedDocument?.id === doc.id ? 'bg-accent' : ''
+                              }`}
+                              onClick={() => selectDocument(doc)}
+                            >
+                              <h4 className="font-medium text-sm truncate">{doc.title}</h4>
+                              <p className="text-xs text-muted-foreground">
+                                {new Date(doc.createdAt).toLocaleDateString()}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="text-center py-8 text-muted-foreground">
+                          <FileText className="h-10 w-10 mx-auto mb-2 opacity-30" />
+                          <p className="text-sm">No documents found</p>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="mt-4"
+                            onClick={() => navigate('/document/upload')}
+                          >
+                            Upload Document
+                          </Button>
+                        </div>
+                      )}
+                    </Card>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+            
+            <div className="mt-6 text-center text-xs text-muted-foreground">
+              <p>
+                Powered by MindGrove AI · <Button variant="link" size="sm" className="p-0 h-auto">Report Issues</Button>
+              </p>
+            </div>
           </div>
         </div>
-      </div>
-    </PageTransition>
+      </PageTransition>
+    </MainLayout>
   );
 };
 

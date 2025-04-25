@@ -11,10 +11,14 @@ import {
   BookOpen,
   Settings,
   LogOut,
-  MessagesSquare,
+  MessageSquare,
 } from 'lucide-react';
 
-const Sidebar = () => {
+interface SidebarProps {
+  isCollapsed?: boolean;
+}
+
+const Sidebar = ({ isCollapsed = false }: SidebarProps) => {
   const navigate = useNavigate();
   const location = useLocation();
   const isMobile = useMediaQuery('(max-width: 768px)');
@@ -52,7 +56,7 @@ const Sidebar = () => {
     },
     {
       label: 'AI Chat',
-      icon: <MessagesSquare className="h-5 w-5" />,
+      icon: <MessageSquare className="h-5 w-5" />,
       href: '/chat',
     },
     {
@@ -67,7 +71,7 @@ const Sidebar = () => {
   }
 
   return (
-    <div className="h-screen w-64 bg-card border-r border-border shadow-sm flex flex-col">
+    <div className={`h-screen ${isCollapsed ? 'w-16' : 'w-64'} bg-card border-r border-border shadow-sm flex flex-col`}>
       {/* Logo */}
       <div className="px-4 py-5 flex items-center">
         <div className="bg-primary/10 w-10 h-10 rounded-xl flex items-center justify-center mr-3">
@@ -77,10 +81,12 @@ const Sidebar = () => {
             className="w-8 h-8"
           />
         </div>
-        <div>
-          <h1 className="text-lg font-bold text-foreground">MindGrove</h1>
-          <p className="text-xs text-muted-foreground">Research Assistant</p>
-        </div>
+        {!isCollapsed && (
+          <div>
+            <h1 className="text-lg font-bold text-foreground">MindGrove</h1>
+            <p className="text-xs text-muted-foreground">Research Assistant</p>
+          </div>
+        )}
       </div>
 
       <Separator />
@@ -91,7 +97,7 @@ const Sidebar = () => {
           <Button
             key={item.href}
             variant={location.pathname === item.href ? 'secondary' : 'ghost'}
-            className={`w-full justify-start ${
+            className={`w-full justify-${isCollapsed ? 'center' : 'start'} ${
               location.pathname === item.href
                 ? 'bg-muted'
                 : ''
@@ -99,7 +105,7 @@ const Sidebar = () => {
             onClick={() => navigate(item.href)}
           >
             {item.icon}
-            <span className="ml-3">{item.label}</span>
+            {!isCollapsed && <span className="ml-3">{item.label}</span>}
           </Button>
         ))}
       </nav>
@@ -107,11 +113,11 @@ const Sidebar = () => {
       <div className="p-4">
         <Button
           variant="outline"
-          className="w-full justify-start text-muted-foreground"
+          className={`w-full justify-${isCollapsed ? 'center' : 'start'} text-muted-foreground`}
           onClick={handleSignOut}
         >
-          <LogOut className="h-5 w-5 mr-3" />
-          Sign Out
+          <LogOut className="h-5 w-5" />
+          {!isCollapsed && <span className="ml-3">Sign Out</span>}
         </Button>
       </div>
     </div>
