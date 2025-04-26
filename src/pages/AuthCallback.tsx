@@ -1,29 +1,26 @@
 
-import { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/store/authStore';
 import { PageTransition } from '@/components/animations/PageTransition';
-import { supabase } from '@/integrations/supabase/client';
 import LoadingAnimation from '@/components/animations/LoadingAnimation';
+import { toast } from '@/components/ui/use-toast';
 
-const Index = () => {
+const AuthCallback = () => {
   const navigate = useNavigate();
-  const { isAuthenticated, loading, setUser, setSession } = useAuthStore(state => ({
-    isAuthenticated: state.isAuthenticated,
-    loading: state.loading,
-    setUser: state.setUser,
-    setSession: state.setSession
-  }));
-  const [isChecking, setIsChecking] = useState(true);
-  
+  const { setUser, setSession } = useAuthStore();
+
   useEffect(() => {
-    const checkAuth = async () => {
+    const handleAuthCallback = async () => {
       try {
-        // Check session directly
-        const { data } = await supabase.auth.getSession();
+        // Get session data
+        const { data, error } = await supabase.auth.getSession();
+        
+        if (error) throw error;
         
         if (data.session) {
-          // Process user metadata from session
+          // Process user metadata
           const user = data.session?.user ? {
             ...data.session.user,
             name: data.session.user.user_metadata?.name || data.session.user.user_metadata?.full_name,
@@ -35,43 +32,46 @@ const Index = () => {
             is_first_login: false
           } : null;
           
-          // Set user and session in the store
+          // Set user and session in store
           setSession(data.session);
           setUser(user);
           
-          // Direct to appropriate dashboard based on account type
-          const accountType = user?.user_metadata?.account_type;
-          if (accountType === 'institution') {
+          // Redirect based on user type
+          if (user?.user_metadata?.account_type === 'institution') {
             navigate('/institution/dashboard');
           } else {
             navigate('/dashboard');
           }
+          
+          toast({
+            title: "Login successful",
+            description: `Welcome back, ${user?.name || 'User'}!`,
+          });
         } else {
-          navigate('/landing');
+          navigate('/login');
         }
       } catch (error) {
-        console.error("Auth check error:", error);
-        navigate('/landing');
-      } finally {
-        setIsChecking(false);
+        console.error('Auth callback error:', error);
+        toast({
+          title: "Authentication error",
+          description: "There was a problem signing you in. Please try again.",
+          variant: "destructive"
+        });
+        navigate('/login');
       }
     };
     
-    // Execute auth check if it's not a direct callback route
-    if (!window.location.hash.includes('/auth/callback')) {
-      checkAuth();
-    } else {
-      setIsChecking(false);
-    }
-  }, [navigate, setUser, setSession]);
-  
+    handleAuthCallback();
+  }, [navigate, setSession, setUser]);
+
   return (
     <PageTransition>
       <div className="flex items-center justify-center min-h-screen">
-        {isChecking && <LoadingAnimation />}
+        <LoadingAnimation />
+        <p className="text-center text-muted-foreground mt-4">Completing authentication...</p>
       </div>
     </PageTransition>
   );
 };
 
-export default Index;
+export default AuthCallback;

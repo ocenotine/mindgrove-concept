@@ -1,374 +1,354 @@
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import InstitutionLayout from '@/components/layout/InstitutionLayout';
 import { useAuthStore } from '@/store/authStore';
-import { toast } from '@/components/ui/use-toast';
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { PageTransition } from '@/components/animations/PageTransition';
 import { supabase } from '@/integrations/supabase/client';
-import { Check, ExternalLink, BadgeDollarSign } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { CheckIcon, XIcon } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Label } from '@/components/ui/label';
-
-interface InstitutionData {
-  id: string;
-  name: string;
-  is_premium: boolean | null;
-  subscription_expiry?: string | null;
-}
+import { Input } from '@/components/ui/input';
+import { toast } from '@/components/ui/use-toast';
+import { PageTransition } from '@/components/animations/PageTransition';
+import { InstitutionData } from '@/types/institution';
+import { format, addDays } from 'date-fns';
 
 const InstitutionSubscription = () => {
   const { user } = useAuthStore();
-  const [institutionData, setInstitutionData] = useState<InstitutionData | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [selectedPlan, setSelectedPlan] = useState<'basic'|'premium'>(null);
-  const [couponCode, setCouponCode] = useState('');
-  const [isVerifying, setIsVerifying] = useState(false);
+  const [institutionData, setInstitutionData] = useState<InstitutionData>({
+    id: '',
+    name: '',
+    domain: '',
+    logo_url: null,
+    is_premium: false,
+    branding_colors: {
+      primary: '#6C72CB',
+      secondary: '#CB69C1'
+    },
+    created_at: '',
+    updated_at: '',
+    selar_co_id: null,
+    subscription_expiry: null
+  });
+  const [loading, setLoading] = useState(true);
   const [tokenDialogOpen, setTokenDialogOpen] = useState(false);
-
+  const [groveToken, setGroveToken] = useState('');
+  const [processingToken, setProcessingToken] = useState(false);
+  
   useEffect(() => {
-    const fetchInstitution = async () => {
-      if (!user || user.user_metadata?.account_type !== 'institution') {
-        return;
-      }
-
-      setIsLoading(true);
+    const fetchInstitutionData = async () => {
+      if (!user?.institution_id) return;
+      
       try {
-        const institutionId = user.user_metadata?.institution_id || user.institution_id;
+        setLoading(true);
+        const { data, error } = await supabase
+          .from('institutions')
+          .select('*')
+          .eq('id', user.institution_id)
+          .single();
         
-        if (institutionId) {
-          // Fetch the institution data
-          const { data: institution, error } = await supabase
-            .from('institutions')
-            .select('id, name, is_premium, subscription_expiry')
-            .eq('id', institutionId)
-            .single();
-
-          if (error) throw error;
-          setInstitutionData(institution);
+        if (error) throw error;
+        
+        if (data) {
+          // Parse branding colors from JSON if needed
+          let brandingColors = {
+            primary: '#6C72CB',
+            secondary: '#CB69C1'
+          };
+          
+          if (data.branding_colors) {
+            if (typeof data.branding_colors === 'string') {
+              try {
+                brandingColors = JSON.parse(data.branding_colors);
+              } catch (e) {
+                console.error('Error parsing branding colors:', e);
+              }
+            } else if (typeof data.branding_colors === 'object') {
+              brandingColors = data.branding_colors as any;
+            }
+          }
+          
+          const institutionWithTypedData: InstitutionData = {
+            ...data,
+            branding_colors: brandingColors,
+            subscription_expiry: data.subscription_expiry || null
+          };
+          
+          setInstitutionData(institutionWithTypedData);
         }
       } catch (error) {
-        console.error('Error fetching institution:', error);
-        setInstitutionData({
-          id: 'temp-id',
-          name: user.user_metadata?.institution_name || 'My Institution',
-          is_premium: false
+        console.error('Error fetching institution data:', error);
+        toast({
+          title: 'Error',
+          description: 'Could not load subscription data.',
+          variant: 'destructive'
         });
       } finally {
-        setIsLoading(false);
+        setLoading(false);
       }
     };
-
-    fetchInstitution();
-  }, [user]);
-
-  const handlePlanSelect = (plan: 'basic'|'premium') => {
-    setSelectedPlan(plan);
-  };
-
-  const handleVerifyToken = async () => {
-    setIsVerifying(true);
+    
+    fetchInstitutionData();
+  }, [user?.institution_id]);
+  
+  const redeemGroveToken = async () => {
+    if (!user?.institution_id) return;
     
     try {
-      // Check if the token is the valid Grove token
-      if (couponCode.toUpperCase() === 'THEGROVE') {
-        // Update institution to premium
-        if (institutionData?.id) {
-          const today = new Date();
-          const expiryDate = new Date();
-          expiryDate.setMonth(today.getMonth() + 1); // Set expiry to 1 month from now
-          
-          const { error } = await supabase
-            .from('institutions')
-            .update({ 
-              is_premium: true,
-              subscription_expiry: expiryDate.toISOString()
-            })
-            .eq('id', institutionData.id);
-          
-          if (error) throw error;
-          
-          // Update local state
-          setInstitutionData({
-            ...institutionData,
-            is_premium: true,
-            subscription_expiry: expiryDate.toISOString()
-          });
-          
-          toast({
-            title: 'Premium Activated!',
-            description: 'Your institution has been upgraded to Premium.',
-          });
-          
-          setTokenDialogOpen(false);
-        }
-      } else {
-        toast({
-          title: 'Invalid Token',
-          description: 'The token you entered is not valid.',
-          variant: 'destructive',
-        });
+      setProcessingToken(true);
+      
+      if (groveToken.trim().toUpperCase() !== 'THEGROVE') {
+        throw new Error('Invalid token');
       }
-    } catch (error) {
-      console.error('Error updating subscription:', error);
+      
+      // Set the institution to premium
+      const expiryDate = addDays(new Date(), 30); // 30-day subscription
+      
+      const { error } = await supabase
+        .from('institutions')
+        .update({
+          is_premium: true,
+          subscription_expiry: expiryDate.toISOString()
+        })
+        .eq('id', user.institution_id);
+      
+      if (error) throw error;
+      
+      // Update local state
+      setInstitutionData({
+        ...institutionData,
+        is_premium: true,
+        subscription_expiry: expiryDate.toISOString()
+      });
+      
+      toast({
+        title: 'Premium Activated',
+        description: 'Your institution is now on the premium plan!'
+      });
+      
+      setTokenDialogOpen(false);
+    } catch (error: any) {
+      console.error('Error redeeming token:', error);
       toast({
         title: 'Error',
-        description: 'Failed to activate premium subscription.',
-        variant: 'destructive',
+        description: error.message || 'Could not redeem token. Please try again.',
+        variant: 'destructive'
       });
     } finally {
-      setIsVerifying(false);
+      setProcessingToken(false);
     }
   };
-
-  const handlePaymentRedirect = () => {
-    window.open('https://selar.com/o54g54', '_blank');
-    toast({
-      title: 'Payment Redirect',
-      description: 'You are being redirected to the payment page.',
-    });
+  
+  const getSubscriptionStatus = () => {
+    if (!institutionData.is_premium) {
+      return 'Free';
+    }
+    
+    if (institutionData.subscription_expiry) {
+      const expiryDate = new Date(institutionData.subscription_expiry);
+      if (expiryDate > new Date()) {
+        return 'Premium';
+      }
+    }
+    
+    return 'Expired';
   };
-
-  // Format date for display
-  const formatDate = (dateString: string) => {
-    if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
+  
+  const getRemainingDays = () => {
+    if (!institutionData.subscription_expiry) return 0;
+    
+    const expiryDate = new Date(institutionData.subscription_expiry);
+    const today = new Date();
+    const diffTime = expiryDate.getTime() - today.getTime();
+    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   };
 
   return (
     <InstitutionLayout>
       <PageTransition>
-        <div className="container pb-10">
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold text-white">Subscription</h1>
-            <p className="text-gray-400 mt-1">
-              Manage your institution's subscription plan
-            </p>
-          </div>
-
-          {isLoading ? (
-            <div className="text-center py-10">
-              <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full mx-auto"></div>
-              <p className="mt-4 text-gray-400">Loading subscription details...</p>
-            </div>
-          ) : (
-            <>
-              {/* Current Plan */}
-              <Card className="bg-[#191C27] border-gray-800 mb-8">
-                <CardHeader>
-                  <CardTitle className="text-white flex items-center">
-                    <BadgeDollarSign className="mr-2 h-5 w-5 text-primary" />
-                    Current Subscription
-                  </CardTitle>
-                  <CardDescription className="text-gray-400">
-                    Your institution's active subscription
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="text-lg font-medium text-white">
-                        {institutionData?.is_premium ? 'Premium Plan' : 'Basic Plan'}
-                      </h3>
-                      {institutionData?.is_premium && institutionData?.subscription_expiry && (
-                        <p className="text-sm text-gray-400">
-                          Expires: {formatDate(institutionData.subscription_expiry)}
-                        </p>
-                      )}
+        <div className="space-y-6">
+          <h1 className="text-3xl font-bold tracking-tight">Subscription</h1>
+          
+          <div className="grid gap-6 md:grid-cols-2">
+            <Card className="bg-card/50">
+              <CardHeader>
+                <CardTitle className="flex justify-between items-center">
+                  <span>Current Plan</span>
+                  <span className={`px-3 py-1 text-sm rounded-full ${
+                    institutionData.is_premium ? 'bg-primary/20 text-primary' : 'bg-muted text-muted-foreground'
+                  }`}>
+                    {getSubscriptionStatus()}
+                  </span>
+                </CardTitle>
+                <CardDescription>
+                  {institutionData.is_premium && institutionData.subscription_expiry ? (
+                    <>Your subscription expires on {format(new Date(institutionData.subscription_expiry), 'PPP')}.</>
+                  ) : (
+                    <>You are currently on the Basic plan.</>
+                  )}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  {institutionData.is_premium && (
+                    <div className="text-3xl font-bold">
+                      {getRemainingDays()} days remaining
                     </div>
-                    <Badge variant={institutionData?.is_premium ? 'default' : 'secondary'}>
-                      {institutionData?.is_premium ? 'Active' : 'Free Tier'}
-                    </Badge>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Subscription Plans */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-                {/* Basic Plan */}
-                <Card className={`bg-[#191C27] border-gray-800 ${!institutionData?.is_premium && 'ring-2 ring-primary'}`}>
+                  )}
+                  <p className="text-muted-foreground">
+                    {institutionData.is_premium 
+                      ? 'Manage your premium features and get the most out of MindGrove.' 
+                      : 'Upgrade to Premium to unlock all features.'}
+                  </p>
+                </div>
+              </CardContent>
+              <CardFooter>
+                {!institutionData.is_premium && (
+                  <Button onClick={() => setTokenDialogOpen(true)} className="mr-2">
+                    Upgrade Now
+                  </Button>
+                )}
+                <Button variant="outline">View Usage</Button>
+              </CardFooter>
+            </Card>
+            
+            <div className="space-y-6">
+              <div className="grid gap-4 md:grid-cols-2">
+                <Card>
                   <CardHeader>
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <CardTitle className="text-white">Basic Plan</CardTitle>
-                        <CardDescription className="text-gray-400">For small institutions</CardDescription>
-                      </div>
-                      {!institutionData?.is_premium && (
-                        <Badge variant="outline" className="bg-primary/20 text-primary">Current Plan</Badge>
-                      )}
-                    </div>
-                    <div className="mt-4">
-                      <span className="text-3xl font-bold text-white">Free</span>
-                    </div>
+                    <CardTitle>Basic</CardTitle>
+                    <div className="text-3xl font-bold">Free</div>
                   </CardHeader>
-                  <CardContent className="space-y-3">
-                    <div className="space-y-3">
-                      <div className="flex items-start">
-                        <Check className="h-5 w-5 text-green-500 mr-2 mt-0.5" />
-                        <span className="text-gray-300">Up to 150 user accounts</span>
-                      </div>
-                      <div className="flex items-start">
-                        <Check className="h-5 w-5 text-green-500 mr-2 mt-0.5" />
-                        <span className="text-gray-300">500 monthly document processing</span>
-                      </div>
-                      <div className="flex items-start">
-                        <Check className="h-5 w-5 text-green-500 mr-2 mt-0.5" />
-                        <span className="text-gray-300">200 AI chat queries per month</span>
-                      </div>
-                      <div className="flex items-start">
-                        <Check className="h-5 w-5 text-green-500 mr-2 mt-0.5" />
-                        <span className="text-gray-300">Basic analytics</span>
-                      </div>
-                    </div>
+                  <CardContent>
+                    <ul className="space-y-2">
+                      <li className="flex items-start">
+                        <CheckIcon className="mr-2 h-5 w-5 text-green-500 flex-shrink-0" />
+                        <span>Basic AI chat</span>
+                      </li>
+                      <li className="flex items-start">
+                        <CheckIcon className="mr-2 h-5 w-5 text-green-500 flex-shrink-0" />
+                        <span>Up to 5 users</span>
+                      </li>
+                      <li className="flex items-start">
+                        <XIcon className="mr-2 h-5 w-5 text-muted-foreground flex-shrink-0" />
+                        <span className="text-muted-foreground">User management</span>
+                      </li>
+                      <li className="flex items-start">
+                        <XIcon className="mr-2 h-5 w-5 text-muted-foreground flex-shrink-0" />
+                        <span className="text-muted-foreground">Advanced analytics</span>
+                      </li>
+                    </ul>
                   </CardContent>
                   <CardFooter>
-                    <Button 
-                      className="w-full"
-                      variant="outline"
-                      disabled={!institutionData?.is_premium}
-                      onClick={() => handlePlanSelect('basic')}
-                    >
-                      {institutionData?.is_premium ? 'Downgrade to Basic' : 'Current Plan'}
-                    </Button>
+                    <Button variant="outline" disabled>Current Plan</Button>
                   </CardFooter>
                 </Card>
-
-                {/* Premium Plan */}
-                <Card className={`bg-[#191C27] border-gray-800 ${institutionData?.is_premium && 'ring-2 ring-primary'}`}>
+                
+                <Card className={`border-primary/50 ${institutionData.is_premium ? 'bg-primary/5' : ''}`}>
                   <CardHeader>
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <CardTitle className="text-white">Premium Plan</CardTitle>
-                        <CardDescription className="text-gray-400">For established institutions</CardDescription>
-                      </div>
-                      {institutionData?.is_premium && (
-                        <Badge variant="outline" className="bg-primary/20 text-primary">Current Plan</Badge>
-                      )}
-                    </div>
-                    <div className="mt-4">
-                      <span className="text-3xl font-bold text-white">UGX 100,000</span>
-                      <span className="text-gray-400 ml-1">/month</span>
-                    </div>
+                    <CardTitle>Premium</CardTitle>
+                    <div className="text-3xl font-bold">$49<span className="text-lg font-normal">/month</span></div>
                   </CardHeader>
-                  <CardContent className="space-y-3">
-                    <div className="space-y-3">
-                      <div className="flex items-start">
-                        <Check className="h-5 w-5 text-green-500 mr-2 mt-0.5" />
-                        <span className="text-gray-300">Unlimited user accounts</span>
-                      </div>
-                      <div className="flex items-start">
-                        <Check className="h-5 w-5 text-green-500 mr-2 mt-0.5" />
-                        <span className="text-gray-300">Unlimited document processing</span>
-                      </div>
-                      <div className="flex items-start">
-                        <Check className="h-5 w-5 text-green-500 mr-2 mt-0.5" />
-                        <span className="text-gray-300">Unlimited AI chat queries</span>
-                      </div>
-                      <div className="flex items-start">
-                        <Check className="h-5 w-5 text-green-500 mr-2 mt-0.5" />
-                        <span className="text-gray-300">Advanced analytics and reporting</span>
-                      </div>
-                      <div className="flex items-start">
-                        <Check className="h-5 w-5 text-green-500 mr-2 mt-0.5" />
-                        <span className="text-gray-300">User management features</span>
-                      </div>
-                      <div className="flex items-start">
-                        <Check className="h-5 w-5 text-green-500 mr-2 mt-0.5" />
-                        <span className="text-gray-300">Research collaboration tools</span>
-                      </div>
-                    </div>
+                  <CardContent>
+                    <ul className="space-y-2">
+                      <li className="flex items-start">
+                        <CheckIcon className="mr-2 h-5 w-5 text-green-500 flex-shrink-0" />
+                        <span>Unlimited AI chat</span>
+                      </li>
+                      <li className="flex items-start">
+                        <CheckIcon className="mr-2 h-5 w-5 text-green-500 flex-shrink-0" />
+                        <span>Unlimited users</span>
+                      </li>
+                      <li className="flex items-start">
+                        <CheckIcon className="mr-2 h-5 w-5 text-green-500 flex-shrink-0" />
+                        <span>User management</span>
+                      </li>
+                      <li className="flex items-start">
+                        <CheckIcon className="mr-2 h-5 w-5 text-green-500 flex-shrink-0" />
+                        <span>Advanced analytics</span>
+                      </li>
+                    </ul>
                   </CardContent>
                   <CardFooter>
-                    {institutionData?.is_premium ? (
-                      <Button className="w-full" disabled>
-                        Current Plan
-                      </Button>
+                    {institutionData.is_premium ? (
+                      <Button variant="outline" disabled>Current Plan</Button>
                     ) : (
-                      <Button 
-                        className="w-full"
-                        onClick={() => setTokenDialogOpen(true)}
-                      >
-                        Upgrade to Premium
-                      </Button>
+                      <Button onClick={() => setTokenDialogOpen(true)}>Upgrade</Button>
                     )}
                   </CardFooter>
                 </Card>
               </div>
-
-              {/* Dialog for token verification */}
-              <Dialog open={tokenDialogOpen} onOpenChange={setTokenDialogOpen}>
-                <DialogContent className="bg-[#191C27] text-white">
-                  <DialogHeader>
-                    <DialogTitle>Upgrade to Premium</DialogTitle>
-                    <DialogDescription className="text-gray-400">
-                      Choose your preferred payment method
-                    </DialogDescription>
-                  </DialogHeader>
-                  
-                  <Tabs defaultValue="token">
-                    <TabsList className="bg-[#131620]">
-                      <TabsTrigger value="token">Grove Token</TabsTrigger>
-                      <TabsTrigger value="payment">Payment</TabsTrigger>
-                    </TabsList>
-                    
-                    <TabsContent value="token" className="mt-4">
-                      <div className="space-y-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="token" className="text-gray-200">Enter Grove Token</Label>
-                          <Input
-                            id="token"
-                            value={couponCode}
-                            onChange={(e) => setCouponCode(e.target.value)}
-                            placeholder="Enter token code"
-                            className="bg-[#131620] border-gray-700 text-white"
-                          />
-                        </div>
-                        <p className="text-xs text-gray-400">
-                          Enter your Grove Token to activate Premium features instantly.
-                          Default token is "THEGROVE".
-                        </p>
-                      </div>
-                      <DialogFooter className="mt-4">
-                        <Button onClick={handleVerifyToken} disabled={isVerifying} className="w-full">
-                          {isVerifying ? 'Verifying...' : 'Activate Premium'}
-                        </Button>
-                      </DialogFooter>
-                    </TabsContent>
-                    
-                    <TabsContent value="payment" className="mt-4">
-                      <div className="space-y-4">
-                        <p className="text-gray-300">
-                          You will be redirected to our payment processor to complete your subscription.
-                        </p>
-                        <div className="p-3 bg-[#131620] rounded border border-gray-700">
-                          <p className="text-sm text-gray-400">
-                            Monthly subscription: UGX 100,000/month
-                          </p>
-                          <p className="text-xs text-gray-500 mt-1">
-                            Cancel anytime
-                          </p>
-                        </div>
-                      </div>
-                      <DialogFooter className="mt-4">
-                        <Button onClick={handlePaymentRedirect} className="w-full">
-                          Proceed to Payment <ExternalLink className="h-4 w-4 ml-2" />
-                        </Button>
-                      </DialogFooter>
-                    </TabsContent>
-                  </Tabs>
-                </DialogContent>
-              </Dialog>
-            </>
-          )}
+              
+              <Card>
+                <CardHeader>
+                  <CardTitle>Enterprise</CardTitle>
+                  <CardDescription>For large institutions with custom needs</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <p>Contact our sales team for a custom quote and tailored solutions.</p>
+                </CardContent>
+                <CardFooter>
+                  <Button variant="outline">Contact Sales</Button>
+                </CardFooter>
+              </Card>
+            </div>
+          </div>
         </div>
+        
+        <Dialog open={tokenDialogOpen} onOpenChange={setTokenDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Upgrade to Premium</DialogTitle>
+              <DialogDescription>
+                Choose how you'd like to activate your premium subscription.
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="grid gap-4 py-4">
+              <div className="space-y-4">
+                <h3 className="font-medium">Option 1: Redeem Grove Token</h3>
+                <div className="flex items-center space-x-2">
+                  <Input
+                    placeholder="Enter your token"
+                    value={groveToken}
+                    onChange={(e) => setGroveToken(e.target.value)}
+                  />
+                  <Button onClick={redeemGroveToken} disabled={processingToken}>
+                    {processingToken ? 'Redeeming...' : 'Redeem'}
+                  </Button>
+                </div>
+              </div>
+              
+              <div className="my-2">
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-background px-2 text-muted-foreground">Or</span>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="space-y-4">
+                <h3 className="font-medium">Option 2: Pay Online</h3>
+                <Button 
+                  onClick={() => window.open('https://selar.com/o54g54', '_blank')}
+                  variant="outline"
+                  className="w-full"
+                >
+                  Proceed to Payment
+                </Button>
+              </div>
+            </div>
+            
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setTokenDialogOpen(false)}>
+                Cancel
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </PageTransition>
     </InstitutionLayout>
   );

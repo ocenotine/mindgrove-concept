@@ -23,6 +23,7 @@ import InstitutionSettings from './pages/InstitutionSettings';
 import InstitutionSubscription from './pages/InstitutionSubscription';
 import InstitutionUsers from './pages/InstitutionUsers';
 import InstitutionAIChat from './pages/InstitutionAIChat';
+import AuthCallback from './pages/AuthCallback';
 
 function App() {
   return (
@@ -32,6 +33,7 @@ function App() {
         <Route path="/landing" element={<LandingPage />} />
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
+        <Route path="/auth/callback" element={<AuthCallback />} />
         
         {/* Student Routes */}
         <Route path="/dashboard" element={<Dashboard />} />

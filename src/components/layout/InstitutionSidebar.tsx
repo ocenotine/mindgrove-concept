@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/button';
 import { motion } from 'framer-motion';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/integrations/supabase/client';
 
 interface SidebarProps {
   isCollapsed: boolean;

@@ -25,6 +25,9 @@ const queryClient = new QueryClient({
   },
 });
 
+// Set up auth callback route for OAuth providers
+const callbackUrl = '/auth/callback';
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>
