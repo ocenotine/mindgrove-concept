@@ -27,6 +27,10 @@ const Login = () => {
     return null;
   }
 
+  const handleBackToLanding = () => {
+    navigate('/landing');
+  };
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -63,10 +67,6 @@ const Login = () => {
         variant: "destructive"
       });
     }
-  };
-
-  const handleBackToLanding = () => {
-    navigate('/landing');
   };
 
   return (
@@ -202,17 +202,18 @@ const Login = () => {
             </div>
           </div>
           
-          {/* Right side - Decoration */}
+          {/* Right side - Decoration with custom image */}
           <div className="hidden md:block md:w-1/2 bg-gradient-to-br from-primary/20 to-primary/30 p-12">
             <div className="h-full flex flex-col justify-center">
               <ParallaxScroll direction="up" speed={0.3}>
                 <div className="text-center">
-                  <h2 className="text-3xl font-bold mb-2">MindGrove</h2>
-                  <p className="text-lg text-muted-foreground mb-6">
-                    Cultivating Smarter Learners, One Streak at a Time!
-                  </p>
+                  <img 
+                    src="/lovable-uploads/d501d0da-a7b8-48c8-82f1-fea9624331d3.png" 
+                    alt="MindGrove AI Research" 
+                    className="mx-auto max-w-full h-auto mb-6"
+                  />
                   
-                  <div className="max-w-sm mx-auto p-6 rounded-lg bg-card/90 backdrop-blur-sm border shadow-lg">
+                  <div className="max-w-sm mx-auto p-6 mt-6 rounded-lg bg-card/90 backdrop-blur-sm border shadow-lg">
                     <p className="text-base font-medium">
                       "MindGrove has transformed my study habits completely. I've gone from struggling to maintain focus to establishing a consistent study streak for over 30 days!"
                     </p>

@@ -45,9 +45,18 @@ const LandingPage = () => {
         <main>
           {/* Hero Section */}
           <section className="relative">
-            <div className="container mx-auto py-24 px-6 text-center">
+            <div className="absolute inset-0 overflow-hidden" style={{ zIndex: -1 }}>
+              <div className="absolute inset-0 bg-black/50"> {/* Semi-transparent overlay */}
+                <img 
+                  src="/lovable-uploads/f73d1a1a-8bd0-4b9f-b8f5-02c5a6740722.png" 
+                  alt="MindGrove Banner" 
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            </div>
+            <div className="container mx-auto py-24 px-6 text-center relative z-10">
               <motion.h1
-                className="text-5xl md:text-6xl lg:text-7xl font-bold mb-6 text-foreground"
+                className="text-5xl md:text-6xl lg:text-7xl font-bold mb-6 text-white"
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.8, delay: 0.2 }}
@@ -56,7 +65,7 @@ const LandingPage = () => {
               </motion.h1>
               
               <motion.p
-                className="text-lg md:text-xl text-muted-foreground mb-8"
+                className="text-lg md:text-xl text-white/90 mb-8"
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.8, delay: 0.4 }}
@@ -72,16 +81,18 @@ const LandingPage = () => {
               >
                 {!isAuthenticated ? (
                   <>
-                    <Button asChild size="lg">
+                    <Button asChild size="lg" className="bg-primary hover:bg-primary/90 text-white">
                       <Link to="/signup">Get Started <ArrowRight className="ml-2" /></Link>
                     </Button>
-                    <Button asChild variant="outline" size="lg">
+                    <Button asChild variant="outline" size="lg" className="border-white text-white hover:bg-white/10">
                       <Link to="/login">Sign In</Link>
                     </Button>
                   </>
                 ) : (
                   <Button asChild size="lg">
-                    <Link to="/dashboard">Go to Dashboard <ArrowRight className="ml-2" /></Link>
+                    <Link to={user?.user_metadata?.account_type === 'institution' ? "/institution/dashboard" : "/dashboard"}>
+                      Go to Dashboard <ArrowRight className="ml-2" />
+                    </Link>
                   </Button>
                 )}
               </motion.div>
@@ -160,7 +171,7 @@ const LandingPage = () => {
           {/* Institution Banner */}
           <InstitutionBanner />
           
-          {/* Companion App Banner - Make sure it's included */}
+          {/* Companion App Banner */}
           <CompanionAppBanner />
         </main>
 

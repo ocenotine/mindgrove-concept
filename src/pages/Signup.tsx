@@ -15,12 +15,10 @@ const Signup = () => {
   const { signup, loginWithGoogle, isAuthenticated } = useAuthStore();
   const [activeTab, setActiveTab] = useState('student');
   
-  // Student form state
   const [studentName, setStudentName] = useState('');
   const [studentEmail, setStudentEmail] = useState('');
   const [studentPassword, setStudentPassword] = useState('');
   
-  // Institution form state
   const [institutionName, setInstitutionName] = useState('');
   const [adminName, setAdminName] = useState('');
   const [adminEmail, setAdminEmail] = useState('');
@@ -119,7 +117,6 @@ const Signup = () => {
           </Button>
         </div>
         <div className="flex-1 flex flex-col md:flex-row">
-          {/* Left side - Form */}
           <div className="w-full md:w-1/2 p-6 md:p-12 flex flex-col justify-center">
             <div className="max-w-md mx-auto w-full">
               <div className="text-center mb-8">
@@ -340,11 +337,16 @@ const Signup = () => {
             </div>
           </div>
           
-          {/* Right side - Decoration */}
           <div className="hidden md:block md:w-1/2 bg-gradient-to-br from-primary/20 to-primary/30 p-12">
             <div className="h-full flex flex-col justify-center">
               <ParallaxScroll direction="up" speed={0.3}>
                 <div className="text-center">
+                  <img 
+                    src="/lovable-uploads/d501d0da-a7b8-48c8-82f1-fea9624331d3.png" 
+                    alt="MindGrove AI Research" 
+                    className="mx-auto max-w-full h-auto mb-6"
+                  />
+                  
                   <h2 className="text-3xl font-bold mb-4">
                     {activeTab === "student" ? (
                       "Join thousands of students"

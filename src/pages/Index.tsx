@@ -29,7 +29,7 @@ const Index = () => {
             name: data.session.user.user_metadata?.name || data.session.user.user_metadata?.full_name,
             account_type: data.session.user.user_metadata?.account_type || 'student',
             avatarUrl: data.session.user.user_metadata?.avatar_url,
-            institution_id: data.session.user.user_metadata?.institution_id,
+            institution_id: data.session.user.user_metadata?.institution_id || 'default_institution',
             subscription_tier: 'free',
             subscription_expiry: null,
             is_first_login: false
