@@ -5,6 +5,7 @@ import Button from '@/components/common/Button';
 import { useDocumentStore } from '@/store/documentStore';
 import { toast } from '@/components/ui/use-toast';
 import { Progress } from '@/components/ui/progress';
+import { useAuthStore } from '@/store/authStore';
 
 interface ProcessingOptions {
   generateSummary: boolean;
@@ -30,6 +31,7 @@ const PDFUploader = ({
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadState, setUploadState] = useState<'idle' | 'uploading' | 'success' | 'error'>('idle');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { user } = useAuthStore();
   const { uploadDocument, isLoading, fetchDocuments } = useDocumentStore();
 
   const handleDragOver = (e: React.DragEvent<HTMLDivElement>) => {
@@ -81,7 +83,7 @@ const PDFUploader = ({
   };
 
   const handleUpload = async () => {
-    if (!selectedFile) return;
+    if (!selectedFile || !user) return;
     
     setUploadState('uploading');
     
@@ -98,13 +100,13 @@ const PDFUploader = ({
     try {
       console.log("Uploading document with processing options:", processingOptions);
       
-      const document = await uploadDocument(selectedFile);
+      const document = await uploadDocument(selectedFile, selectedFile.name, user.id);
       
       clearInterval(interval);
       setUploadProgress(100);
       setUploadState('success');
       
-      await fetchDocuments();
+      const documents = await fetchDocuments();
       
       toast({
         title: 'Document uploaded successfully',

@@ -51,13 +51,13 @@ const DocumentsPage = () => {
   };
 
   const handleDeleteDocument = async (documentId: string) => {
-    const success = await deleteDocument(documentId);
-    if (success) {
+    try {
+      await deleteDocument(documentId);
       toast({
         title: "Success",
         description: "Document deleted successfully.",
       });
-    } else {
+    } catch (error) {
       toast({
         title: "Error",
         description: "Failed to delete document.",

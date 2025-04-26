@@ -1,19 +1,28 @@
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 
 const LoadingAnimation = () => {
+  const navigate = useNavigate();
+  const [timedOut, setTimedOut] = useState(false);
+
   // Set a timeout to ensure the loading animation doesn't display too long
   useEffect(() => {
     const timer = setTimeout(() => {
+      // Only redirect if we're still on this page after timeout
+      setTimedOut(true);
+      
       // Force redirect to landing page if loading takes too long
       if (window.location.pathname !== '/login' && window.location.pathname !== '/signup') {
-        window.location.href = '/landing';
+        navigate('/landing');
       }
-    }, 10000); // 10 seconds timeout
-    
-    return () => clearTimeout(timer);
-  }, []);
+    }, 8000); // 8 seconds timeout
+
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [navigate]);
 
   return (
     <motion.div
@@ -70,7 +79,27 @@ const LoadingAnimation = () => {
           />
         </motion.div>
         
-        <p className="mt-4 text-muted-foreground">Cultivating knowledge...</p>
+        <p className="mt-4 text-muted-foreground">
+          {timedOut 
+            ? "Taking longer than expected... Redirecting you now." 
+            : "Cultivating knowledge..."}
+        </p>
+        
+        {timedOut && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.5 }}
+            className="mt-4"
+          >
+            <button 
+              className="bg-primary text-primary-foreground px-4 py-2 rounded-md"
+              onClick={() => navigate('/landing')}
+            >
+              Go to Landing Page
+            </button>
+          </motion.div>
+        )}
       </motion.div>
     </motion.div>
   );

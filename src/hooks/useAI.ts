@@ -1,17 +1,12 @@
 
 import { useState } from 'react';
 import { toast } from '@/components/ui/use-toast';
-import { useDocumentStore } from '@/store/documentStore';
+import { useDocumentStore, Flashcard } from '@/store/documentStore';
 import { generateDocumentSummary, generateFlashcards, playNotificationSound } from '@/utils/openRouterUtils';
 
 interface UseAIProps {
   onSuccess?: (data: any) => void;
   onError?: (error: Error) => void;
-}
-
-interface Flashcard {
-  question: string;
-  answer: string;
 }
 
 export function useAI({ onSuccess, onError }: UseAIProps = {}) {

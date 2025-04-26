@@ -1,450 +1,291 @@
 
-import React, { useState, useEffect } from 'react';
-import { PageTransition } from '@/components/animations/PageTransition';
+import React, { useState, useRef, useEffect } from 'react';
+import { motion } from 'framer-motion';
+import { Send, User, Bot, ChevronDown, ChevronUp, Sparkles, Info, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card } from '@/components/ui/card';
+import { Textarea } from '@/components/ui/textarea';
+import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
+import MainLayout from '@/components/layout/MainLayout';
+import { PageTransition } from '@/components/animations/PageTransition';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import { toast } from '@/components/ui/use-toast';
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
-import { Loader2, Send, Bot, User, FileText, Code, Sparkles, MessageSquare, ChevronRight } from 'lucide-react';
-import { useAuthStore } from '@/store/authStore';
+import Typewriter from '@/components/chat/Typewriter';
 import { generateDocumentChatResponse } from '@/utils/openRouterUtils';
-import { motion, AnimatePresence } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
 
 interface Message {
   id: string;
   text: string;
   sender: 'user' | 'ai';
   timestamp: Date;
-  type?: 'text' | 'code' | 'document';
-  codeLanguage?: string;
-  documentId?: string;
-  documentTitle?: string;
+  isTyping?: boolean;
 }
 
-interface DocumentPreview {
-  id: string;
-  title: string;
-  extractedText: string | null;
-  createdAt: string;
-}
+const WELCOME_MESSAGE = "👋 Hello! I'm your MindGrove AI assistant. You can ask me anything about your documents, academic concepts, or study strategies. How can I help you today?";
 
 const AIChat = () => {
-  const { user } = useAuthStore();
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [input, setInput] = useState('');
-  const [isTyping, setIsTyping] = useState(false);
-  const [selectedDocument, setSelectedDocument] = useState<DocumentPreview | null>(null);
-  const [showDocumentPanel, setShowDocumentPanel] = useState(true);
-  const navigate = useNavigate();
-
-  // Fetch user's documents
-  const { data: documents, isLoading: loadingDocuments } = useQuery({
-    queryKey: ['userDocuments'],
-    queryFn: async () => {
-      if (!user) return [];
-      const { data, error } = await supabase
-        .from('documents')
-        .select('id, title, extracted_text, created_at')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .limit(10);
-        
-      if (error) throw error;
-      
-      return data as DocumentPreview[];
+  const [messages, setMessages] = useState<Message[]>([
+    {
+      id: 'welcome',
+      text: WELCOME_MESSAGE,
+      sender: 'ai',
+      timestamp: new Date(),
     }
-  });
-
+  ]);
+  const [inputMessage, setInputMessage] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [typingComplete, setTypingComplete] = useState<Record<string, boolean>>({});
+  
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  
+  // Auto scroll to bottom when new messages arrive
   useEffect(() => {
-    // Initialize with welcome message
-    if (messages.length === 0) {
-      setMessages([
-        {
-          id: 'welcome',
-          text: "👋 Hello! I'm your MindGrove AI assistant. I can help you understand your documents, answer questions, and assist with your research. Select a document from the sidebar or ask me a general question!",
-          sender: 'ai',
-          timestamp: new Date(),
-          type: 'text'
-        }
-      ]);
+    scrollToBottom();
+  }, [messages, typingComplete]);
+  
+  // Focus input on load
+  useEffect(() => {
+    if (inputRef.current) {
+      inputRef.current.focus();
     }
   }, []);
-
+  
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+  
   const handleSendMessage = async () => {
-    if (!input.trim()) return;
+    if (!inputMessage.trim()) return;
     
-    // Create user message
+    const userMessageText = inputMessage.trim();
+    setInputMessage('');
+    
+    // Add user message to chat
     const userMessage: Message = {
       id: `user-${Date.now()}`,
-      text: input,
+      text: userMessageText,
       sender: 'user',
       timestamp: new Date(),
-      type: 'text'
     };
     
-    // Add document context if a document is selected
-    if (selectedDocument) {
-      userMessage.documentId = selectedDocument.id;
-      userMessage.documentTitle = selectedDocument.title;
-      userMessage.type = 'document';
-    }
-    
     setMessages(prev => [...prev, userMessage]);
-    setInput('');
-    setIsTyping(true);
+    
+    // Show AI typing indicator
+    const typingMessage: Message = {
+      id: `ai-typing-${Date.now()}`,
+      text: '...',
+      sender: 'ai',
+      timestamp: new Date(),
+      isTyping: true,
+    };
+    
+    setMessages(prev => [...prev, typingMessage]);
+    setIsLoading(true);
     
     try {
-      let response: string;
+      // Generate AI response without document context
+      const response = await generateDocumentChatResponse('', userMessageText);
       
-      if (selectedDocument && selectedDocument.extractedText) {
-        // Document-specific chat
-        response = await generateDocumentChatResponse(
-          selectedDocument.extractedText,
-          input
-        );
-      } else {
-        // General chat
-        response = await generateDocumentChatResponse(
-          "", // No document context
-          input
-        );
-      }
+      // Remove typing indicator and add actual response
+      setMessages(prev => prev.filter(msg => !msg.isTyping));
       
-      // Look for code blocks in the response
-      const codeBlockRegex = /```([a-zA-Z]*)\n([\s\S]*?)```/g;
-      let match = codeBlockRegex.exec(response);
-      
-      if (match) {
-        // We have a code block
-        const aiMessage: Message = {
-          id: `ai-${Date.now()}`,
-          text: response,
-          sender: 'ai',
-          timestamp: new Date(),
-          type: 'code',
-          codeLanguage: match[1] || 'plaintext'
-        };
-        setMessages(prev => [...prev, aiMessage]);
-      } else {
-        // Regular text response
-        const aiMessage: Message = {
-          id: `ai-${Date.now()}`,
-          text: response,
-          sender: 'ai',
-          timestamp: new Date(),
-          type: 'text'
-        };
-        setMessages(prev => [...prev, aiMessage]);
-      }
-    } catch (error) {
-      console.error('Error sending message:', error);
-      
-      // Error message
-      const errorMessage: Message = {
+      const aiMessage: Message = {
         id: `ai-${Date.now()}`,
-        text: "I'm sorry, but I encountered an error processing your request. Please try again later.",
+        text: response,
         sender: 'ai',
         timestamp: new Date(),
-        type: 'text'
       };
+      
+      setMessages(prev => [...prev, aiMessage]);
+    } catch (error) {
+      console.error('Error generating response:', error);
+      
+      // Remove typing indicator
+      setMessages(prev => prev.filter(msg => !msg.isTyping));
+      
+      // Add error message
+      const errorMessage: Message = {
+        id: `ai-error-${Date.now()}`,
+        text: "I'm sorry, I encountered an issue while processing your request. Please try again.",
+        sender: 'ai',
+        timestamp: new Date(),
+      };
+      
       setMessages(prev => [...prev, errorMessage]);
+      
+      toast({
+        title: 'Error',
+        description: 'Failed to generate a response. Please try again.',
+        variant: 'destructive',
+      });
     } finally {
-      setIsTyping(false);
+      setIsLoading(false);
     }
   };
-
-  const handleKeyPress = (e: React.KeyboardEvent) => {
+  
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       handleSendMessage();
     }
   };
-
-  const selectDocument = (doc: DocumentPreview) => {
-    setSelectedDocument(doc);
+  
+  const handleTypewriterComplete = (messageId: string) => {
+    setTypingComplete(prev => ({
+      ...prev,
+      [messageId]: true
+    }));
+  };
+  
+  const clearChat = () => {
+    setMessages([
+      {
+        id: 'welcome',
+        text: WELCOME_MESSAGE,
+        sender: 'ai',
+        timestamp: new Date(),
+      }
+    ]);
     
-    // Add system message about document selection
-    const systemMessage: Message = {
-      id: `system-${Date.now()}`,
-      text: `📄 Now chatting about "${doc.title}". You can ask questions specific to this document.`,
-      sender: 'ai',
-      timestamp: new Date(),
-      type: 'text'
-    };
-    setMessages(prev => [...prev, systemMessage]);
+    toast({
+      title: 'Chat cleared',
+      description: 'All messages have been removed.',
+    });
   };
-
-  const clearSelectedDocument = () => {
-    setSelectedDocument(null);
-    
-    // Add system message about clearing document
-    const systemMessage: Message = {
-      id: `system-${Date.now()}`,
-      text: "You're now in general chat mode. You can ask me about anything or select another document.",
-      sender: 'ai',
-      timestamp: new Date(),
-      type: 'text'
-    };
-    setMessages(prev => [...prev, systemMessage]);
-  };
-
-  const toggleDocumentPanel = () => {
-    setShowDocumentPanel(!showDocumentPanel);
-  };
-
+  
   return (
-    <PageTransition>
-      <div className="h-full flex flex-col">
-        <div className="container mx-auto px-4 py-6 flex-1 flex flex-col">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h1 className="text-2xl font-bold flex items-center">
-                <MessageSquare className="h-6 w-6 mr-2 text-primary" />
-                AI Chat Assistant
-              </h1>
-              <p className="text-muted-foreground">
-                Chat with your documents or ask general questions
-              </p>
+    <MainLayout>
+      <PageTransition>
+        <div className="container mx-auto">
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-2xl font-bold">AI Assistant</h1>
+                <p className="text-muted-foreground">Chat with our AI to help with your studies</p>
+              </div>
+              
+              <Button variant="ghost" onClick={clearChat}>Clear Chat</Button>
             </div>
             
-            <div className="flex items-center">
-              {selectedDocument && (
-                <Badge variant="outline" className="flex items-center gap-1.5 mr-4 py-1.5">
-                  <FileText className="h-3.5 w-3.5" /> 
-                  {selectedDocument.title.length > 20 
-                    ? selectedDocument.title.substring(0, 20) + '...' 
-                    : selectedDocument.title}
-                  <button className="ml-1" onClick={clearSelectedDocument}>
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                </Badge>
-              )}
-              
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="md:hidden"
-                onClick={toggleDocumentPanel}
-              >
-                {showDocumentPanel ? 'Hide Documents' : 'Show Documents'}
-              </Button>
-            </div>
-          </div>
-          
-          <div className="flex flex-1 gap-4 overflow-hidden">
-            {/* Main chat area */}
-            <div className="flex-1 flex flex-col">
-              <div className="flex-1 overflow-y-auto mb-4 space-y-4 p-4 border rounded-lg bg-card/50">
-                <AnimatePresence>
-                  {messages.map((message) => (
-                    <motion.div
+            <Alert className="bg-primary/10 border-primary/20">
+              <Sparkles className="h-4 w-4" />
+              <AlertTitle>Powered by AI</AlertTitle>
+              <AlertDescription>
+                This chat uses advanced AI to answer your questions. While helpful, remember to verify important information.
+              </AlertDescription>
+            </Alert>
+            
+            <Card className="flex flex-col h-[600px]">
+              <CardContent className="flex-1 overflow-y-auto p-4">
+                <div className="space-y-4">
+                  {messages.map((message, index) => (
+                    <div
                       key={message.id}
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ duration: 0.2 }}
                       className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
                     >
-                      <div className="flex gap-2 max-w-[85%]">
+                      <div className="flex items-start max-w-[80%]">
                         {message.sender === 'ai' && (
-                          <Avatar className="h-8 w-8 mt-1">
-                            <AvatarFallback className="bg-primary text-primary-foreground">AI</AvatarFallback>
-                            <AvatarImage src="/mindgrove.png" />
-                          </Avatar>
+                          <div className="mr-2 mt-1">
+                            <Avatar className="h-8 w-8 bg-primary">
+                              <AvatarFallback className="bg-primary text-primary-foreground">
+                                <Bot className="h-4 w-4" />
+                              </AvatarFallback>
+                            </Avatar>
+                          </div>
                         )}
                         
-                        <div>
-                          {message.type === 'document' && message.documentTitle && (
-                            <div className="text-xs text-muted-foreground mb-1 flex items-center">
-                              <FileText className="h-3 w-3 mr-1" /> 
-                              About: {message.documentTitle}
+                        <div
+                          className={`rounded-lg p-3 ${
+                            message.sender === 'user'
+                              ? 'bg-primary text-primary-foreground'
+                              : message.isTyping
+                              ? 'bg-muted'
+                              : 'bg-muted'
+                          }`}
+                        >
+                          {message.isTyping ? (
+                            <div className="flex space-x-1">
+                              <motion.span
+                                animate={{ y: [0, -5, 0] }}
+                                transition={{ repeat: Infinity, duration: 0.5 }}
+                                className="h-2 w-2 bg-foreground/60 rounded-full"
+                              />
+                              <motion.span
+                                animate={{ y: [0, -5, 0] }}
+                                transition={{ repeat: Infinity, duration: 0.5, delay: 0.1 }}
+                                className="h-2 w-2 bg-foreground/60 rounded-full"
+                              />
+                              <motion.span
+                                animate={{ y: [0, -5, 0] }}
+                                transition={{ repeat: Infinity, duration: 0.5, delay: 0.2 }}
+                                className="h-2 w-2 bg-foreground/60 rounded-full"
+                              />
                             </div>
+                          ) : message.sender === 'ai' && !typingComplete[message.id] ? (
+                            <Typewriter
+                              text={message.text}
+                              delay={20}
+                              onComplete={() => handleTypewriterComplete(message.id)}
+                              cursor={true}
+                            />
+                          ) : (
+                            <div className="whitespace-pre-wrap">{message.text}</div>
                           )}
                           
-                          <div 
-                            className={`rounded-lg p-4 ${
-                              message.sender === 'user' 
-                                ? 'bg-primary text-primary-foreground ml-auto' 
-                                : 'bg-muted border'
-                            }`}
-                          >
-                            {message.type === 'code' ? (
-                              <div className="overflow-auto">
-                                <div className="text-xs text-muted-foreground mb-2">
-                                  <Code className="h-3 w-3 inline mr-1" /> 
-                                  {message.codeLanguage || 'Code'}
-                                </div>
-                                <pre className="p-2 bg-black/10 rounded-md overflow-x-auto">
-                                  <code>{message.text.replace(/```[a-zA-Z]*\n|```/g, '')}</code>
-                                </pre>
-                              </div>
-                            ) : (
-                              <div className="whitespace-pre-wrap">{message.text}</div>
-                            )}
-                            
-                            <div className="text-xs opacity-70 mt-2 text-right">
-                              {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                            </div>
+                          <div className="text-xs opacity-70 mt-1 text-right">
+                            {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                           </div>
                         </div>
                         
                         {message.sender === 'user' && (
-                          <Avatar className="h-8 w-8 mt-1">
-                            <AvatarFallback className="bg-muted text-muted-foreground">
-                              {user?.name?.charAt(0) || 'U'}
-                            </AvatarFallback>
-                            <AvatarImage src={user?.avatarUrl || ''} />
-                          </Avatar>
+                          <div className="ml-2 mt-1">
+                            <Avatar className="h-8 w-8 bg-primary/20">
+                              <AvatarFallback className="bg-primary/20 text-primary">
+                                <User className="h-4 w-4" />
+                              </AvatarFallback>
+                            </Avatar>
+                          </div>
                         )}
                       </div>
-                    </motion.div>
+                    </div>
                   ))}
-                  
-                  {isTyping && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="flex justify-start"
-                    >
-                      <div className="flex gap-2 max-w-[85%]">
-                        <Avatar className="h-8 w-8">
-                          <AvatarFallback className="bg-primary text-primary-foreground">AI</AvatarFallback>
-                          <AvatarImage src="/mindgrove.png" />
-                        </Avatar>
-                        
-                        <div className="rounded-lg p-4 bg-muted border">
-                          <div className="flex items-center gap-1.5">
-                            <div className="flex space-x-1 items-center">
-                              <motion.div 
-                                animate={{ y: [0, -4, 0] }} 
-                                transition={{ duration: 0.6, repeat: Infinity, repeatDelay: 0.1 }}
-                                className="h-1.5 w-1.5 rounded-full bg-primary"
-                              />
-                              <motion.div 
-                                animate={{ y: [0, -4, 0] }} 
-                                transition={{ duration: 0.6, repeat: Infinity, repeatDelay: 0.2, delay: 0.2 }}
-                                className="h-1.5 w-1.5 rounded-full bg-primary"
-                              />
-                              <motion.div 
-                                animate={{ y: [0, -4, 0] }} 
-                                transition={{ duration: 0.6, repeat: Infinity, repeatDelay: 0.3, delay: 0.4 }}
-                                className="h-1.5 w-1.5 rounded-full bg-primary"
-                              />
-                            </div>
-                            <span className="text-sm text-muted-foreground">Thinking...</span>
-                          </div>
-                        </div>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
+                  <div ref={messagesEndRef} />
+                </div>
+              </CardContent>
               
-              <div className="flex gap-2 items-center">
-                <Input
-                  placeholder="Type your message..."
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={handleKeyPress}
-                  className="flex-1"
-                  disabled={isTyping}
-                />
-                <Button 
-                  onClick={handleSendMessage} 
-                  disabled={!input.trim() || isTyping}
-                >
-                  {isTyping ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                </Button>
-              </div>
-            </div>
-            
-            {/* Document panel - Hidden on mobile unless toggled */}
-            <AnimatePresence>
-              {showDocumentPanel && (
-                <motion.div 
-                  className="w-[300px] hidden md:block lg:flex-none"
-                  initial={{ opacity: 0, width: 0 }}
-                  animate={{ opacity: 1, width: 300 }}
-                  exit={{ opacity: 0, width: 0 }}
-                  transition={{ duration: 0.3 }}
-                >
-                  <Card className="p-4 h-full">
-                    <h3 className="font-medium text-lg mb-4 flex items-center">
-                      <FileText className="h-4 w-4 mr-2 text-muted-foreground" />
-                      Your Documents
-                    </h3>
-                    
-                    {loadingDocuments ? (
-                      <div className="flex justify-center py-8">
-                        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                      </div>
-                    ) : documents && documents.length > 0 ? (
-                      <div className="space-y-2">
-                        {documents.map((doc) => (
-                          <div
-                            key={doc.id}
-                            className={`p-2 rounded-md cursor-pointer hover:bg-accent transition-colors ${
-                              selectedDocument?.id === doc.id ? 'bg-accent' : ''
-                            }`}
-                            onClick={() => selectDocument(doc)}
-                          >
-                            <h4 className="font-medium text-sm truncate">{doc.title}</h4>
-                            <p className="text-xs text-muted-foreground">
-                              {new Date(doc.createdAt).toLocaleDateString()}
-                            </p>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-center py-8 text-muted-foreground">
-                        <FileText className="h-10 w-10 mx-auto mb-2 opacity-30" />
-                        <p className="text-sm">No documents found</p>
-                        <Button 
-                          variant="outline" 
-                          size="sm" 
-                          className="mt-4"
-                          onClick={() => navigate('/document/upload')}
-                        >
-                          Upload Document
-                        </Button>
-                      </div>
-                    )}
-                  </Card>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-          
-          <div className="mt-6 text-center text-xs text-muted-foreground">
-            <p>
-              Powered by MindGrove AI · <Button variant="link" size="sm" className="p-0 h-auto">Report Issues</Button>
-            </p>
+              <CardFooter className="p-4 border-t">
+                <div className="flex w-full gap-2">
+                  <Textarea
+                    ref={inputRef}
+                    value={inputMessage}
+                    onChange={(e) => setInputMessage(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder="Type your message..."
+                    className="flex-1 min-h-[40px]"
+                    disabled={isLoading}
+                  />
+                  <Button 
+                    onClick={handleSendMessage} 
+                    disabled={isLoading || !inputMessage.trim()} 
+                    size="icon"
+                    className="h-[40px]"
+                  >
+                    <Send className="h-4 w-4" />
+                  </Button>
+                </div>
+                <div className="text-xs text-muted-foreground mt-1">
+                  Press Enter to send, Shift+Enter for a new line
+                </div>
+              </CardFooter>
+            </Card>
           </div>
         </div>
-      </div>
-    </PageTransition>
+      </PageTransition>
+    </MainLayout>
   );
 };
 
 export default AIChat;
-
-// Helper components
-const X = ({ className }: { className?: string }) => (
-  <svg 
-    xmlns="http://www.w3.org/2000/svg" 
-    viewBox="0 0 24 24" 
-    fill="none" 
-    stroke="currentColor" 
-    strokeWidth="2" 
-    strokeLinecap="round" 
-    strokeLinejoin="round" 
-    className={className}
-  >
-    <line x1="18" y1="6" x2="6" y2="18"></line>
-    <line x1="6" y1="6" x2="18" y2="18"></line>
-  </svg>
-);

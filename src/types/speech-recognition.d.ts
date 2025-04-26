@@ -1,7 +1,8 @@
 
 interface SpeechRecognitionEvent extends Event {
-  resultIndex: number;
   results: SpeechRecognitionResultList;
+  interpretation: any;
+  emma: Document | null;
 }
 
 interface SpeechRecognitionResultList {
@@ -11,10 +12,10 @@ interface SpeechRecognitionResultList {
 }
 
 interface SpeechRecognitionResult {
-  isFinal: boolean;
   length: number;
   item(index: number): SpeechRecognitionAlternative;
   [index: number]: SpeechRecognitionAlternative;
+  isFinal: boolean;
 }
 
 interface SpeechRecognitionAlternative {
@@ -24,6 +25,7 @@ interface SpeechRecognitionAlternative {
 
 interface SpeechRecognition extends EventTarget {
   continuous: boolean;
+  grammars: any;
   interimResults: boolean;
   lang: string;
   maxAlternatives: number;
@@ -38,9 +40,9 @@ interface SpeechRecognition extends EventTarget {
   onspeechend: ((this: SpeechRecognition, ev: Event) => any) | null;
   onspeechstart: ((this: SpeechRecognition, ev: Event) => any) | null;
   onstart: ((this: SpeechRecognition, ev: Event) => any) | null;
+  abort(): void;
   start(): void;
   stop(): void;
-  abort(): void;
 }
 
 interface SpeechRecognitionConstructor {

@@ -10,6 +10,7 @@ import { useAuthStore } from '@/store/authStore';
 import { Navigate } from 'react-router-dom';
 import ChatBot from '@/components/chat/ChatBot';
 import MobileBottomNav from '@/components/layout/MobileBottomNav';
+import CompanionAppAd from '@/components/CompanionAppAd';
 
 interface MainLayoutProps {
   children: React.ReactNode;
@@ -41,6 +42,7 @@ const MainLayout = ({ children }: MainLayoutProps) => {
           animate={{ opacity: 1 }}
           transition={{ duration: 0.3 }}
         >
+          <CompanionAppAd />
           <div className="fixed bottom-20 right-4 z-50">
             <ChatBot />
           </div>

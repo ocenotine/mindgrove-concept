@@ -1,3 +1,4 @@
+
 import { useEffect } from 'react';
 import MainLayout from '@/components/layout/MainLayout';
 import DashboardHeader from '@/components/dashboard/DashboardHeader';
@@ -9,6 +10,7 @@ import { motion } from 'framer-motion';
 import { Plus, Rocket, BookOpen, BrainCircuit, ChartLine, Clock } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import ContactForm from '@/components/common/ContactForm';
+import LeaderboardCard from '@/components/dashboard/LeaderboardCard';
 
 const Dashboard = () => {
   const { user } = useAuthStore();
@@ -47,7 +49,7 @@ const Dashboard = () => {
             initial="hidden"
             animate="show"
             transition={{ duration: 0.3 }}
-            className="col-span-2 bg-background/30 backdrop-blur-md rounded-2xl p-6 h-full border border-white/10 shadow-lg"
+            className="md:col-span-2 bg-background/30 backdrop-blur-md rounded-2xl p-6 h-full border border-white/10 shadow-lg"
           >
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-2xl font-semibold text-foreground">Welcome, {user?.name}</h2>
@@ -78,11 +80,11 @@ const Dashboard = () => {
                 </div>
                 <div className="bg-background/60 rounded-lg p-3 border border-white/5 shadow-sm">
                   <h4 className="font-medium text-sm text-muted-foreground">Flashcards</h4>
-                  <p className="text-2xl font-bold">{user?.flashcardCount || 0}</p>
+                  <p className="text-2xl font-bold">{user?.flashcard_count || 0}</p>
                 </div>
                 <div className="bg-background/60 rounded-lg p-3 border border-white/5 shadow-sm">
                   <h4 className="font-medium text-sm text-muted-foreground">Study Streak</h4>
-                  <p className="text-2xl font-bold">{user?.streak || 0} days</p>
+                  <p className="text-2xl font-bold">{user?.streak_count || 0} days</p>
                 </div>
               </div>
             </div>
@@ -145,7 +147,11 @@ const Dashboard = () => {
             transition={{ duration: 0.3, delay: 0.2 }}
             className="bg-background/30 backdrop-blur-md rounded-2xl h-full border border-white/10 shadow-lg"
           >
-            <ContactForm className="h-full" />
+            {user?.account_type === 'student' ? (
+              <LeaderboardCard />
+            ) : (
+              <ContactForm className="h-full" />
+            )}
           </motion.div>
         </div>
         

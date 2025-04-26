@@ -1,45 +1,47 @@
 
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { toast } from '@/components/ui/use-toast';
-import { motion } from 'framer-motion';
-import { Mail, Lock, ArrowRight, Loader2, ArrowLeft } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { PageTransition } from '@/components/animations/PageTransition';
+import { Mail, Lock, ArrowRight, LogIn, Github, ArrowLeft } from 'lucide-react';
+import ParallaxScroll from '@/components/animations/ParallaxScroll';
 
 const Login = () => {
+  const navigate = useNavigate();
+  const { login, loginWithGoogle, isAuthenticated } = useAuthStore();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
-  const navigate = useNavigate();
-  const { signIn } = useAuthStore();
-  
+
+  if (isAuthenticated) {
+    navigate('/dashboard');
+    return null;
+  }
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsLoading(true);
     
     try {
-      setIsLoading(true);
-      await signIn(email, password);
+      await login(email, password);
       
       toast({
-        title: "Welcome back!",
-        description: "You've successfully signed in to MindGrove.",
-        variant: "success",
+        title: "Login successful",
+        description: "Welcome back to MindGrove!",
+        variant: "default"
       });
       
-      // Redirect to dashboard
       navigate('/dashboard');
     } catch (error) {
-      console.error('Login error:', error);
+      console.error("Login error:", error);
       toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : 'Invalid email or password',
-        variant: "destructive",
+        title: "Login failed",
+        description: error instanceof Error ? error.message : "An unexpected error occurred",
+        variant: "destructive"
       });
     } finally {
       setIsLoading(false);
@@ -48,25 +50,14 @@ const Login = () => {
 
   const handleGoogleLogin = async () => {
     try {
-      setIsGoogleLoading(true);
-      const { error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: window.location.origin + '/dashboard'
-        }
-      });
-      
-      if (error) throw error;
-      
-      // The redirect happens automatically by Supabase
+      await loginWithGoogle();
     } catch (error) {
-      console.error('Google login error:', error);
+      console.error("Google login error:", error);
       toast({
-        title: "Google Sign In Failed",
-        description: error instanceof Error ? error.message : 'Failed to sign in with Google',
-        variant: "destructive",
+        title: "Google login failed",
+        description: error instanceof Error ? error.message : "An unexpected error occurred",
+        variant: "destructive"
       });
-      setIsGoogleLoading(false);
     }
   };
 
@@ -74,191 +65,170 @@ const Login = () => {
     navigate('/landing');
   };
 
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.1
-      }
-    }
-  };
-
-  const itemVariants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: { opacity: 1, y: 0 }
-  };
-  
   return (
-    <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 bg-opacity-80">
-      <button 
-        onClick={handleBackToLanding}
-        className="absolute top-6 left-6 p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
-      >
-        <ArrowLeft className="h-6 w-6 text-white" />
-      </button>
-      
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute inset-0 z-0 opacity-20">
-          <svg width="100%" height="100%" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-              <radialGradient id="rgrad" cx="50%" cy="50%" r="50%" fx="50%" fy="50%">
-                <stop offset="0%" stopColor="#7C3AED" stopOpacity="0.3" />
-                <stop offset="100%" stopColor="#3730A3" stopOpacity="0" />
-              </radialGradient>
-              <pattern id="grid" width="50" height="50" patternUnits="userSpaceOnUse">
-                <rect width="50" height="50" fill="url(#rgrad)" />
-                <path d="M 50 0 L 0 0 0 50" fill="none" stroke="rgba(124, 58, 237, 0.2)" strokeWidth="1" />
-              </pattern>
-            </defs>
-            <rect width="100%" height="100%" fill="url(#grid)" />
-          </svg>
+    <PageTransition>
+      <div className="min-h-screen flex flex-col bg-background">
+        <div className="p-4">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleBackToLanding}
+            className="hover:bg-muted/50"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Button>
         </div>
-      </div>
-
-      <motion.div
-        initial="hidden"
-        animate="visible"
-        variants={containerVariants}
-        className="w-full max-w-md z-10"
-      >
-        <div className="text-center mb-8">
-          <motion.div 
-            className="flex justify-center mb-6"
-            variants={itemVariants}
-          >
-            <div className="w-16 h-16 rounded-full bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center p-0.5 shadow-lg shadow-primary/30">
-              <img 
-                src="/mindgrove.png"
-                alt="MindGrove"
-                className="w-full h-full rounded-full object-cover"
-              />
-            </div>
-          </motion.div>
-          <motion.h1 
-            className="text-4xl font-bold mb-2 bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-300"
-            variants={itemVariants}
-          >
-            Welcome back
-          </motion.h1>
-          <motion.p 
-            className="text-muted-foreground"
-            variants={itemVariants}
-          >
-            Sign in to continue your research journey
-          </motion.p>
-        </div>
-        
-        <motion.div variants={itemVariants}>
-          <Card className="border border-white/10 shadow-xl backdrop-blur-md bg-white/5">
-            <CardHeader>
-              <CardTitle className="text-xl bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-300">Sign In</CardTitle>
-              <CardDescription className="text-gray-400">Enter your credentials to access your account</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleLogin} className="space-y-5">
-                <div className="space-y-2">
-                  <Label htmlFor="email" className="text-gray-300">Email</Label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                    <Input
-                      id="email"
-                      type="email"
-                      placeholder="Enter your email"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      required
-                      className="pl-10 bg-white/10 border-white/20 text-white placeholder:text-gray-500 focus:border-primary"
-                    />
+        <div className="flex-1 flex flex-col md:flex-row">
+          {/* Left side - Form */}
+          <div className="w-full md:w-1/2 p-6 md:p-12 flex flex-col justify-center">
+            <div className="max-w-md mx-auto w-full">
+              <div className="text-center mb-8">
+                <h1 className="text-3xl font-bold">Welcome back</h1>
+                <p className="text-muted-foreground mt-2">
+                  Sign in to your MindGrove account
+                </p>
+              </div>
+              
+              <Card className="p-6">
+                <form onSubmit={handleLogin} className="space-y-4">
+                  <div className="space-y-2">
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                      <Input 
+                        type="email" 
+                        placeholder="Email" 
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        required
+                        className="pl-10"
+                      />
+                    </div>
                   </div>
-                </div>
-                
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <Label htmlFor="password" className="text-gray-300">Password</Label>
-                    <Link to="/forgot-password" className="text-xs text-primary hover:text-primary/90 transition-colors">
-                      Forgot password?
-                    </Link>
+                  
+                  <div className="space-y-2">
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                      <Input 
+                        type="password" 
+                        placeholder="Password" 
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        required
+                        className="pl-10"
+                      />
+                    </div>
+                    <div className="text-right">
+                      <Link 
+                        to="/forgot-password" 
+                        className="text-sm text-primary hover:underline"
+                      >
+                        Forgot password?
+                      </Link>
+                    </div>
                   </div>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                    <Input
-                      id="password"
-                      type="password"
-                      placeholder="Enter your password"
-                      value={password}
-                      onChange={(e) => setPassword(e.target.value)}
-                      required
-                      className="pl-10 bg-white/10 border-white/20 text-white placeholder:text-gray-500 focus:border-primary"
-                    />
+                  
+                  <Button 
+                    type="submit" 
+                    className="w-full"
+                    disabled={isLoading}
+                  >
+                    {isLoading ? (
+                      <span className="flex items-center">
+                        <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        Signing in...
+                      </span>
+                    ) : (
+                      <span className="flex items-center">
+                        <LogIn className="mr-2 h-4 w-4" />
+                        Sign in
+                      </span>
+                    )}
+                  </Button>
+                  
+                  <div className="relative my-6">
+                    <div className="absolute inset-0 flex items-center">
+                      <div className="w-full border-t"></div>
+                    </div>
+                    <div className="relative flex justify-center text-xs uppercase">
+                      <span className="bg-card px-2 text-muted-foreground">
+                        Or continue with
+                      </span>
+                    </div>
                   </div>
-                </div>
-                
-                <Button 
-                  type="submit" 
-                  className="w-full bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70" 
-                  disabled={isLoading}
-                >
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Signing in...
-                    </>
-                  ) : (
-                    <>
-                      Sign In
-                      <ArrowRight className="ml-2 h-4 w-4" />
-                    </>
-                  )}
-                </Button>
-                
-                <div className="relative my-4">
-                  <div className="absolute inset-0 flex items-center">
-                    <span className="w-full border-t border-gray-600"></span>
+                  
+                  <div className="grid gap-2">
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      onClick={handleGoogleLogin}
+                    >
+                      <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
+                        <path
+                          d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                          fill="#4285F4"
+                        />
+                        <path
+                          d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                          fill="#34A853"
+                        />
+                        <path
+                          d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+                          fill="#FBBC05"
+                        />
+                        <path
+                          d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+                          fill="#EA4335"
+                        />
+                      </svg>
+                      Google
+                    </Button>
                   </div>
-                  <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-card px-2 text-gray-400">Or continue with</span>
-                  </div>
-                </div>
-                
-                <Button 
-                  type="button"
-                  variant="outline" 
-                  className="w-full border border-gray-600 hover:bg-white/10"
-                  onClick={handleGoogleLogin}
-                  disabled={isGoogleLoading}
-                >
-                  {isGoogleLoading ? (
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  ) : (
-                    <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" className="h-5 w-5 mr-2" />
-                  )}
-                  Sign in with Google
-                </Button>
-              </form>
-            </CardContent>
-            <CardFooter className="flex justify-center border-t border-white/10 pt-5">
-              <p className="text-sm text-gray-400">
+                </form>
+              </Card>
+              
+              <p className="text-center mt-6 text-sm text-muted-foreground">
                 Don't have an account?{' '}
-                <Link to="/signup" className="text-primary hover:text-primary/90 font-medium transition-colors">
-                  Sign Up
+                <Link to="/signup" className="text-primary font-medium hover:underline">
+                  Sign up
                 </Link>
               </p>
-            </CardFooter>
-          </Card>
-        </motion.div>
-        
-        <motion.p
-          variants={itemVariants}
-          className="text-center mt-6 text-xs text-gray-500"
-        >
-          By signing in, you agree to our{' '}
-          <Link to="/terms" className="text-gray-400 hover:text-primary transition-colors">Terms of Service</Link>
-          {' '}and{' '}
-          <Link to="/privacy" className="text-gray-400 hover:text-primary transition-colors">Privacy Policy</Link>
-        </motion.p>
-      </motion.div>
-    </div>
+            </div>
+          </div>
+          
+          {/* Right side - Decoration */}
+          <div className="hidden md:block md:w-1/2 bg-gradient-to-br from-primary/20 to-primary/30 p-12">
+            <div className="h-full flex flex-col justify-center">
+              <ParallaxScroll direction="up" speed={0.3}>
+                <div className="text-center">
+                  <h2 className="text-3xl font-bold mb-2">MindGrove</h2>
+                  <p className="text-lg text-muted-foreground mb-6">
+                    Cultivating Smarter Learners, One Streak at a Time!
+                  </p>
+                  
+                  <div className="max-w-sm mx-auto p-6 rounded-lg bg-card/90 backdrop-blur-sm border shadow-lg">
+                    <p className="text-base font-medium">
+                      "MindGrove has transformed my study habits completely. I've gone from struggling to maintain focus to establishing a consistent study streak for over 30 days!"
+                    </p>
+                    <div className="mt-4 flex items-center justify-center">
+                      <div className="relative w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
+                        <span className="font-semibold">JK</span>
+                      </div>
+                      <div className="ml-3 text-left">
+                        <p className="font-medium text-sm">John K.</p>
+                        <p className="text-xs text-muted-foreground">Computer Science Student</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </ParallaxScroll>
+            </div>
+          </div>
+        </div>
+      </div>
+    </PageTransition>
   );
 };
 

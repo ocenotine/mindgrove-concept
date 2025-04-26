@@ -1,70 +1,62 @@
 
-import { useState } from 'react';
-import { motion } from 'framer-motion';
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import MainLayout from '@/components/layout/MainLayout';
-import { User, Mail } from 'lucide-react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { PageTransition } from '@/components/animations/PageTransition';
 import ProfileHeader from '@/components/profile/ProfileHeader';
-import EditProfileForm from '@/components/profile/EditProfileForm';
-import EmailPreferencePanel from '@/components/profile/EmailPreferencePanel';
-import SupportPanel from '@/components/profile/SupportPanel';
 import { useAuthStore } from '@/store/authStore';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import EmailPreferences from '@/components/profile/EmailPreferences';
+import ProfilePage from '@/components/profile/ProfilePage'; 
+import SupportPanel from '@/components/profile/SupportPanel';
 
-const ProfilePage = () => {
+const ProfilePageContainer = () => {
   const { user } = useAuthStore();
-  const [activeTab, setActiveTab] = useState('profile');
-  
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    // If no user is logged in, redirect to login
+    if (!user) {
+      navigate('/login');
+    }
+  }, [user, navigate]);
+
+  // Don't render anything if user isn't available yet
   if (!user) {
-    return null; 
+    return null;
   }
-  
+
   return (
     <MainLayout>
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold mb-2">Profile</h1>
-        <p className="text-muted-foreground">
-          Manage your account settings and preferences
-        </p>
-      </div>
-      
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="col-span-1">
-          <ProfileHeader />
+      <PageTransition>
+        <div className="container mx-auto px-4 py-8 max-w-5xl">
+          <div className="mb-6">
+            <ProfileHeader user={user} />
+          </div>
+
+          <Tabs defaultValue="profile" className="w-full">
+            <TabsList className="mb-4">
+              <TabsTrigger value="profile">Profile</TabsTrigger>
+              <TabsTrigger value="email">Email</TabsTrigger>
+              <TabsTrigger value="support">Support</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="profile" className="space-y-4">
+              <ProfilePage user={user} />
+            </TabsContent>
+            
+            <TabsContent value="email">
+              <EmailPreferences />
+            </TabsContent>
+            
+            <TabsContent value="support">
+              <SupportPanel />
+            </TabsContent>
+          </Tabs>
         </div>
-        
-        <div className="col-span-1 md:col-span-2">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3, delay: 0.1 }}
-          >
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-              <TabsList>
-                <TabsTrigger value="profile" className="flex items-center gap-2">
-                  <User className="h-4 w-4" />
-                  <span>Profile</span>
-                </TabsTrigger>
-                <TabsTrigger value="preferences" className="flex items-center gap-2">
-                  <Mail className="h-4 w-4" />
-                  <span>Email Preferences</span>
-                </TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="profile" className="space-y-4">
-                <EditProfileForm />
-              </TabsContent>
-              
-              <TabsContent value="preferences" className="space-y-4">
-                <EmailPreferencePanel />
-              </TabsContent>
-            </Tabs>
-          </motion.div>
-          
-          <SupportPanel />
-        </div>
-      </div>
+      </PageTransition>
     </MainLayout>
   );
 };
 
-export default ProfilePage;
+export default ProfilePageContainer;

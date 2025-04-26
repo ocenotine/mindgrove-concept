@@ -1,212 +1,248 @@
 
 import { create } from 'zustand';
 import { supabase } from '@/integrations/supabase/client';
+import { User, Session } from '@supabase/supabase-js';
 
-export interface User {
-  id: string;
-  email: string;
-  name: string;
+// Export the UserWithMetadata interface
+export interface UserWithMetadata extends User {
+  name?: string;
+  email?: string;
+  account_type?: 'student' | 'admin' | 'teacher' | 'institution';
   avatarUrl?: string;
-  streak?: number;
-  flashcardCount?: number;
-  lastActive?: string;
+  last_prompt_shown?: string;
+  bio?: string;
+  document_count?: number;
+  flashcard_count?: number;
+  streak_count?: number;
+  study_hours?: number;
+  last_active?: string;
+  institution_id?: string;
+  user_metadata: {
+    name?: string;
+    account_type?: 'student' | 'admin' | 'teacher' | 'institution';
+    institution_name?: string;
+    domain?: string;
+    institution_id?: string;
+    bio?: string;
+  };
 }
 
-export interface AuthState {
-  user: User | null;
-  token: string | null;
+interface AuthState {
+  user: UserWithMetadata | null;
+  session: Session | null;
   isAuthenticated: boolean;
   loading: boolean;
-  error: string | null;
-  
-  // Add method signatures for authentication
-  signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string, name: string) => Promise<void>;
-  signOut: () => Promise<void>;
-  updateProfile: (data: Partial<User>) => void;
-
-  initialize: () => Promise<void>;
-  getSession: () => Promise<boolean>;
+  login: (email: string, password: string) => Promise<void>;
+  signup: (email: string, password: string, name: string, options?: any) => Promise<void>;
+  loginWithGoogle: () => Promise<void>;
+  logout: () => Promise<void>;
+  setUser: (user: UserWithMetadata | null) => void;
+  setSession: (session: Session | null) => void;
+  setLoading: (loading: boolean) => void;
+  updateProfile: (data: Partial<UserWithMetadata>) => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
-  token: null,
+  session: null,
   isAuthenticated: false,
   loading: true,
-  error: null,
   
-  // Initialize the auth store
-  initialize: async () => {
-    set({ loading: true });
-    try {
-      const authenticated = await get().getSession();
-      set({ isAuthenticated: authenticated, loading: false });
-    } catch (error) {
-      console.error('Error initializing auth:', error);
-      set({ error: 'Failed to initialize authentication', loading: false });
-    }
+  setUser: (user) => {
+    set({ user, isAuthenticated: !!user });
   },
+  
+  setSession: (session) => {
+    // Extract user metadata from session
+    const user = session?.user ? {
+      ...session.user,
+      name: session.user.user_metadata?.name || session.user.user_metadata?.full_name,
+      account_type: session.user.user_metadata?.account_type || 'student',
+      avatarUrl: session.user.user_metadata?.avatar_url,
+      institution_id: session.user.user_metadata?.institution_id
+    } as UserWithMetadata : null;
 
-  // Get the current session
-  getSession: async () => {
-    try {
-      const { data, error } = await supabase.auth.getSession();
-      if (error) throw error;
-      
-      if (data?.session) {
-        const user = data.session.user;
-        
-        // Get user profile data
-        const { data: profileData } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', user.id)
-          .single();
-          
-        set({ 
-          user: { 
-            id: user.id,
-            email: user.email || '',
-            name: profileData?.full_name || user.user_metadata?.full_name || 'User',
-            avatarUrl: profileData?.avatar_url,
-            streak: profileData?.streak_count || 0,
-            flashcardCount: profileData?.flashcard_count || 0,
-            lastActive: profileData?.last_active
-          },
-          token: data.session.access_token,
-          isAuthenticated: true 
-        });
-        return true;
-      } else {
-        set({ user: null, token: null, isAuthenticated: false });
-        return false;
-      }
-    } catch (error) {
-      console.error('Session error:', error);
-      set({ user: null, token: null, isAuthenticated: false });
-      return false;
-    }
+    set({ 
+      session, 
+      user,
+      isAuthenticated: !!session?.user
+    });
   },
-
-  // Sign in a user
-  signIn: async (email, password) => {
-    set({ loading: true, error: null });
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-      
-      if (error) throw error;
-      
-      if (data?.user) {
-        // Get user profile data
-        const { data: profileData } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', data.user.id)
-          .single();
-          
-        set({ 
-          user: { 
-            id: data.user.id,
-            email: data.user.email || '',
-            name: profileData?.full_name || data.user.user_metadata?.full_name || 'User',
-            avatarUrl: profileData?.avatar_url,
-            streak: profileData?.streak_count || 0,
-            flashcardCount: profileData?.flashcard_count || 0,
-            lastActive: profileData?.last_active
-          },
-          token: data.session?.access_token || null,
-          isAuthenticated: true,
-          loading: false
-        });
-      }
-    } catch (error) {
-      console.error('Sign in error:', error);
-      set({ 
-        error: error instanceof Error ? error.message : 'Failed to sign in', 
-        loading: false 
-      });
-      throw error;
-    }
+  
+  setLoading: (loading) => {
+    set({ loading });
   },
-
-  // Sign up a new user
-  signUp: async (email, password, name) => {
-    set({ loading: true, error: null });
-    try {
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            full_name: name,
-          },
-        },
-      });
-      
-      if (error) throw error;
-      
-      if (data?.user) {
-        // Create a profile for the user
-        await supabase.from('profiles').upsert({
-          id: data.user.id,
-          full_name: name,
-          email: email,
-          updated_at: new Date().toISOString(),
-          streak_count: 1,
-          last_active: new Date().toISOString()
-        });
-        
-        set({ 
-          user: { 
-            id: data.user.id, 
-            email: email,
-            name: name,
-            streak: 1,
-            flashcardCount: 0,
-            lastActive: new Date().toISOString()
-          },
-          token: data.session?.access_token || null,
-          isAuthenticated: true,
-          loading: false
-        });
-      }
-    } catch (error) {
-      console.error('Sign up error:', error);
-      set({ 
-        error: error instanceof Error ? error.message : 'Failed to sign up', 
-        loading: false 
-      });
-      throw error;
-    }
-  },
-
-  // Sign out the current user
-  signOut: async () => {
-    try {
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
-      set({ user: null, token: null, isAuthenticated: false });
-    } catch (error) {
-      console.error('Sign out error:', error);
-      set({ error: 'Failed to sign out' });
-      throw error;
-    }
-  },
-
-  // Update user profile
-  updateProfile: (data) => {
-    const currentUser = get().user;
-    if (!currentUser) return;
+  
+  login: async (email, password) => {
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password
+    });
     
-    set({
-      user: {
-        ...currentUser,
-        ...data
+    if (error) {
+      throw error;
+    }
+    
+    // Process user metadata
+    const user = data.user ? {
+      ...data.user,
+      name: data.user.user_metadata?.name || data.user.user_metadata?.full_name,
+      account_type: data.user.user_metadata?.account_type || 'student',
+      avatarUrl: data.user.user_metadata?.avatar_url
+    } as UserWithMetadata : null;
+    
+    set({ 
+      user,
+      session: data.session,
+      isAuthenticated: true 
+    });
+  },
+  
+  signup: async (email, password, name, options = {}) => {
+    const userData = {
+      name,
+      account_type: options.accountType || 'student'
+    };
+    
+    if (options.accountType === 'institution') {
+      Object.assign(userData, {
+        institution_name: options.institutionName,
+        domain: options.domain
+      });
+    }
+    
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: userData
       }
     });
+    
+    if (error) {
+      throw error;
+    }
+    
+    if (data.user) {
+      // Process user metadata
+      const user = {
+        ...data.user,
+        name: userData.name,
+        account_type: userData.account_type
+      } as UserWithMetadata;
+      
+      set({ 
+        user,
+        session: data.session,
+        isAuthenticated: !!data.session
+      });
+    }
+  },
+  
+  loginWithGoogle: async () => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/dashboard`
+      }
+    });
+    
+    if (error) {
+      throw error;
+    }
+  },
+  
+  logout: async () => {
+    try {
+      // First clear the store state
+      set({ 
+        user: null, 
+        session: null, 
+        isAuthenticated: false 
+      });
+      
+      // Then tell Supabase to sign out
+      const { error } = await supabase.auth.signOut({ 
+        scope: 'local' // Use 'global' to sign out from all devices
+      });
+      
+      if (error) {
+        console.error('Supabase signOut error:', error);
+        throw error;
+      }
+      
+      // Clear any local auth data
+      localStorage.removeItem('supabase.auth.token');
+      
+      // Return successful
+      return Promise.resolve();
+    } catch (error) {
+      console.error('Logout error:', error);
+      return Promise.reject(error);
+    }
+  },
+
+  updateProfile: async (data) => {
+    const { error } = await supabase.auth.updateUser({
+      data
+    });
+
+    if (error) {
+      throw error;
+    }
+
+    // Update local user data
+    const currentUser = get().user;
+    if (currentUser) {
+      set({ user: { ...currentUser, ...data } });
+    }
   }
 }));
+
+// Set up auth listener
+export const initializeAuth = async () => {
+  const { setUser, setSession, setLoading } = useAuthStore.getState();
+  
+  try {
+    // First set up the auth state change listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        // Process user metadata from session
+        const user = session?.user ? {
+          ...session.user,
+          name: session.user.user_metadata?.name || session.user.user_metadata?.full_name,
+          account_type: session.user.user_metadata?.account_type || 'student',
+          avatarUrl: session.user.user_metadata?.avatar_url,
+          institution_id: session.user.user_metadata?.institution_id
+        } as UserWithMetadata : null;
+        
+        setSession(session);
+        setUser(user);
+        setLoading(false);
+      }
+    );
+    
+    // Then check for any existing session
+    const { data: { session } } = await supabase.auth.getSession();
+    
+    // Process user metadata from existing session
+    const user = session?.user ? {
+      ...session.user,
+      name: session.user.user_metadata?.name || session.user.user_metadata?.full_name,
+      account_type: session.user.user_metadata?.account_type || 'student',
+      avatarUrl: session.user.user_metadata?.avatar_url,
+      institution_id: session.user.user_metadata?.institution_id
+    } as UserWithMetadata : null;
+    
+    setSession(session);
+    setUser(user);
+    setLoading(false);
+    
+    return () => {
+      subscription.unsubscribe();
+    };
+  } catch (error) {
+    console.error("Auth initialization error:", error);
+    setLoading(false);
+  }
+};

@@ -6,15 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { toast } from '@/components/ui/use-toast';
 import Typewriter from '@/components/chat/Typewriter';
-import { generateDocumentChatResponse } from '@/utils/openRouterUtils';
-
-// Define global SpeechRecognition types
-declare global {
-  interface Window {
-    SpeechRecognition: typeof SpeechRecognition;
-    webkitSpeechRecognition: typeof SpeechRecognition;
-  }
-}
+import { generateDocumentChatResponse, generateGeneralChatResponse } from '@/utils/openRouterUtils';
 
 interface Message {
   id: string;
@@ -45,7 +37,9 @@ const DocumentChat = ({ documentText, documentId, documentTitle }: DocumentChatP
     if (messages.length === 0) {
       const initialMessage: Message = {
         id: `assistant-${Date.now()}`,
-        content: `👋 Hello! I'm your MindGrove document assistant. I can answer questions about "${documentTitle}". What would you like to know about this document?`,
+        content: documentTitle ? 
+          `👋 Hello! I'm your MindGrove assistant. I can answer questions about "${documentTitle}" or any general academic questions. What would you like to know?` :
+          `👋 Hello! I'm your MindGrove assistant. How can I help you with your academic questions today?`,
         role: 'assistant',
         timestamp: new Date()
       };
@@ -62,16 +56,16 @@ const DocumentChat = ({ documentText, documentId, documentTitle }: DocumentChatP
 
   // Set up speech recognition if available
   useEffect(() => {
-    if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
-      const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (typeof window !== 'undefined' && ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)) {
+      const SpeechRecognitionAPI = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
       const recognition = new SpeechRecognitionAPI();
       recognition.continuous = false;
       recognition.interimResults = true;
       recognition.lang = 'en-US';
       
-      recognition.onresult = (event) => {
+      recognition.onresult = (event: any) => {
         const transcript = Array.from(event.results)
-          .map(result => result[0])
+          .map(result => (result as any)[0])
           .map(result => result.transcript)
           .join('');
         
@@ -138,8 +132,22 @@ const DocumentChat = ({ documentText, documentId, documentTitle }: DocumentChatP
     setIsTyping(true);
 
     try {
-      // Generate response from OpenRouter API
-      const response = await generateDocumentChatResponse(documentText, inputMessage);
+      let response;
+      
+      // If we have document text, try to answer based on it first
+      if (documentText && documentText.trim().length > 100) {
+        try {
+          // Try document-specific response
+          response = await generateDocumentChatResponse(documentText, inputMessage);
+        } catch (documentError) {
+          console.error("Error with document-specific response:", documentError);
+          // Fall back to general response
+          response = await generateGeneralChatResponse(inputMessage);
+        }
+      } else {
+        // No document or document too short, use general response
+        response = await generateGeneralChatResponse(inputMessage);
+      }
       
       const botResponse: Message = {
         id: `assistant-${Date.now()}`,
@@ -182,11 +190,11 @@ const DocumentChat = ({ documentText, documentId, documentTitle }: DocumentChatP
     <div className="document-chat">
       {/* Chat button */}
       <motion.button
-        className="fixed bottom-20 right-20 z-50 flex items-center justify-center w-12 h-12 rounded-full bg-primary text-white shadow-lg hover:bg-primary/90 transition-colors"
+        className="fixed bottom-20 right-6 z-50 flex items-center justify-center w-12 h-12 rounded-full bg-primary text-white shadow-lg hover:bg-primary/90 transition-colors"
         onClick={toggleChat}
         whileHover={{ scale: 1.05 }}
         whileTap={{ scale: 0.95 }}
-        aria-label="Chat about document"
+        aria-label="Chat with AI assistant"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.5 }}
@@ -208,7 +216,7 @@ const DocumentChat = ({ documentText, documentId, documentTitle }: DocumentChatP
             <div className="bg-primary p-3 text-white flex items-center justify-between">
               <div className="flex items-center">
                 <Sparkles className="h-4 w-4 mr-2" />
-                <h2 className="font-medium text-sm">Document Assistant</h2>
+                <h2 className="font-medium text-sm">MindGrove Assistant</h2>
               </div>
               <Button 
                 onClick={toggleChat}
@@ -301,7 +309,7 @@ const DocumentChat = ({ documentText, documentId, documentTitle }: DocumentChatP
                 
                 <input
                   type="text"
-                  placeholder="Ask about this document..."
+                  placeholder="Ask me anything..."
                   className="flex-1 p-2 bg-background border-0 focus:outline-none focus:ring-0"
                   value={inputMessage}
                   onChange={handleInputChange}

@@ -1,33 +1,24 @@
 
 import { create } from 'zustand';
-import type { Document, Flashcard } from '@/utils/mockData';
-import { useAuthStore } from './authStore';
 import { supabase } from '@/integrations/supabase/client';
-import { v4 as uuidv4 } from 'uuid';
-import { toast } from '@/components/ui/use-toast';
-import { generateDocumentSummary, generateFlashcards } from '@/utils/nlpCloudUtils';
 
-interface DBDocument {
+// Define the Document type that matches Supabase schema
+export interface Document {
   id: string;
   title: string;
+  content: string | null;
   summary: string | null;
   file_path: string | null;
   file_type: string | null;
-  content: string | null;
+  user_id: string;
   created_at: string | null;
   updated_at: string | null;
-  user_id: string;
-  pages?: number;
 }
 
-interface DBFlashcard {
-  id: string;
-  front_content: string;
-  back_content: string;
-  document_id: string;
-  created_at: string;
-  updated_at?: string;
-  user_id: string;
+// Define flashcard type
+export interface Flashcard {
+  question: string;
+  answer: string;
 }
 
 interface DocumentState {
@@ -35,21 +26,16 @@ interface DocumentState {
   currentDocument: Document | null;
   isLoading: boolean;
   error: string | null;
-  fetchDocuments: () => Promise<void>;
-  fetchDocumentById: (id: string) => Promise<void>;
-  createDocument: (title: string, content: string, fileType: string, filePath: string) => Promise<string>;
-  updateDocument: (id: string, updates: Partial<Document>) => Promise<void>;
+  fetchDocuments: () => Promise<Document[]>;
+  fetchDocumentById: (id: string) => Promise<Document | null>;
+  createDocument: (document: Partial<Document> & { title: string; user_id: string }) => Promise<Document | null>;
+  uploadDocument: (file: File, title: string, userId: string) => Promise<Document | null>;
   deleteDocument: (id: string) => Promise<boolean>;
-  fetchDocumentFlashcards: (id: string) => Promise<Flashcard[]>;
-  clearCurrentDocument: () => void;
+  setDocumentSummary: (documentId: string, summary: string) => Promise<void>;
+  saveFlashcards: (documentId: string, flashcards: Flashcard[]) => Promise<void>;
+  generateSummary: (documentId: string) => Promise<string>;
+  generateFlashcards: (documentId: string) => Promise<string[]>;
   searchDocuments: (query: string) => Document[];
-  setDocumentSummary: (id: string, summary: string) => Promise<void>;
-  
-  getDocument: (id: string) => Promise<void>;
-  uploadDocument: (file: File) => Promise<Document | undefined>;
-  generateSummary: (documentId: string, text: string) => Promise<string>;
-  generateFlashcards: (documentId: string, text: string) => Promise<any[]>;
-  saveFlashcards: (documentId: string, flashcards: any[]) => Promise<void>;
 }
 
 export const useDocumentStore = create<DocumentState>((set, get) => ({
@@ -61,456 +47,270 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
   fetchDocuments: async () => {
     set({ isLoading: true, error: null });
     try {
-      const { user } = useAuthStore.getState();
-      
-      if (!user?.id) {
-        throw new Error('User not authenticated');
-      }
-      
-      const { data: documents, error } = await supabase
+      // Fetch documents from Supabase
+      const { data, error } = await supabase
         .from('documents')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
+        .select('*');
       
-      if (error) {
-        throw error;
-      }
+      if (error) throw new Error(error.message);
       
-      const formattedDocuments: Document[] = documents?.map((doc: DBDocument) => {
-        return {
-          id: doc.id,
-          title: doc.title,
-          content: doc.content || '',
-          fileType: doc.file_type || undefined,
-          summary: doc.summary || '',
-          createdAt: doc.created_at || new Date().toISOString(),
-          updatedAt: doc.updated_at || new Date().toISOString(),
-          userId: doc.user_id,
-          description: '',
-          pages: doc.pages || 1,
-          lastAccessed: doc.updated_at || new Date().toISOString(),
-          status: doc.summary ? 'processed' : 'processing',
-          tags: [],
-        } as Document;
-      }) || [];
-      
-      set({ documents: formattedDocuments, isLoading: false });
+      const documents = data || [];
+      set({ documents, isLoading: false });
+      return documents;
     } catch (error) {
-      console.error('Error fetching documents:', error);
-      set({ isLoading: false, error: 'Failed to fetch documents' });
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      set({ error: errorMessage, isLoading: false });
+      return [];
     }
   },
   
   fetchDocumentById: async (id: string) => {
     set({ isLoading: true, error: null });
     try {
-      const { data: document, error } = await supabase
+      // Fetch document by ID from Supabase
+      const { data, error } = await supabase
         .from('documents')
         .select('*')
         .eq('id', id)
         .single();
       
-      if (error) {
-        throw error;
-      }
+      if (error) throw new Error(error.message);
       
-      if (!document) {
-        throw new Error(`Document with ID ${id} not found`);
-      }
-      
-      const formattedDocument: Document = {
-        id: document.id,
-        title: document.title,
-        content: document.content || '',
-        fileType: document.file_type || undefined,
-        summary: document.summary || '',
-        createdAt: document.created_at || new Date().toISOString(),
-        updatedAt: document.updated_at || new Date().toISOString(),
-        userId: document.user_id,
-        description: '',
-        pages: (document as DBDocument).pages || 1,
-        lastAccessed: document.updated_at || new Date().toISOString(),
-        status: document.summary ? 'processed' : 'processing',
-        tags: [],
-      };
-      
-      set({ currentDocument: formattedDocument, isLoading: false });
+      const document = data as Document;
+      set({ currentDocument: document, isLoading: false });
+      return document;
     } catch (error) {
-      console.error('Error fetching document:', error);
-      set({ isLoading: false, error: 'Failed to fetch document' });
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      set({ error: errorMessage, isLoading: false });
+      return null;
     }
   },
   
-  createDocument: async (title: string, content: string, fileType: string, filePath: string) => {
+  createDocument: async (document) => {
     set({ isLoading: true, error: null });
     try {
-      const { user } = useAuthStore.getState();
-      
-      if (!user?.id) {
-        throw new Error('User not authenticated');
-      }
-      
-      const documentId = uuidv4();
-      
-      const { error } = await supabase
+      // Create document in Supabase
+      const { data, error } = await supabase
         .from('documents')
-        .insert([
-          {
-            id: documentId,
-            title,
-            content,
-            file_type: fileType,
-            file_path: filePath,
-            user_id: user.id,
-          },
-        ]);
+        .insert([document])
+        .select()
+        .single();
       
-      if (error) {
-        throw error;
-      }
+      if (error) throw new Error(error.message);
       
-      const newDocument: Document = {
-        id: documentId,
-        title,
-        content,
-        fileType,
-        summary: '',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        userId: user.id,
-        description: '',
-        pages: 1,
-        lastAccessed: new Date().toISOString(),
-        status: 'processing',
-        tags: [],
-      };
-      
-      set((state) => ({
-        documents: [newDocument, ...state.documents],
-        isLoading: false,
+      const newDocument = data as Document;
+      set((state) => ({ 
+        documents: [...state.documents, newDocument], 
+        isLoading: false 
       }));
       
-      return documentId;
+      return newDocument;
     } catch (error) {
-      console.error('Error creating document:', error);
-      set({ isLoading: false, error: 'Failed to create document' });
-      throw error;
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      set({ error: errorMessage, isLoading: false });
+      return null;
     }
   },
   
-  updateDocument: async (id: string, updates: Partial<Document>) => {
+  uploadDocument: async (file: File, title: string, userId: string): Promise<Document | null> => {
     set({ isLoading: true, error: null });
     try {
-      // Convert Document fields to DB fields
-      const dbUpdates: any = { ...updates };
-      if ('fileType' in updates) {
-        dbUpdates.file_type = updates.fileType;
-        delete dbUpdates.fileType;
-      }
-      
-      const { error } = await supabase
+      // Upload file to Supabase storage
+      const filePath = `documents/${userId}/${Date.now()}_${file.name}`;
+      const { data: storageData, error: storageError } = await supabase
+        .storage
         .from('documents')
-        .update(dbUpdates)
-        .eq('id', id);
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
       
-      if (error) {
-        throw error;
-      }
+      if (storageError) throw new Error(storageError.message);
+      
+      // Get public URL of the uploaded file
+      const { data } = supabase
+        .storage
+        .from('documents')
+        .getPublicUrl(filePath);
+      
+      const file_path = data.publicUrl;
+      
+      // Create document record in Supabase
+      const { data: documentData, error: documentError } = await supabase
+        .from('documents')
+        .insert([{ 
+          title,
+          user_id: userId,
+          file_path,
+          file_type: file.type,
+          content: '' // You might want to extract text content here
+        }])
+        .select('*')
+        .single();
+      
+      if (documentError) throw new Error(documentError.message);
+      
+      const newDocument = documentData as Document;
       
       set((state) => ({
-        documents: state.documents.map((doc) => (doc.id === id ? { ...doc, ...updates } : doc)),
-        currentDocument:
-          state.currentDocument?.id === id ? { ...state.currentDocument, ...updates } : state.currentDocument,
-        isLoading: false,
+        documents: [...state.documents, newDocument],
+        isLoading: false
       }));
+      
+      return newDocument;
     } catch (error) {
-      console.error('Error updating document:', error);
-      set({ isLoading: false, error: 'Failed to update document' });
+      console.error('Error uploading document:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      set({ error: errorMessage, isLoading: false });
+      return null;
     }
   },
-  
+
   deleteDocument: async (id: string): Promise<boolean> => {
+    set({ isLoading: true, error: null });
     try {
-      set({ isLoading: true });
-      
+      // Remove from database
       const { error } = await supabase
         .from('documents')
         .delete()
         .eq('id', id);
-      
-      if (error) throw error;
-      
-      set(state => ({
-        documents: state.documents.filter(doc => doc.id !== id),
+
+      if (error) throw new Error(error.message);
+
+      // Update local state by removing the document
+      set((state) => ({
+        documents: state.documents.filter((doc) => doc.id !== id),
         isLoading: false
       }));
       
       return true;
     } catch (error) {
       console.error('Error deleting document:', error);
-      set({ isLoading: false, error: 'Failed to delete document' });
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      set({ error: errorMessage, isLoading: false });
       return false;
     }
   },
   
-  setDocumentSummary: async (id: string, summary: string) => {
+  setDocumentSummary: async (documentId: string, summary: string): Promise<void> => {
     try {
       const { error } = await supabase
         .from('documents')
         .update({ summary })
-        .eq('id', id);
+        .eq('id', documentId);
+        
+      if (error) throw error;
       
-      if (error) {
-        throw error;
-      }
-      
-      set((state) => ({
-        documents: state.documents.map(doc => 
-          doc.id === id ? { ...doc, summary, status: 'processed' } : doc
-        ),
-        currentDocument: state.currentDocument?.id === id ? 
-          { ...state.currentDocument, summary, status: 'processed' } : 
-          state.currentDocument
-      }));
-    } catch (error) {
-      console.error('Error updating document summary:', error);
-      throw new Error('Failed to update document summary');
-    }
-  },
-  
-  fetchDocumentFlashcards: async (id: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('flashcards')
-        .select('*')
-        .eq('document_id', id);
-      
-      if (error) {
-        throw error;
-      }
-      
-      // Convert database format to application format
-      const flashcards: Flashcard[] = (data || []).map((card: DBFlashcard) => {
+      // Update the document in state if it exists
+      set(state => {
+        const updatedDocuments = state.documents.map(doc => 
+          doc.id === documentId ? { ...doc, summary } : doc
+        );
+        
+        const updatedCurrentDocument = state.currentDocument?.id === documentId
+          ? { ...state.currentDocument, summary }
+          : state.currentDocument;
+          
         return {
-          id: card.id,
-          front_content: card.front_content,
-          back_content: card.back_content,
-          question: card.front_content,  // Map DB fields to app fields
-          answer: card.back_content,     // Map DB fields to app fields
-          documentId: card.document_id,
-          document_id: card.document_id,
-          createdAt: card.created_at,
-          created_at: card.created_at,
-          userId: card.user_id,
-          user_id: card.user_id,
-          updated_at: card.updated_at,
+          documents: updatedDocuments,
+          currentDocument: updatedCurrentDocument
         };
       });
-      
-      return flashcards;
     } catch (error) {
-      console.error('Error fetching flashcards:', error);
-      toast({
-        title: "Error",
-        description: "Failed to fetch flashcards",
-        variant: "destructive"
-      });
-      throw new Error('Failed to fetch flashcards');
+      console.error('Error updating document summary:', error);
     }
   },
   
-  clearCurrentDocument: () => {
-    set({ currentDocument: null });
+  saveFlashcards: async (documentId: string, flashcards: Flashcard[]): Promise<void> => {
+    try {
+      // In a real implementation, you would save these to a flashcards table
+      console.log('Saving flashcards for document:', documentId, flashcards);
+      
+      // For demonstration purposes, just log them
+      // In a real implementation, you would insert them into a flashcards table
+      for (const flashcard of flashcards) {
+        const { error } = await supabase
+          .from('flashcards')
+          .insert({
+            document_id: documentId,
+            front_content: flashcard.question,
+            back_content: flashcard.answer,
+            user_id: get().currentDocument?.user_id || ''
+          });
+          
+        if (error) console.error('Error saving flashcard:', error);
+      }
+    } catch (error) {
+      console.error('Error saving flashcards:', error);
+    }
   },
   
-  searchDocuments: (query) => {
-    const { documents } = get();
-    if (!query) return [];
+  generateSummary: async (documentId: string): Promise<string> => {
+    set({ isLoading: true, error: null });
+    try {
+      // Call Supabase function to generate summary
+      // const { data, error } = await supabase
+      //   .functions
+      //   .invoke('generate-summary', {
+      //     body: { documentId }
+      //   });
+        
+      // if (error) throw new Error(error.message);
+      
+      // set({ isLoading: false });
+      
+      // return data;
+      
+      // Mock summary generation
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      set({ isLoading: false });
+      return 'This is a mock summary.';
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      set({ error: errorMessage, isLoading: false });
+      return 'Failed to generate summary.';
+    }
+  },
+  
+  generateFlashcards: async (documentId: string): Promise<string[]> => {
+    set({ isLoading: true, error: null });
+    try {
+      // Call Supabase function to generate flashcards
+      // const { data, error } = await supabase
+      //   .functions
+      //   .invoke('generate-flashcards', {
+      //     body: { documentId }
+      //   });
+        
+      // if (error) throw new Error(error.message);
+      
+      // set({ isLoading: false });
+      
+      // return data;
+      
+      // Mock flashcard generation
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      set({ isLoading: false });
+      return ['Mock flashcard 1', 'Mock flashcard 2'];
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      set({ error: errorMessage, isLoading: false });
+      return ['Failed to generate flashcards.'];
+    }
+  },
+  
+  searchDocuments: (query: string): Document[] => {
+    // Mock search functionality
+    const documents = get().documents;
+    if (!query.trim()) return documents;
     
+    // Filter documents by title or content
     const results = documents.filter(doc => 
       doc.title.toLowerCase().includes(query.toLowerCase()) || 
-      (doc.content && doc.content.toLowerCase().includes(query.toLowerCase()))
+      (doc.content && doc.content.toLowerCase().includes(query.toLowerCase())) ||
+      (doc.summary && doc.summary.toLowerCase().includes(query.toLowerCase()))
     );
     
     return results;
-  },
-  
-  getDocument: async (id: string) => {
-    return get().fetchDocumentById(id);
-  },
-  
-  uploadDocument: async (file: File) => {
-    set({ isLoading: true, error: null });
-    try {
-      if (file.type !== 'application/pdf' && 
-          !file.type.includes('text/') && 
-          !file.type.includes('document')) {
-        throw new Error('Only PDF, text, and document files are supported');
-      }
-      
-      const { user } = useAuthStore.getState();
-      if (!user?.id) {
-        throw new Error('User not authenticated');
-      }
-      
-      const filePath = `documents/${user.id}/${Date.now()}_${file.name}`;
-      
-      const content = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = (e) => resolve(e.target?.result as string);
-        reader.onerror = (e) => reject(e);
-        
-        if (file.type === 'application/pdf') {
-          resolve(`Content extracted from ${file.name}`);
-        } else {
-          reader.readAsText(file);
-        }
-      });
-      
-      const documentId = await get().createDocument(file.name, content, file.type, filePath);
-      
-      const createdDocument = get().documents.find(doc => doc.id === documentId);
-      
-      // Update profile document count - wrap in try/catch to prevent failures
-      try {
-        await supabase
-          .from('profiles')
-          .update({ document_count: user.documentCount ? user.documentCount + 1 : 1 })
-          .eq('id', user.id);
-      } catch (e) {
-        console.error('Error updating document count:', e);
-      }
-      
-      set({ isLoading: false });
-      toast({
-        title: "Document uploaded",
-        description: "Document has been successfully uploaded",
-      });
-      
-      return createdDocument;
-    } catch (error) {
-      console.error('Error uploading document:', error);
-      toast({
-        title: "Upload failed",
-        description: error instanceof Error ? error.message : 'Failed to upload document',
-        variant: "destructive"
-      });
-      set({ isLoading: false, error: 'Failed to upload document' });
-      throw error;
-    }
-  },
-  
-  generateSummary: async (documentId: string, text: string) => {
-    try {
-      // Use our new NLPCloud utility
-      const summary = await generateDocumentSummary(text);
-      
-      // Update the document with the new summary
-      await get().setDocumentSummary(documentId, summary);
-      
-      toast({
-        title: "Summary generated",
-        description: "Document summary has been created successfully",
-      });
-      
-      return summary;
-    } catch (error) {
-      console.error('Error generating summary:', error);
-      toast({
-        title: "Summary generation failed",
-        description: error instanceof Error ? error.message : 'An error occurred',
-        variant: "destructive"
-      });
-      
-      const fallbackSummary = `This document appears to discuss research methodologies and academic findings. The content covers various aspects of data analysis and theoretical frameworks within the field of study.`;
-      await get().setDocumentSummary(documentId, fallbackSummary);
-      return fallbackSummary;
-    }
-  },
-  
-  generateFlashcards: async (documentId: string, text: string) => {
-    try {
-      // Use our new NLPCloud utility
-      const flashcardData = await generateFlashcards(text);
-      
-      await get().saveFlashcards(documentId, flashcardData);
-      
-      toast({
-        title: "Flashcards generated",
-        description: `${flashcardData.length} flashcards have been created`,
-      });
-      
-      return flashcardData;
-    } catch (error) {
-      console.error('Error generating flashcards:', error);
-      toast({
-        title: "Flashcard generation failed",
-        description: error instanceof Error ? error.message : 'An error occurred',
-        variant: "destructive"
-      });
-      
-      const fallbackFlashcards = [
-        {
-          question: "What is this document about?",
-          answer: "This document discusses academic and research topics."
-        },
-        {
-          question: "What are some key concepts in research?",
-          answer: "Research methods, data analysis, and literature review."
-        }
-      ];
-      
-      await get().saveFlashcards(documentId, fallbackFlashcards);
-      
-      return fallbackFlashcards;
-    }
-  },
-  
-  saveFlashcards: async (documentId: string, flashcards: any[]) => {
-    try {
-      const { user } = useAuthStore.getState();
-      
-      if (!user?.id) {
-        throw new Error('User not authenticated');
-      }
-      
-      // Clean up existing flashcards
-      await supabase
-        .from('flashcards')
-        .delete()
-        .eq('document_id', documentId);
-      
-      const flashcardsToInsert = flashcards.map(card => ({
-        id: uuidv4(),
-        document_id: documentId,
-        user_id: user.id,
-        front_content: card.question,
-        back_content: card.answer,
-        created_at: new Date().toISOString()
-      }));
-      
-      const { error } = await supabase
-        .from('flashcards')
-        .insert(flashcardsToInsert);
-      
-      if (error) {
-        throw error;
-      }
-      
-      // Update profile flashcard count - wrap in try/catch to prevent failures
-      try {
-        await supabase
-          .from('profiles')
-          .update({ flashcard_count: user.flashcardCount ? user.flashcardCount + flashcards.length : flashcards.length })
-          .eq('id', user.id);
-      } catch (e) {
-        console.error('Error updating flashcard count:', e);
-      }
-      
-    } catch (error) {
-      console.error('Error saving flashcards:', error);
-      throw new Error('Failed to save flashcards');
-    }
   }
 }));

@@ -38,7 +38,7 @@ const Navbar = () => {
               <Link to="/dashboard" className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white">
                   <img 
-                    src="public//mindgrove.png"
+                    src="/mindgrove.png"
                     alt="MindGrove"
                     className="w-8 h-8 rounded-full object-cover"
                   />
@@ -64,8 +64,8 @@ const Navbar = () => {
             
             <Link to="/profile" className="flex items-center gap-2">
               <div className="h-10 w-10 rounded-full flex items-center justify-center text-primary bg-white/40 dark:bg-black/20 backdrop-blur-md shadow-lg overflow-hidden border border-white/30 dark:border-white/10">
-                {user?.avatar_url ? (
-                  <img src={user.avatar_url} alt={user.name} className="h-10 w-10 object-cover" />
+                {user?.avatarUrl ? (
+                  <img src={user.avatarUrl} alt={user.name} className="h-10 w-10 object-cover" />
                 ) : (
                   <User className="h-5 w-5" />
                 )}

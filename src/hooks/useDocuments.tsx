@@ -3,7 +3,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { useDocumentStore } from '@/store/documentStore';
 import { Document } from '@/utils/mockData';
 import { useAuthStore } from '@/store/authStore';
-import { getDocumentThumbnail } from '@/utils/documentUtils';
+import { adaptToMockDocument, adaptStoreDocumentsToMockDocuments } from '@/utils/documentAdapter';
 
 export const useDocuments = () => {
   const { user } = useAuthStore();
@@ -11,8 +11,8 @@ export const useDocuments = () => {
   const [isSearching, setIsSearching] = useState(false);
   
   const { 
-    documents,
-    currentDocument,
+    documents: storeDocuments,
+    currentDocument: storeCurrentDocument,
     isLoading,
     error,
     fetchDocuments,
@@ -21,8 +21,12 @@ export const useDocuments = () => {
     uploadDocument,
     generateSummary,
     generateFlashcards,
-    searchDocuments
+    searchDocuments: searchStoreDocuments
   } = useDocumentStore();
+
+  // Convert store documents to mock documents
+  const documents = adaptStoreDocumentsToMockDocuments(storeDocuments || []);
+  const currentDocument = storeCurrentDocument ? adaptToMockDocument(storeCurrentDocument) : null;
 
   // Only fetch documents when the hook is first used or when user changes
   useEffect(() => {
@@ -39,7 +43,8 @@ export const useDocuments = () => {
     
     try {
       await fetchDocumentById(id);
-      return useDocumentStore.getState().currentDocument;
+      const storeDoc = useDocumentStore.getState().currentDocument;
+      return storeDoc ? adaptToMockDocument(storeDoc) : null;
     } catch (error) {
       console.error('Error fetching document:', error);
       return null;
@@ -54,19 +59,20 @@ export const useDocuments = () => {
     
     setIsSearching(true);
     try {
-      const results = searchDocuments(query);
-      setSearchResults(results);
+      const storeResults = searchStoreDocuments(query);
+      const mockResults = adaptStoreDocumentsToMockDocuments(storeResults || []);
+      setSearchResults(mockResults);
       setIsSearching(false);
-      return results;
+      return mockResults;
     } catch (error) {
       console.error('Error searching documents:', error);
       setIsSearching(false);
       return [];
     }
-  }, [searchDocuments]);
+  }, [searchStoreDocuments]);
 
   // Filter documents to show only those belonging to the current user
-  const userDocuments = user 
+  const userDocuments = user && documents
     ? documents.filter(doc => doc.userId === user.id)
     : [];
 

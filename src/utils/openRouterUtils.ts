@@ -2,7 +2,7 @@
 const OPEN_ROUTER_API_ENDPOINT = 'https://openrouter.ai/api/v1/chat/completions';
 
 // Use the provided API key directly
-const API_KEY = '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';
+const API_KEY = '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';
 
 // Default model to use for requests
 const DEFAULT_MODEL = 'openai/gpt-3.5-turbo';
@@ -46,6 +46,7 @@ export const generateDocumentSummary = async (text: string): Promise<string> => 
     // Even if text is minimal, we'll attempt to summarize it
     const inputText = text.trim() || "This document appears to be empty or contains minimal content.";
     
+    console.log("Making API request to OpenRouter...");
     const response = await fetch(OPEN_ROUTER_API_ENDPOINT, {
       method: 'POST',
       headers: {
@@ -71,15 +72,25 @@ export const generateDocumentSummary = async (text: string): Promise<string> => 
       })
     });
     
+    console.log("API Response status:", response.status);
+    
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("API Error:", errorText);
+      console.error("API Error Details:", {
+        status: response.status,
+        statusText: response.statusText,
+        headers: Object.fromEntries(response.headers.entries()),
+        error: errorText
+      });
       throw new Error(`API returned status: ${response.status} - ${getErrorMessage(errorText)}`);
     }
     
     // Parse the response
     const data = await response.json();
+    console.log("API Response data:", data);
+    
     const summary = data.choices?.[0]?.message?.content || "Failed to generate summary.";
+    console.log("Generated summary:", summary);
     
     return summary;
   } catch (error) {
@@ -251,6 +262,52 @@ ${contextText}`
     return chatResponse;
   } catch (error) {
     console.error('Error generating chat response:', error);
+    throw error;
+  }
+};
+
+/**
+ * Generate an AI chat response related to general content
+ */
+export const generateGeneralChatResponse = async (userMessage: string) => {
+  try {
+    const apiKey = import.meta.env.VITE_OPENROUTER_API_KEY || localStorage.getItem('OPENROUTER_API_KEY');
+    
+    if (!apiKey) {
+      throw new Error('OpenRouter API key is not configured');
+    }
+    
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': window.location.origin,
+        'X-Title': 'MindGrove'
+      },
+      body: JSON.stringify({
+        model: 'openai/gpt-3.5-turbo',
+        messages: [
+          {
+            role: 'system',
+            content: 'You are a helpful academic assistant for MindGrove, an educational platform. Provide clear, educational responses to users\' questions. Focus on being helpful, accurate, and concise. Cite sources when appropriate.'
+          },
+          { role: 'user', content: userMessage }
+        ],
+        temperature: 0.7,
+        max_tokens: 800
+      })
+    });
+    
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(`OpenRouter API error: ${errorData.error?.message || response.statusText}`);
+    }
+    
+    const data = await response.json();
+    return data.choices[0].message.content;
+  } catch (error) {
+    console.error('Error generating general chat response:', error);
     throw error;
   }
 };
