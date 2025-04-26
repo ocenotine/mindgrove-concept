@@ -17,6 +17,9 @@ export interface UserWithMetadata extends User {
   study_hours?: number;
   last_active?: string;
   institution_id?: string;
+  subscription_tier?: string;
+  subscription_expiry?: string;
+  is_first_login?: boolean;
   user_metadata: {
     name?: string;
     account_type?: 'student' | 'admin' | 'teacher' | 'institution';
@@ -40,6 +43,7 @@ interface AuthState {
   setSession: (session: Session | null) => void;
   setLoading: (loading: boolean) => void;
   updateProfile: (data: Partial<UserWithMetadata>) => Promise<void>;
+  initialize: () => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
@@ -59,7 +63,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       name: session.user.user_metadata?.name || session.user.user_metadata?.full_name,
       account_type: session.user.user_metadata?.account_type || 'student',
       avatarUrl: session.user.user_metadata?.avatar_url,
-      institution_id: session.user.user_metadata?.institution_id
+      institution_id: session.user.user_metadata?.institution_id,
+      subscription_tier: 'free',
+      subscription_expiry: null,
+      is_first_login: false
     } as UserWithMetadata : null;
 
     set({ 
@@ -88,7 +95,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       ...data.user,
       name: data.user.user_metadata?.name || data.user.user_metadata?.full_name,
       account_type: data.user.user_metadata?.account_type || 'student',
-      avatarUrl: data.user.user_metadata?.avatar_url
+      avatarUrl: data.user.user_metadata?.avatar_url,
+      subscription_tier: 'free',
+      subscription_expiry: null,
+      is_first_login: false
     } as UserWithMetadata : null;
     
     set({ 
@@ -128,7 +138,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const user = {
         ...data.user,
         name: userData.name,
-        account_type: userData.account_type
+        account_type: userData.account_type,
+        subscription_tier: 'free',
+        subscription_expiry: null,
+        is_first_login: true
       } as UserWithMetadata;
       
       set({ 
@@ -196,6 +209,38 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     if (currentUser) {
       set({ user: { ...currentUser, ...data } });
     }
+  },
+  
+  initialize: async () => {
+    const { setUser, setSession, setLoading } = get();
+    setLoading(true);
+    
+    try {
+      // Get the current session
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      // Process user metadata from existing session
+      const user = session?.user ? {
+        ...session.user,
+        name: session.user.user_metadata?.name || session.user.user_metadata?.full_name,
+        account_type: session.user.user_metadata?.account_type || 'student',
+        avatarUrl: session.user.user_metadata?.avatar_url,
+        institution_id: session.user.user_metadata?.institution_id,
+        subscription_tier: 'free',
+        subscription_expiry: null,
+        is_first_login: false
+      } as UserWithMetadata : null;
+      
+      setSession(session);
+      setUser(user);
+      
+      return Promise.resolve();
+    } catch (error) {
+      console.error("Auth initialization error:", error);
+      return Promise.reject(error);
+    } finally {
+      setLoading(false);
+    }
   }
 }));
 
@@ -213,7 +258,10 @@ export const initializeAuth = async () => {
           name: session.user.user_metadata?.name || session.user.user_metadata?.full_name,
           account_type: session.user.user_metadata?.account_type || 'student',
           avatarUrl: session.user.user_metadata?.avatar_url,
-          institution_id: session.user.user_metadata?.institution_id
+          institution_id: session.user.user_metadata?.institution_id,
+          subscription_tier: 'free',
+          subscription_expiry: null,
+          is_first_login: false
         } as UserWithMetadata : null;
         
         setSession(session);
@@ -231,7 +279,10 @@ export const initializeAuth = async () => {
       name: session.user.user_metadata?.name || session.user.user_metadata?.full_name,
       account_type: session.user.user_metadata?.account_type || 'student',
       avatarUrl: session.user.user_metadata?.avatar_url,
-      institution_id: session.user.user_metadata?.institution_id
+      institution_id: session.user.user_metadata?.institution_id,
+      subscription_tier: 'free',
+      subscription_expiry: null,
+      is_first_login: false
     } as UserWithMetadata : null;
     
     setSession(session);

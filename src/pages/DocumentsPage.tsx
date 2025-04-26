@@ -1,216 +1,127 @@
 
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useDocuments } from '@/hooks/useDocuments';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Search, Upload, Filter, Plus, MoreHorizontal, FileText } from 'lucide-react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { getDocumentThumbnail, generateDocumentPreview } from '@/utils/documentUtils';
-import {
-  Table,
-  TableBody,
-  TableCaption,
-  TableCell,
-  TableFooter,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { useToast } from '@/hooks/use-toast';
-import { useDocumentStore } from '@/store/documentStore';
+import { useState } from 'react';
 import MainLayout from '@/components/layout/MainLayout';
 import { PageTransition } from '@/components/animations/PageTransition';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Plus, Search, X } from 'lucide-react';
+import { useDocuments } from '@/hooks/useDocuments';
+import DocumentCard from '@/components/document/DocumentCard';
+import UploadDocumentDialog from '@/components/document/UploadDocumentDialog';
+import SkeletonLoader from '@/components/common/SkeletonLoader';
 
 const DocumentsPage = () => {
-  const navigate = useNavigate();
-  const { documents, searchResults, isSearching, handleSearch } = useDocuments();
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterOption, setFilterOption] = useState('all');
-  const [open, setOpen] = useState(false);
-  const { toast } = useToast();
-  const { deleteDocument } = useDocumentStore();
-
-  useEffect(() => {
+  const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
+  const { documents, isLoading, searchResults, handleSearch, isSearching } = useDocuments();
+  const [hasSearched, setHasSearched] = useState(false);
+  
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
     if (searchQuery.trim()) {
       handleSearch(searchQuery);
-    }
-  }, [searchQuery, handleSearch]);
-
-  const handleDocumentClick = (documentId: string) => {
-    navigate(`/document/${documentId}`);
-  };
-
-  const handleDeleteDocument = async (documentId: string) => {
-    try {
-      await deleteDocument(documentId);
-      toast({
-        title: "Success",
-        description: "Document deleted successfully.",
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to delete document.",
-        variant: "destructive",
-      });
+      setHasSearched(true);
     }
   };
-
-  const filteredDocuments = () => {
-    let docs = searchQuery ? searchResults : documents;
-
-    if (filterOption === 'summarized') {
-      docs = docs.filter(doc => doc.summary);
-    } else if (filterOption === 'not_summarized') {
-      docs = docs.filter(doc => !doc.summary);
-    }
-
-    return docs;
+  
+  const clearSearch = () => {
+    setSearchQuery('');
+    setHasSearched(false);
   };
+  
+  const displayDocuments = hasSearched ? searchResults : documents;
 
   return (
     <MainLayout>
-      <div className="container mx-auto py-10">
-        <div className="flex justify-between items-center mb-6">
-          <div className="relative w-full md:w-1/2">
-            <Input
-              type="search"
-              placeholder="Search documents..."
-              className="pl-10 pr-4 py-3 rounded-full"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-          </div>
-
-          <div className="flex items-center space-x-4">
-            <Dialog open={open} onOpenChange={setOpen}>
-              <DialogTrigger asChild>
-                <Button variant="outline" className="rounded-full">
-                  <Filter className="w-4 h-4 mr-2" /> Filter
+      <PageTransition>
+        <div className="space-y-6">
+          <div className="flex flex-col md:flex-row justify-between gap-4">
+            <h1 className="text-3xl font-bold">Documents</h1>
+            <div className="flex gap-2">
+              <form onSubmit={handleSearchSubmit} className="relative flex items-center flex-1">
+                <Input
+                  placeholder="Search documents..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pr-8"
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={clearSearch}
+                    className="absolute right-8 text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+                <Button type="submit" size="icon" variant="ghost" className="absolute right-0">
+                  <Search className="h-4 w-4" />
                 </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Filter Documents</DialogTitle>
-                </DialogHeader>
-                <Select value={filterOption} onValueChange={setFilterOption}>
-                  <SelectTrigger className="w-[200px]">
-                    <SelectValue placeholder="All" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Documents</SelectItem>
-                    <SelectItem value="summarized">Summarized</SelectItem>
-                    <SelectItem value="not_summarized">Not Summarized</SelectItem>
-                  </SelectContent>
-                </Select>
-              </DialogContent>
-            </Dialog>
-
-            <Button variant="secondary" className="rounded-full" onClick={() => navigate('/document/upload')}>
-              <Upload className="w-4 h-4 mr-2" /> Upload
-            </Button>
-            <Button className="rounded-full" onClick={() => navigate('/document/upload')}>
-              <Plus className="w-4 h-4 mr-2" /> New Document
-            </Button>
+              </form>
+              <Button onClick={() => setIsUploadDialogOpen(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Upload
+              </Button>
+            </div>
           </div>
-        </div>
-
-        {isSearching && <div className="text-center">Searching...</div>}
-
-        <div className="overflow-x-auto">
-          <Table>
-            <TableCaption>A list of your recent documents.</TableCaption>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[400px]">Title</TableHead>
-                <TableHead>Date Created</TableHead>
-                <TableHead>Summary</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredDocuments().map((document) => (
-                <TableRow key={document.id}>
-                  <TableCell className="font-medium">
-                    <div className="flex items-center">
-                      <div className="w-10 h-10 mr-3 flex items-center justify-center bg-muted rounded overflow-hidden">
-                        <img
-                          src={getDocumentThumbnail(document.fileType)}
-                          alt="Document Thumbnail"
-                          className="w-8 h-8 rounded-md object-contain"
-                        />
-                      </div>
-                      <div>
-                        <span
-                          className="hover:underline cursor-pointer block font-medium"
-                          onClick={() => handleDocumentClick(document.id)}
-                        >
-                          {document.title}
-                        </span>
-                        <p className="text-xs text-muted-foreground truncate max-w-[300px]">
-                          {generateDocumentPreview(document.content, 50)}
-                        </p>
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell>{new Date(document.createdAt).toLocaleDateString()}</TableCell>
-                  <TableCell>{document.summary ? 'Yes' : 'No'}</TableCell>
-                  <TableCell className="text-right">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" className="h-8 w-8 p-0">
-                          <span className="sr-only">Open menu</span>
-                          <MoreHorizontal className="h-4 w-4" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                        <DropdownMenuItem onClick={() => handleDocumentClick(document.id)}>
-                          View
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => navigate(`/document/${document.id}`)}>
-                          Edit
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem onClick={() => handleDeleteDocument(document.id)}>
-                          Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
+          
+          {isLoading || isSearching ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {[...Array(6)].map((_, i) => (
+                <SkeletonLoader key={i} className="h-48" />
               ))}
-              {filteredDocuments().length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={4} className="text-center py-10">
-                    {searchQuery ? 'No documents found matching your search.' : 'You have no documents yet.'}
-                  </TableCell>
-                </TableRow>
+            </div>
+          ) : displayDocuments.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {displayDocuments.map((document) => (
+                <DocumentCard key={document.id} document={document} />
+              ))}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <div className="rounded-full bg-muted p-6 mb-4">
+                <FileIcon className="h-10 w-10 text-muted-foreground" />
+              </div>
+              <h3 className="text-lg font-medium mb-2">No documents found</h3>
+              <p className="text-muted-foreground mb-6">
+                {hasSearched ? 
+                  `No results found for "${searchQuery}". Try a different search.` : 
+                  "Upload your first document to get started with AI analysis"}
+              </p>
+              {!hasSearched && (
+                <Button onClick={() => setIsUploadDialogOpen(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Upload a document
+                </Button>
               )}
-            </TableBody>
-            <TableFooter>
-              <TableRow>
-                <TableCell colSpan={4}>
-                  {filteredDocuments().length} document(s)
-                </TableCell>
-              </TableRow>
-            </TableFooter>
-          </Table>
+            </div>
+          )}
         </div>
-      </div>
+        
+        <UploadDocumentDialog 
+          isOpen={isUploadDialogOpen} 
+          onClose={() => setIsUploadDialogOpen(false)}
+        />
+      </PageTransition>
     </MainLayout>
   );
 };
+
+// FileIcon component
+const FileIcon = ({ className }: { className?: string }) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    strokeWidth="2"
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    className={className}
+  >
+    <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+    <polyline points="14 2 14 8 20 8" />
+  </svg>
+);
 
 export default DocumentsPage;

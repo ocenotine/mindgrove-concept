@@ -5,7 +5,7 @@ import * as pdfjs from 'pdfjs-dist';
 
 // Initialize PDF.js worker
 const pdfWorkerSrc = `https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js`;
-if (!pdfjs.GlobalWorkerOptions.workerSrc) {
+if (typeof window !== 'undefined' && !pdfjs.GlobalWorkerOptions.workerSrc) {
   pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerSrc;
 }
 
@@ -59,14 +59,14 @@ export const downloadDocument = (document: Document) => {
   const url = URL.createObjectURL(blob);
   
   // Create anchor element for download
-  const a = window.document.createElement('a');
+  const a = document.createElement ? document.createElement('a') : window.document.createElement('a');
   a.href = url;
   a.download = document.title || 'document.txt';
-  window.document.body.appendChild(a);
+  document.body ? document.body.appendChild(a) : window.document.body.appendChild(a);
   a.click();
   
   // Clean up
-  window.document.body.removeChild(a);
+  document.body ? document.body.removeChild(a) : window.document.body.removeChild(a);
   URL.revokeObjectURL(url);
 };
 
@@ -111,13 +111,6 @@ export const generateDocumentPreview = (content: string, maxLength: number = 200
 };
 
 /**
- * Create a canvas element (browser API)
- */
-const createCanvas = (): HTMLCanvasElement => {
-  return window.document.createElement('canvas');
-};
-
-/**
  * Create document thumbnail from content
  */
 export const createContentThumbnail = (doc: Document): string => {
@@ -131,7 +124,9 @@ export const createContentThumbnail = (doc: Document): string => {
   
   try {
     // For text content, create a preview box with the first few lines
-    const canvas = createCanvas();
+    if (typeof window === 'undefined') return getDocumentThumbnail(doc.fileType);
+    
+    const canvas = document.createElement ? document.createElement('canvas') : window.document.createElement('canvas');
     canvas.width = 400;
     canvas.height = 300;
     
