@@ -7,7 +7,7 @@ import { useTheme } from '@/hooks/useTheme';
 import { Moon, Sun } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useAuthStore } from '@/store/authStore';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import ChatBot from '@/components/chat/ChatBot';
 import MobileBottomNav from '@/components/layout/MobileBottomNav';
 import CompanionAppAd from '@/components/CompanionAppAd';
@@ -20,11 +20,25 @@ const MainLayout = ({ children }: MainLayoutProps) => {
   const isMobile = useIsMobile();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const { isDarkMode, toggleTheme } = useTheme();
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, user } = useAuthStore();
+  const location = useLocation();
   
   // Redirect to login if not authenticated
   if (!isAuthenticated) {
     return <Navigate to="/login" />;
+  }
+  
+  // Redirect institution users to institution dashboard if they try to access student pages
+  // And redirect student users to student dashboard if they try to access institution pages
+  const isInstitutionPage = location.pathname.startsWith('/institution');
+  const isInstitutionUser = user?.user_metadata?.account_type === 'institution';
+  
+  if (isInstitutionUser && !isInstitutionPage && location.pathname !== '/profile' && location.pathname !== '/profile/edit') {
+    return <Navigate to="/institution/dashboard" />;
+  }
+  
+  if (!isInstitutionUser && isInstitutionPage) {
+    return <Navigate to="/dashboard" />;
   }
 
   return (

@@ -12,13 +12,18 @@ import ParallaxScroll from '@/components/animations/ParallaxScroll';
 
 const Login = () => {
   const navigate = useNavigate();
-  const { login, loginWithGoogle, isAuthenticated } = useAuthStore();
+  const { login, loginWithGoogle, isAuthenticated, user } = useAuthStore();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
   if (isAuthenticated) {
-    navigate('/dashboard');
+    // Redirect based on account type
+    if (user?.user_metadata?.account_type === 'institution') {
+      navigate('/institution/dashboard');
+    } else {
+      navigate('/dashboard');
+    }
     return null;
   }
 
@@ -35,7 +40,7 @@ const Login = () => {
         variant: "default"
       });
       
-      navigate('/dashboard');
+      // Redirect will happen via the isAuthenticated check above on the next render
     } catch (error) {
       console.error("Login error:", error);
       toast({
@@ -43,7 +48,6 @@ const Login = () => {
         description: error instanceof Error ? error.message : "An unexpected error occurred",
         variant: "destructive"
       });
-    } finally {
       setIsLoading(false);
     }
   };

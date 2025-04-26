@@ -8,20 +8,43 @@ import LoadingAnimation from '@/components/animations/LoadingAnimation';
 
 const Index = () => {
   const navigate = useNavigate();
-  const { isAuthenticated, loading } = useAuthStore(state => ({
+  const { isAuthenticated, loading, setUser, setSession } = useAuthStore(state => ({
     isAuthenticated: state.isAuthenticated,
-    loading: state.loading
+    loading: state.loading,
+    setUser: state.setUser,
+    setSession: state.setSession
   }));
   const [isChecking, setIsChecking] = useState(true);
   
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        // Check session directly without calling initialize
+        // Check session directly
         const { data } = await supabase.auth.getSession();
         
         if (data.session) {
-          navigate('/dashboard');
+          // Process user metadata from session
+          const user = data.session?.user ? {
+            ...data.session.user,
+            name: data.session.user.user_metadata?.name || data.session.user.user_metadata?.full_name,
+            account_type: data.session.user.user_metadata?.account_type || 'student',
+            avatarUrl: data.session.user.user_metadata?.avatar_url,
+            institution_id: data.session.user.user_metadata?.institution_id,
+            subscription_tier: 'free',
+            subscription_expiry: null,
+            is_first_login: false
+          } : null;
+          
+          // Set user and session in the store
+          setSession(data.session);
+          setUser(user);
+          
+          // Direct to appropriate dashboard based on account type
+          if (user?.user_metadata?.account_type === 'institution') {
+            navigate('/institution/dashboard');
+          } else {
+            navigate('/dashboard');
+          }
         } else {
           navigate('/landing');
         }
@@ -34,7 +57,7 @@ const Index = () => {
     };
     
     checkAuth();
-  }, [navigate]);
+  }, [navigate, setUser, setSession]);
   
   return (
     <PageTransition>
