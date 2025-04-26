@@ -8,7 +8,7 @@ import { Plus, Search, X } from 'lucide-react';
 import { useDocuments } from '@/hooks/useDocuments';
 import DocumentCard from '@/components/document/DocumentCard';
 import UploadDocumentDialog from '@/components/document/UploadDocumentDialog';
-import SkeletonLoader from '@/components/common/SkeletonLoader';
+import { SkeletonLoader } from '@/components/common/SkeletonLoader';
 
 const DocumentsPage = () => {
   const [searchQuery, setSearchQuery] = useState('');

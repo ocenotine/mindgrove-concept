@@ -8,19 +8,16 @@ import LoadingAnimation from '@/components/animations/LoadingAnimation';
 
 const Index = () => {
   const navigate = useNavigate();
-  const { isAuthenticated, loading, initialize } = useAuthStore(state => ({
+  const { isAuthenticated, loading } = useAuthStore(state => ({
     isAuthenticated: state.isAuthenticated,
-    loading: state.loading,
-    initialize: state.initialize
+    loading: state.loading
   }));
   const [isChecking, setIsChecking] = useState(true);
   
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        // Initialize auth store first
-        await initialize();
-        
+        // Check session directly without calling initialize
         const { data } = await supabase.auth.getSession();
         
         if (data.session) {
@@ -37,7 +34,7 @@ const Index = () => {
     };
     
     checkAuth();
-  }, [navigate, initialize]);
+  }, [navigate]);
   
   return (
     <PageTransition>

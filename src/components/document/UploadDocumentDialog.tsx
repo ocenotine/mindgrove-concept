@@ -53,8 +53,8 @@ const UploadDocumentDialog = ({ isOpen, onClose }: UploadDocumentDialogProps) =>
         return;
       }
 
-      // Upload document
-      const result = await uploadDocument(file);
+      // Upload document - provide the required arguments (file, title, description)
+      const result = await uploadDocument(file, file.name, '');
       
       if (result?.id) {
         toast({

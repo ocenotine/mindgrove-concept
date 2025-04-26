@@ -58,15 +58,15 @@ export const downloadDocument = (document: Document) => {
   const blob = new Blob([document.content || ''], { type: document.fileType || 'text/plain' });
   const url = URL.createObjectURL(blob);
   
-  // Create anchor element for download
-  const a = document.createElement ? document.createElement('a') : window.document.createElement('a');
+  // Create anchor element for download - using window.document to avoid Document type conflicts
+  const a = window.document.createElement('a');
   a.href = url;
   a.download = document.title || 'document.txt';
-  document.body ? document.body.appendChild(a) : window.document.body.appendChild(a);
+  window.document.body.appendChild(a);
   a.click();
   
   // Clean up
-  document.body ? document.body.removeChild(a) : window.document.body.removeChild(a);
+  window.document.body.removeChild(a);
   URL.revokeObjectURL(url);
 };
 
@@ -126,7 +126,7 @@ export const createContentThumbnail = (doc: Document): string => {
     // For text content, create a preview box with the first few lines
     if (typeof window === 'undefined') return getDocumentThumbnail(doc.fileType);
     
-    const canvas = document.createElement ? document.createElement('canvas') : window.document.createElement('canvas');
+    const canvas = window.document.createElement('canvas');
     canvas.width = 400;
     canvas.height = 300;
     
