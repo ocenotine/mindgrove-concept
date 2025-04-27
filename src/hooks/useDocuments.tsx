@@ -4,53 +4,57 @@ import { useDocumentStore } from '@/store/documentStore';
 import { Document } from '@/utils/mockData';
 import { useAuthStore } from '@/store/authStore';
 import { adaptToMockDocument, adaptStoreDocumentsToMockDocuments } from '@/utils/documentAdapter';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/components/ui/use-toast';
 
 export const useDocuments = () => {
   const { user } = useAuthStore();
   const [searchResults, setSearchResults] = useState<Document[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [lastRefresh, setLastRefresh] = useState<number>(Date.now());
+  const [isRefreshing, setIsRefreshing] = useState(false);
   
   const { 
     documents: storeDocuments,
     currentDocument: storeCurrentDocument,
-    isLoading,
-    error,
-    fetchDocuments,
-    fetchDocumentById,
-    createDocument,
-    uploadDocument,
-    generateSummary,
-    generateFlashcards,
+    fetchDocuments: storeFetchDocuments,
     searchDocuments: searchStoreDocuments
   } = useDocumentStore();
 
-  // Convert store documents to mock documents
+  // Adapt store documents to mock documents
   const documents = adaptStoreDocumentsToMockDocuments(storeDocuments || []);
   const currentDocument = storeCurrentDocument ? adaptToMockDocument(storeCurrentDocument) : null;
 
-  // Only fetch documents when the hook is first used or when user changes
-  useEffect(() => {
-    if (user?.id) {
-      console.log("Fetching documents for user:", user.id);
-      fetchDocuments();
-    }
-  }, [fetchDocuments, user?.id]);
-
-  const getDocumentById = useCallback(async (id: string): Promise<Document | null> => {
-    if (currentDocument?.id === id) {
-      return currentDocument;
+  // Add refreshDocuments function that was missing
+  const refreshDocuments = useCallback(async () => {
+    if (!user?.id) {
+      console.warn("Cannot refresh documents: No authenticated user");
+      return;
     }
     
+    setIsRefreshing(true);
     try {
-      await fetchDocumentById(id);
-      const storeDoc = useDocumentStore.getState().currentDocument;
-      return storeDoc ? adaptToMockDocument(storeDoc) : null;
+      await storeFetchDocuments();
+      setLastRefresh(Date.now());
     } catch (error) {
-      console.error('Error fetching document:', error);
-      return null;
+      console.error("Error refreshing documents:", error);
+      toast({
+        title: "Error refreshing documents",
+        description: "Failed to fetch your latest documents. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsRefreshing(false);
     }
-  }, [currentDocument, fetchDocumentById]);
-  
+  }, [user?.id, storeFetchDocuments]);
+
+  // Initial fetch of documents
+  useEffect(() => {
+    if (user?.id && storeDocuments.length === 0) {
+      refreshDocuments();
+    }
+  }, [user?.id, storeDocuments.length, refreshDocuments]);
+
   const handleSearch = useCallback(async (query: string): Promise<Document[]> => {
     if (!query.trim()) {
       setSearchResults([]);
@@ -59,8 +63,25 @@ export const useDocuments = () => {
     
     setIsSearching(true);
     try {
+      // First, try searching in the local store
       const storeResults = searchStoreDocuments(query);
       const mockResults = adaptStoreDocumentsToMockDocuments(storeResults || []);
+      
+      // If no local results, search in Supabase
+      if (mockResults.length === 0 && user?.id) {
+        const { data, error } = await supabase
+          .from('documents')
+          .select('*')
+          .eq('user_id', user.id)
+          .or(`title.ilike.%${query}%,content.ilike.%${query}%`);
+        
+        if (error) throw error;
+        
+        const supabaseResults = data?.map(adaptToMockDocument) || [];
+        setSearchResults(supabaseResults);
+        return supabaseResults;
+      }
+      
       setSearchResults(mockResults);
       setIsSearching(false);
       return mockResults;
@@ -69,25 +90,17 @@ export const useDocuments = () => {
       setIsSearching(false);
       return [];
     }
-  }, [searchStoreDocuments]);
-
-  // Filter documents to show only those belonging to the current user
-  const userDocuments = user && documents
-    ? documents.filter(doc => doc.userId === user.id)
-    : [];
+  }, [searchStoreDocuments, user?.id]);
 
   return {
-    documents: userDocuments,
+    ...useDocumentStore(),
+    documents,
     searchResults,
     isSearching,
     currentDocument,
-    isLoading,
-    error,
-    fetchDocuments,
-    getDocumentById,
-    uploadDocument,
-    generateSummary,
-    generateFlashcards,
-    handleSearch
+    handleSearch,
+    lastRefresh,
+    refreshDocuments,
+    isRefreshing
   };
 };

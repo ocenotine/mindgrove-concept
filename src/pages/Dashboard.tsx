@@ -11,6 +11,7 @@ import { Plus, Rocket, BookOpen, BrainCircuit, ChartLine, Clock } from 'lucide-r
 import { Link } from 'react-router-dom';
 import ContactForm from '@/components/common/ContactForm';
 import LeaderboardCard from '@/components/dashboard/LeaderboardCard';
+import QuoteWidget from '@/components/dashboard/QuoteWidget';
 
 const Dashboard = () => {
   const { user } = useAuthStore();
@@ -41,7 +42,10 @@ const Dashboard = () => {
         animate={{ opacity: 1 }}
         className="space-y-8"
       >
-        <DashboardHeader title="Dashboard" subtitle="Welcome back to MindGrove" />
+        <div className="flex justify-between items-start">
+          <DashboardHeader title="Dashboard" subtitle="Welcome back to MindGrove" />
+          <QuoteWidget />
+        </div>
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <motion.div

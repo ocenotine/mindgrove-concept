@@ -1,77 +1,31 @@
 
-import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useEffect } from 'react';
+import { Navigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
-import { PageTransition } from '@/components/animations/PageTransition';
-import { supabase } from '@/integrations/supabase/client';
-import LoadingAnimation from '@/components/animations/LoadingAnimation';
+import LoadingScreen from '@/components/animations/LoadingScreen';
+import { useDocuments } from '@/hooks/useDocuments';
 
-const Index = () => {
-  const navigate = useNavigate();
-  const { isAuthenticated, loading, setUser, setSession } = useAuthStore(state => ({
-    isAuthenticated: state.isAuthenticated,
-    loading: state.loading,
-    setUser: state.setUser,
-    setSession: state.setSession
-  }));
-  const [isChecking, setIsChecking] = useState(true);
+export default function Index() {
+  const { isAuthenticated, user } = useAuthStore();
+  const loading = useAuthStore.getState().loading;
+  const { fetchDocuments } = useDocuments();
   
   useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        // Check session directly
-        const { data } = await supabase.auth.getSession();
-        
-        if (data.session) {
-          // Process user metadata from session
-          const user = data.session?.user ? {
-            ...data.session.user,
-            name: data.session.user.user_metadata?.name || data.session.user.user_metadata?.full_name,
-            account_type: data.session.user.user_metadata?.account_type || 'student',
-            avatarUrl: data.session.user.user_metadata?.avatar_url,
-            institution_id: data.session.user.user_metadata?.institution_id || 'default_institution',
-            subscription_tier: 'free',
-            subscription_expiry: null,
-            is_first_login: false
-          } : null;
-          
-          // Set user and session in the store
-          setSession(data.session);
-          setUser(user);
-          
-          // Direct to appropriate dashboard based on account type
-          const accountType = user?.user_metadata?.account_type;
-          if (accountType === 'institution') {
-            navigate('/institution/dashboard');
-          } else {
-            navigate('/dashboard');
-          }
-        } else {
-          navigate('/landing');
-        }
-      } catch (error) {
-        console.error("Auth check error:", error);
-        navigate('/landing');
-      } finally {
-        setIsChecking(false);
-      }
-    };
-    
-    // Execute auth check if it's not a direct callback route
-    if (!window.location.hash.includes('/auth/callback')) {
-      checkAuth();
-    } else {
-      setIsChecking(false);
+    if (isAuthenticated && user) {
+      // Preload documents data
+      fetchDocuments().catch(console.error);
     }
-  }, [navigate, setUser, setSession]);
-  
-  return (
-    <PageTransition>
-      <div className="flex items-center justify-center min-h-screen">
-        {isChecking && <LoadingAnimation />}
-      </div>
-    </PageTransition>
-  );
-};
+  }, [isAuthenticated, user, fetchDocuments]);
 
-export default Index;
+  // Show loading screen while authentication state is being determined
+  if (loading) {
+    return <LoadingScreen />;
+  }
+
+  // Redirect based on authentication state
+  if (isAuthenticated) {
+    return <Navigate to="/dashboard" replace />;
+  } else {
+    return <Navigate to="/login" replace />;
+  }
+}

@@ -18,7 +18,6 @@ interface MainLayoutProps {
 
 const MainLayout = ({ children }: MainLayoutProps) => {
   const isMobile = useIsMobile();
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const { isDarkMode, toggleTheme } = useTheme();
   const { isAuthenticated, user } = useAuthStore();
   const location = useLocation();
@@ -42,42 +41,40 @@ const MainLayout = ({ children }: MainLayoutProps) => {
   }
 
   return (
-    <div className="flex h-screen flex-col bg-background">
-      <Navbar />
+    <div className="flex h-screen flex-col bg-background text-foreground">
+      {/* Navbar is only shown for mobile */}
+      {isMobile && <Navbar />}
       <div className="flex flex-1 overflow-hidden">
         {!isMobile && (
-          <div className={isSidebarCollapsed ? "w-16" : "w-64"}>
-            <Sidebar isCollapsed={isSidebarCollapsed} />
+          <div className="w-64">
+            <Sidebar />
           </div>
         )}
         <motion.main 
-          className="flex-1 overflow-y-auto p-4 md:p-6 relative"
+          className="flex-1 overflow-y-auto px-4 py-6 md:px-6 lg:px-8"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.3 }}
         >
           <CompanionAppAd />
-          <div className="fixed bottom-20 right-4 z-50">
+          <div className="fixed bottom-20 right-4 z-50 md:bottom-4 md:right-6">
             <ChatBot />
           </div>
-          <div className="fixed bottom-4 right-4 z-40">
+          <div className="fixed bottom-4 right-4 z-40 md:right-6">
             <motion.button
               onClick={toggleTheme}
-              className="flex items-center justify-center h-10 w-10 rounded-full glass-card text-primary shadow-lg hover:shadow-xl transition-all"
+              className="flex h-10 w-10 items-center justify-center rounded-full glass-card text-primary shadow-lg hover:shadow-xl transition-all"
               aria-label="Toggle theme"
               initial={{ rotate: 0 }}
               animate={{ rotate: isDarkMode ? 180 : 0 }}
-              transition={{ 
-                duration: 0.5, 
-                type: "tween" 
-              }}
+              transition={{ duration: 0.5, type: "tween" }}
               whileHover={{ scale: 1.1 }}
               whileTap={{ scale: 0.95 }}
             >
               {isDarkMode ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
             </motion.button>
           </div>
-          <div className="max-w-7xl mx-auto">
+          <div className="mx-auto w-full max-w-[1400px]">
             {children}
           </div>
           {isMobile && (

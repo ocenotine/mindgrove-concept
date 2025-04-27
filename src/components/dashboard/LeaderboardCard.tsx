@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarImage, AvatarFallback } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { supabase } from '@/integrations/supabase/client';
 
 interface LeaderboardUser {
@@ -20,13 +21,14 @@ const LeaderboardCard = () => {
   useEffect(() => {
     const fetchLeaderboard = async () => {
       try {
+        setLoading(true);
         const { data, error } = await supabase
           .from('profiles')
           .select('id, name, avatar_url, streak_count')
           .eq('account_type', 'student')
           .gt('streak_count', 0)
           .order('streak_count', { ascending: false })
-          .limit(10);
+          .limit(50);
           
         if (error) {
           throw error;
@@ -42,9 +44,9 @@ const LeaderboardCard = () => {
     
     fetchLeaderboard();
     
-    // Set up real-time subscription for profiles updates
+    // Set up real-time subscription for profile updates
     const profileSubscription = supabase
-      .channel('public:profiles:streak_changes')
+      .channel('profiles_leaderboard')
       .on('postgres_changes', 
         { 
           event: 'UPDATE', 
@@ -60,7 +62,7 @@ const LeaderboardCard = () => {
       supabase.removeChannel(profileSubscription);
     };
   }, []);
-  
+
   const getInitials = (name: string | null) => {
     if (!name) return 'U';
     return name.split(' ')
@@ -69,7 +71,7 @@ const LeaderboardCard = () => {
       .toUpperCase()
       .substring(0, 2);
   };
-  
+
   const getRankClass = (rank: number) => {
     switch (rank) {
       case 0:
@@ -95,11 +97,14 @@ const LeaderboardCard = () => {
         return `${rank + 1}`;
     }
   };
-  
+
   return (
-    <Card className="overflow-hidden">
+    <Card className="h-full">
       <CardHeader className="bg-primary/10 pb-2">
-        <CardTitle className="text-lg">Study Streak Leaderboard</CardTitle>
+        <CardTitle className="text-lg flex items-center justify-between">
+          <span>Global Study Streak Leaderboard</span>
+          <span className="text-sm font-normal text-muted-foreground">Top 50</span>
+        </CardTitle>
       </CardHeader>
       
       <CardContent className="p-0">
@@ -120,44 +125,45 @@ const LeaderboardCard = () => {
             No streak data available yet. Start studying to get on the leaderboard!
           </div>
         ) : (
-          <div className="divide-y">
-            {leaderboardUsers.map((user, index) => (
-              <motion.div 
-                key={user.id}
-                className={`flex items-center p-3 ${index < 3 ? 'bg-muted/40' : ''}`}
-                initial={index < 3 ? { opacity: 0, y: 10 } : { opacity: 0 }}
-                animate={index < 3 ? { opacity: 1, y: 0 } : { opacity: 1 }}
-                transition={{ duration: 0.3, delay: index * 0.1 }}
-                whileHover={{ backgroundColor: 'rgba(0,0,0,0.05)' }}
-              >
-                <div className={`flex items-center justify-center h-8 w-8 rounded-full ${getRankClass(index)} text-white mr-3`}>
-                  {getRankIcon(index)}
-                </div>
-                
-                <Avatar className="h-8 w-8 mr-3">
-                  {user.avatar_url ? (
-                    <AvatarImage src={user.avatar_url} alt={user.name || 'User'} />
-                  ) : (
-                    <AvatarFallback className="bg-primary/10">
-                      {getInitials(user.name)}
-                    </AvatarFallback>
-                  )}
-                </Avatar>
-                
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate">
-                    {user.name || 'Anonymous User'}
-                  </p>
-                </div>
-                
-                <div className="flex items-center gap-1 text-sm font-medium">
-                  <span className="hidden sm:inline text-muted-foreground mr-1">Streak:</span>
-                  <span className="text-primary font-semibold">{user.streak_count}</span>
-                  <span className="text-muted-foreground">days</span>
-                </div>
-              </motion.div>
-            ))}
-          </div>
+          <ScrollArea className="h-[400px]">
+            <div className="divide-y">
+              {leaderboardUsers.map((user, index) => (
+                <motion.div 
+                  key={user.id}
+                  className={`flex items-center p-3 ${index < 3 ? 'bg-muted/40' : ''}`}
+                  initial={index < 3 ? { opacity: 0, y: 10 } : { opacity: 0 }}
+                  animate={index < 3 ? { opacity: 1, y: 0 } : { opacity: 1 }}
+                  transition={{ duration: 0.3, delay: index * 0.1 }}
+                  whileHover={{ backgroundColor: 'rgba(0,0,0,0.05)' }}
+                >
+                  <div className={`flex items-center justify-center h-8 w-8 rounded-full ${getRankClass(index)} text-white mr-3 text-sm font-medium`}>
+                    {getRankIcon(index)}
+                  </div>
+                  
+                  <Avatar className="h-8 w-8 mr-3">
+                    {user.avatar_url ? (
+                      <AvatarImage src={user.avatar_url} alt={user.name || 'User'} />
+                    ) : (
+                      <AvatarFallback className="bg-primary/10">
+                        {getInitials(user.name)}
+                      </AvatarFallback>
+                    )}
+                  </Avatar>
+                  
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">
+                      {user.name || 'Anonymous User'}
+                    </p>
+                  </div>
+                  
+                  <div className="flex items-center gap-1 text-sm font-medium">
+                    <span className="text-primary font-semibold">{user.streak_count}</span>
+                    <span className="text-muted-foreground">days</span>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          </ScrollArea>
         )}
       </CardContent>
     </Card>

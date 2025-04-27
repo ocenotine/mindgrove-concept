@@ -18,6 +18,7 @@ import { motion } from 'framer-motion';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
+import { BrandingColors } from '@/types/institution';
 
 interface SidebarProps {
   isCollapsed: boolean;
@@ -42,8 +43,17 @@ const InstitutionSidebar = ({ isCollapsed, toggleCollapse }: SidebarProps) => {
             .single();
             
           if (data?.branding_colors) {
-            setPrimaryColor(data.branding_colors.primary || '#6C72CB');
-            setSecondaryColor(data.branding_colors.secondary || '#CB69C1');
+            // Safely handle the branding_colors
+            let brandingColors: BrandingColors = { primary: '#6C72CB', secondary: '#CB69C1' };
+            
+            if (typeof data.branding_colors === 'object') {
+              const colors = data.branding_colors as any;
+              if (colors.primary) brandingColors.primary = colors.primary;
+              if (colors.secondary) brandingColors.secondary = colors.secondary;
+            }
+            
+            setPrimaryColor(brandingColors.primary);
+            setSecondaryColor(brandingColors.secondary);
           }
         } catch (error) {
           console.error("Error fetching branding colors:", error);

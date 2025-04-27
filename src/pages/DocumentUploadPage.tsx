@@ -8,14 +8,22 @@ import Card, { CardHeader, CardTitle, CardContent } from '@/components/common/Ca
 import Button from '@/components/common/Button';
 import { FileUp, UploadCloud, Settings, Book, Sparkles } from 'lucide-react';
 import { toast } from '@/components/ui/use-toast';
+import { useAuthStore } from '@/store/authStore';
 
 const DocumentUploadPage = () => {
   const navigate = useNavigate();
+  const { user } = useAuthStore();
   const [processingOptions, setProcessingOptions] = useState({
     generateSummary: true,
     createFlashcards: true,
     ocrTextRecognition: true
   });
+  
+  // Redirect if not logged in
+  if (!user) {
+    navigate('/login');
+    return null;
+  }
   
   const toggleOption = (option: keyof typeof processingOptions) => {
     setProcessingOptions(prev => ({

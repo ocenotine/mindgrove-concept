@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 
 const LoadingScreen = () => {
   return (
-    <div className="h-screen w-full flex flex-col items-center justify-center bg-background">
+    <div className="w-full h-full flex flex-col items-center justify-center">
       <motion.div
         animate={{ 
           rotate: 360,

@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import MainLayout from '@/components/layout/MainLayout';
 import { PageTransition } from '@/components/animations/PageTransition';
@@ -7,16 +7,45 @@ import EditProfileForm from '@/components/profile/EditProfileForm';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
 import { toast } from '@/components/ui/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuthStore } from '@/store/authStore';
 
 const EditProfile = () => {
   const navigate = useNavigate();
-  const [isSaving, setIsSaving] = useState(false);
+  const { user, setUser } = useAuthStore();
   
-  const handleSave = async () => {
-    setIsSaving(true);
-    
+  const handleSave = async (formData) => {
     try {
-      // Form submission is handled within the EditProfileForm component
+      if (!user) {
+        toast({
+          title: "Error",
+          description: "You must be logged in to update your profile.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      // Update profile in Supabase
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          name: formData.name,
+          bio: formData.bio,
+          avatar_url: formData.avatar_url,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', user.id);
+        
+      if (error) throw error;
+      
+      // Update local user state
+      setUser({
+        ...user,
+        name: formData.name,
+        bio: formData.bio,
+        avatar_url: formData.avatar_url,
+      });
+      
       toast({
         title: "Profile updated",
         description: "Your profile has been updated successfully.",
@@ -31,8 +60,6 @@ const EditProfile = () => {
         description: "Failed to update profile. Please try again.",
         variant: "destructive",
       });
-    } finally {
-      setIsSaving(false);
     }
   };
   
@@ -49,19 +76,12 @@ const EditProfile = () => {
               <ArrowLeft className="h-4 w-4" />
               Back to Profile
             </Button>
-            
-            <Button 
-              onClick={handleSave}
-              disabled={isSaving}
-            >
-              {isSaving ? 'Saving...' : 'Save Changes'}
-            </Button>
           </div>
           
           <div className="bg-card border rounded-lg shadow-sm overflow-hidden">
             <div className="p-6">
               <h1 className="text-2xl font-bold mb-6">Edit Profile</h1>
-              <EditProfileForm />
+              <EditProfileForm onSave={handleSave} />
             </div>
           </div>
         </div>

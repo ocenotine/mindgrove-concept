@@ -23,48 +23,75 @@ const StreakCounter = () => {
           .eq('id', user.id)
           .single();
         
-        if (error) throw error;
+        if (error) {
+          console.error('Error fetching streak data:', error);
+          return;
+        }
         
+        // Set the current streak count
         setStreak(data?.streak_count || 0);
         
         // Check if we need to update the streak
-        const lastActiveDate = data?.last_active ? new Date(data.last_active) : new Date();
+        const lastActiveDate = data?.last_active ? new Date(data.last_active) : null;
         const today = new Date();
-        const yesterday = new Date();
+        today.setHours(0, 0, 0, 0); // Set to start of day
+        
+        const yesterday = new Date(today);
         yesterday.setDate(yesterday.getDate() - 1);
         
-        // If the user hasn't been active today, and was last active before yesterday,
-        // reset the streak. If they were active yesterday, increment the streak.
-        if (lastActiveDate.toDateString() !== today.toDateString()) {
-          // Update last_active in the profile table
-          await supabase
+        // If last_active is null or user hasn't been active today
+        if (!lastActiveDate || lastActiveDate.getDate() !== today.getDate()) {
+          let newStreakCount = 0;
+          
+          // If they were active yesterday, increment streak
+          if (lastActiveDate && 
+              lastActiveDate.getDate() === yesterday.getDate() && 
+              lastActiveDate.getMonth() === yesterday.getMonth() && 
+              lastActiveDate.getFullYear() === yesterday.getFullYear()) {
+            newStreakCount = (data?.streak_count || 0) + 1;
+          } else {
+            // Not active yesterday, reset to 1 for today
+            newStreakCount = 1;
+          }
+          
+          // Update last_active and streak_count in the profile table
+          const { error: updateError } = await supabase
             .from('profiles')
             .update({ 
               last_active: new Date().toISOString(),
-              streak_count: lastActiveDate.toDateString() === yesterday.toDateString() ? (data?.streak_count || 0) + 1 : 1
+              streak_count: newStreakCount
             })
             .eq('id', user.id);
             
-          // Update local streak state
-          setStreak(lastActiveDate.toDateString() === yesterday.toDateString() ? (data?.streak_count || 0) + 1 : 1);
+          if (updateError) {
+            console.error('Error updating streak:', updateError);
+          } else {
+            // Update local streak state
+            setStreak(newStreakCount);
+          }
         }
         
       } catch (error) {
-        console.error('Error fetching streak:', error);
+        console.error('Error managing streak:', error);
       } finally {
         setLoading(false);
       }
     };
     
     fetchStreak();
+    
+    // Set up a daily check for the streak
+    const dailyCheck = setInterval(fetchStreak, 1000 * 60 * 60); // Check every hour
+    
+    return () => clearInterval(dailyCheck);
   }, [user]);
 
   return (
     <div>
       {loading ? (
-        <span>Loading...</span>
+        <span className="text-muted-foreground">Loading...</span>
       ) : (
-        <span>{streak} days</span>
+        <span className="font-medium">{streak} day{streak !== 1 ? 's' : ''}</span>
       )}
     </div>
   );

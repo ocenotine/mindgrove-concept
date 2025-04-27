@@ -1,4 +1,3 @@
-
 import { Document } from "./mockData";
 import { FileText, FileImage, FileArchive } from 'lucide-react';
 import * as pdfjs from 'pdfjs-dist';
@@ -11,25 +10,72 @@ if (typeof window !== 'undefined' && !pdfjs.GlobalWorkerOptions.workerSrc) {
 
 export const extractTextFromPDF = async (file: File): Promise<string> => {
   try {
+    console.log(`Starting PDF extraction for file: ${file.name} (${file.size} bytes)`);
     // Read the file as ArrayBuffer
     const arrayBuffer = await file.arrayBuffer();
     
     // Load the PDF document
-    const pdf = await pdfjs.getDocument({ data: arrayBuffer }).promise;
+    const loadingTask = pdfjs.getDocument({ data: arrayBuffer });
+    const pdf = await loadingTask.promise;
+    
+    console.log(`PDF loaded successfully. Pages: ${pdf.numPages}`);
     
     let fullText = '';
+    const pageTexts: string[] = [];
+    
+    // Calculate total pages for better progress tracking
+    const totalPages = pdf.numPages;
     
     // Extract text from each page
-    for (let i = 1; i <= pdf.numPages; i++) {
-      const page = await pdf.getPage(i);
-      const textContent = await page.getTextContent();
-      const pageText = textContent.items
-        .map((item: any) => item.str)
-        .join(' ');
-      
-      fullText += pageText + '\n\n';
+    const pagePromises = [];
+    for (let i = 1; i <= totalPages; i++) {
+      pagePromises.push(
+        (async (pageNum) => {
+          try {
+            const page = await pdf.getPage(pageNum);
+            const textContent = await page.getTextContent();
+            
+            // Join text items and preserve some layout with newlines
+            let lastY;
+            let pageText = '';
+            
+            for (const item of textContent.items) {
+              const textItem = item as any;
+              
+              // If this is a new line/paragraph based on Y position, add a newline
+              if (lastY !== undefined && Math.abs(textItem.transform[5] - lastY) > 5) {
+                pageText += '\n';
+              }
+              
+              // Add the text content
+              pageText += textItem.str + ' ';
+              
+              // Update lastY
+              lastY = textItem.transform[5];
+            }
+            
+            return { pageNum, text: pageText.trim() };
+          } catch (err) {
+            console.error(`Error processing page ${pageNum}:`, err);
+            return { pageNum, text: `[Error extracting page ${pageNum}]` };
+          }
+        })(i)
+      );
     }
     
+    // Process all pages in parallel
+    const pageResults = await Promise.all(pagePromises);
+    
+    // Sort results by page number and join
+    pageResults
+      .sort((a, b) => a.pageNum - b.pageNum)
+      .forEach(result => {
+        pageTexts.push(result.text);
+      });
+    
+    fullText = pageTexts.join('\n\n');
+    
+    console.log(`PDF extraction complete. Extracted ${fullText.length} characters`);
     return fullText;
   } catch (error) {
     console.error('Error extracting text from PDF:', error);

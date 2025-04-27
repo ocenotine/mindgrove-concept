@@ -1,4 +1,3 @@
-
 import { create } from 'zustand';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -47,17 +46,34 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
   fetchDocuments: async () => {
     set({ isLoading: true, error: null });
     try {
-      // Fetch documents from Supabase
+      console.log("Fetching documents from Supabase");
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        console.warn("User not authenticated");
+        set({ documents: [], isLoading: false });
+        return [];
+      }
+      
+      // Fetch documents from Supabase for current user
       const { data, error } = await supabase
         .from('documents')
-        .select('*');
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
       
-      if (error) throw new Error(error.message);
+      if (error) {
+        console.error("Error fetching documents:", error);
+        throw new Error(error.message);
+      }
       
       const documents = data || [];
+      console.log("Fetched documents:", documents.length);
       set({ documents, isLoading: false });
       return documents;
     } catch (error) {
+      console.error("Error in fetchDocuments:", error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       set({ error: errorMessage, isLoading: false });
       return [];
@@ -67,6 +83,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
   fetchDocumentById: async (id: string) => {
     set({ isLoading: true, error: null });
     try {
+      console.log("Fetching document by ID:", id);
       // Fetch document by ID from Supabase
       const { data, error } = await supabase
         .from('documents')
@@ -74,12 +91,17 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
         .eq('id', id)
         .single();
       
-      if (error) throw new Error(error.message);
+      if (error) {
+        console.error("Error fetching document by ID:", error);
+        throw new Error(error.message);
+      }
       
       const document = data as Document;
+      console.log("Fetched document:", document);
       set({ currentDocument: document, isLoading: false });
       return document;
     } catch (error) {
+      console.error("Error in fetchDocumentById:", error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       set({ error: errorMessage, isLoading: false });
       return null;
@@ -115,8 +137,23 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
   uploadDocument: async (file: File, title: string, userId: string): Promise<Document | null> => {
     set({ isLoading: true, error: null });
     try {
+      console.log("Starting document upload process...");
+      
+      // First, check if the storage bucket exists and create it if it doesn't
+      const { data: buckets } = await supabase.storage.listBuckets();
+      if (!buckets?.some(bucket => bucket.name === 'documents')) {
+        const { error: bucketError } = await supabase.storage.createBucket('documents', {
+          public: true
+        });
+        
+        if (bucketError) {
+          console.error("Error creating bucket:", bucketError);
+          // Continue anyway as the bucket might exist but not be visible to the user
+        }
+      }
+      
       // Upload file to Supabase storage
-      const filePath = `documents/${userId}/${Date.now()}_${file.name}`;
+      const filePath = `${userId}/${Date.now()}_${file.name}`;
       const { data: storageData, error: storageError } = await supabase
         .storage
         .from('documents')
@@ -125,7 +162,12 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
           upsert: false
         });
       
-      if (storageError) throw new Error(storageError.message);
+      if (storageError) {
+        console.error("Storage upload error:", storageError);
+        throw new Error(storageError.message);
+      }
+      
+      console.log("File uploaded to storage:", storageData);
       
       // Get public URL of the uploaded file
       const { data } = supabase
@@ -134,6 +176,7 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
         .getPublicUrl(filePath);
       
       const file_path = data.publicUrl;
+      console.log("Public URL:", file_path);
       
       // Create document record in Supabase
       const { data: documentData, error: documentError } = await supabase
@@ -148,9 +191,13 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
         .select('*')
         .single();
       
-      if (documentError) throw new Error(documentError.message);
+      if (documentError) {
+        console.error("Document insert error:", documentError);
+        throw new Error(documentError.message);
+      }
       
       const newDocument = documentData as Document;
+      console.log("Document created in database:", newDocument);
       
       set((state) => ({
         documents: [...state.documents, newDocument],
@@ -169,13 +216,51 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
   deleteDocument: async (id: string): Promise<boolean> => {
     set({ isLoading: true, error: null });
     try {
+      console.log("Deleting document with ID:", id);
+      
+      // First, get the document to find its storage path
+      const { data: document } = await supabase
+        .from('documents')
+        .select('file_path')
+        .eq('id', id)
+        .single();
+      
       // Remove from database
       const { error } = await supabase
         .from('documents')
         .delete()
         .eq('id', id);
 
-      if (error) throw new Error(error.message);
+      if (error) {
+        console.error("Error deleting document from database:", error);
+        throw new Error(error.message);
+      }
+      
+      // If we have a file path, try to remove the file from storage
+      if (document?.file_path) {
+        try {
+          // Extract the path from the URL
+          const url = new URL(document.file_path);
+          const pathParts = url.pathname.split('/');
+          // The last two parts should be the userId/filename
+          const storagePath = pathParts.slice(-2).join('/');
+          
+          if (storagePath) {
+            const { error: storageError } = await supabase
+              .storage
+              .from('documents')
+              .remove([storagePath]);
+            
+            if (storageError) {
+              console.error("Error removing file from storage:", storageError);
+              // Don't throw here, as the document was already deleted from the database
+            }
+          }
+        } catch (storageError) {
+          console.error("Error parsing file path:", storageError);
+          // Continue anyway as the document was deleted from the database
+        }
+      }
 
       // Update local state by removing the document
       set((state) => ({
@@ -194,12 +279,16 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
   
   setDocumentSummary: async (documentId: string, summary: string): Promise<void> => {
     try {
+      console.log("Setting document summary for ID:", documentId);
       const { error } = await supabase
         .from('documents')
         .update({ summary })
         .eq('id', documentId);
         
-      if (error) throw error;
+      if (error) {
+        console.error("Error updating document summary:", error);
+        throw error;
+      }
       
       // Update the document in state if it exists
       set(state => {
@@ -223,11 +312,16 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
   
   saveFlashcards: async (documentId: string, flashcards: Flashcard[]): Promise<void> => {
     try {
-      // In a real implementation, you would save these to a flashcards table
-      console.log('Saving flashcards for document:', documentId, flashcards);
+      console.log('Saving flashcards for document:', documentId);
       
-      // For demonstration purposes, just log them
-      // In a real implementation, you would insert them into a flashcards table
+      // Get the current user
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        throw new Error("User not authenticated");
+      }
+      
+      // Create flashcard entries for each flashcard
       for (const flashcard of flashcards) {
         const { error } = await supabase
           .from('flashcards')
@@ -235,32 +329,25 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
             document_id: documentId,
             front_content: flashcard.question,
             back_content: flashcard.answer,
-            user_id: get().currentDocument?.user_id || ''
+            user_id: user.id
           });
           
-        if (error) console.error('Error saving flashcard:', error);
+        if (error) {
+          console.error('Error saving flashcard:', error);
+          throw error;
+        }
       }
+      
+      console.log(`Successfully saved ${flashcards.length} flashcards`);
     } catch (error) {
       console.error('Error saving flashcards:', error);
+      throw error;
     }
   },
   
   generateSummary: async (documentId: string): Promise<string> => {
     set({ isLoading: true, error: null });
     try {
-      // Call Supabase function to generate summary
-      // const { data, error } = await supabase
-      //   .functions
-      //   .invoke('generate-summary', {
-      //     body: { documentId }
-      //   });
-        
-      // if (error) throw new Error(error.message);
-      
-      // set({ isLoading: false });
-      
-      // return data;
-      
       // Mock summary generation
       await new Promise(resolve => setTimeout(resolve, 2000));
       set({ isLoading: false });
@@ -275,19 +362,6 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
   generateFlashcards: async (documentId: string): Promise<string[]> => {
     set({ isLoading: true, error: null });
     try {
-      // Call Supabase function to generate flashcards
-      // const { data, error } = await supabase
-      //   .functions
-      //   .invoke('generate-flashcards', {
-      //     body: { documentId }
-      //   });
-        
-      // if (error) throw new Error(error.message);
-      
-      // set({ isLoading: false });
-      
-      // return data;
-      
       // Mock flashcard generation
       await new Promise(resolve => setTimeout(resolve, 2000));
       set({ isLoading: false });
@@ -300,11 +374,10 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
   },
   
   searchDocuments: (query: string): Document[] => {
-    // Mock search functionality
+    // Filter documents by title or content
     const documents = get().documents;
     if (!query.trim()) return documents;
     
-    // Filter documents by title or content
     const results = documents.filter(doc => 
       doc.title.toLowerCase().includes(query.toLowerCase()) || 
       (doc.content && doc.content.toLowerCase().includes(query.toLowerCase())) ||

@@ -1,18 +1,24 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MessageSquare, Send, X, Mic, Paperclip, Sparkles } from 'lucide-react';
+import { MessageSquare, Send, X, Mic, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
 import { toast } from '@/components/ui/use-toast';
 import Typewriter from '@/components/chat/Typewriter';
-import { generateDocumentChatResponse, generateGeneralChatResponse } from '@/utils/openRouterUtils';
+import { getOpenRouterApiKey } from '@/utils/openRouterUtils';
+import { chatWithDocument } from '@/utils/nlpUtils';
+import { supabase } from '@/integrations/supabase/client';
 
 interface Message {
   id: string;
   content: string;
   role: 'user' | 'assistant';
   timestamp: Date;
+}
+
+interface ChatHistoryMessage {
+  role: 'user' | 'assistant';
+  content: string;
 }
 
 interface DocumentChatProps {
@@ -31,6 +37,15 @@ const DocumentChat = ({ documentText, documentId, documentTitle }: DocumentChatP
   const [isListening, setIsListening] = useState(false);
   const [speechRecognition, setSpeechRecognition] = useState<any>(null);
   const chatContentRef = useRef<HTMLDivElement>(null);
+  const [chatHistory, setChatHistory] = useState<ChatHistoryMessage[]>([]);
+
+  // Check if API key is set
+  const [hasApiKey, setHasApiKey] = useState(false);
+  
+  useEffect(() => {
+    const apiKey = getOpenRouterApiKey();
+    setHasApiKey(!!apiKey);
+  }, []);
 
   // Initialize chat with greeting
   useEffect(() => {
@@ -46,6 +61,50 @@ const DocumentChat = ({ documentText, documentId, documentTitle }: DocumentChatP
       setMessages([initialMessage]);
     }
   }, [documentTitle, messages.length]);
+
+  // Load previous chat messages from database if available
+  useEffect(() => {
+    const loadChatHistory = async () => {
+      try {
+        if (documentId) {
+          const { data, error } = await supabase
+            .from('document_chats')
+            .select('*')
+            .eq('document_id', documentId)
+            .order('created_at', { ascending: true });
+            
+          if (!error && data && data.length > 0) {
+            const loadedMessages = data.map(msg => ({
+              id: msg.id,
+              content: msg.content,
+              role: msg.role as 'user' | 'assistant',
+              timestamp: new Date(msg.created_at)
+            }));
+            
+            setMessages(prev => {
+              // Only load if no messages except the greeting
+              if (prev.length <= 1) {
+                return [...prev, ...loadedMessages];
+              }
+              return prev;
+            });
+            
+            // Build chat history for context
+            const history = data.map(msg => ({
+              role: msg.role as 'user' | 'assistant',
+              content: msg.content
+            }));
+            
+            setChatHistory(history);
+          }
+        }
+      } catch (error) {
+        console.error("Error loading chat history:", error);
+      }
+    };
+    
+    loadChatHistory();
+  }, [documentId]);
 
   // Scroll to bottom when new messages arrive
   useEffect(() => {
@@ -119,6 +178,17 @@ const DocumentChat = ({ documentText, documentId, documentTitle }: DocumentChatP
 
   const sendMessage = async () => {
     if (!inputMessage.trim()) return;
+    
+    // Check if API key is set
+    const apiKey = getOpenRouterApiKey();
+    if (!apiKey) {
+      toast({
+        title: "API Key Required",
+        description: "Please set your OpenRouter API key in the settings to use the chat feature.",
+        variant: "destructive"
+      });
+      return;
+    }
 
     const userMessage: Message = {
       id: `user-${Date.now()}`,
@@ -132,29 +202,52 @@ const DocumentChat = ({ documentText, documentId, documentTitle }: DocumentChatP
     setIsTyping(true);
 
     try {
+      // Save user message to database
+      try {
+        await supabase.from('document_chats').insert({
+          document_id: documentId,
+          role: 'user',
+          content: userMessage.content,
+        });
+      } catch (dbError) {
+        console.error("Error saving user message to database:", dbError);
+        // Continue even if saving fails
+      }
+      
+      // Update chat history
+      const updatedHistory: ChatHistoryMessage[] = [...chatHistory, { role: 'user', content: userMessage.content }];
+      setChatHistory(updatedHistory);
+      
       let response;
       
-      // If we have document text, try to answer based on it first
-      if (documentText && documentText.trim().length > 100) {
-        try {
-          // Try document-specific response
-          response = await generateDocumentChatResponse(documentText, inputMessage);
-        } catch (documentError) {
-          console.error("Error with document-specific response:", documentError);
-          // Fall back to general response
-          response = await generateGeneralChatResponse(inputMessage);
-        }
-      } else {
-        // No document or document too short, use general response
-        response = await generateGeneralChatResponse(inputMessage);
+      // Use our nlpUtils for chat functionality
+      const result = await chatWithDocument(documentId, documentText, inputMessage);
+      
+      if (!result.success) {
+        throw new Error(result.error || "Failed to generate response");
       }
       
       const botResponse: Message = {
         id: `assistant-${Date.now()}`,
-        content: response,
+        content: result.response,
         role: 'assistant',
         timestamp: new Date()
       };
+      
+      // Save bot response to database
+      try {
+        await supabase.from('document_chats').insert({
+          document_id: documentId,
+          role: 'assistant',
+          content: botResponse.content
+        });
+      } catch (dbError) {
+        console.error("Error saving bot response to database:", dbError);
+        // Continue even if saving fails
+      }
+      
+      // Update chat history
+      setChatHistory([...updatedHistory, { role: 'assistant', content: botResponse.content }]);
       
       setMessages(prev => [...prev, botResponse]);
     } catch (error) {
@@ -206,7 +299,7 @@ const DocumentChat = ({ documentText, documentId, documentTitle }: DocumentChatP
       <AnimatePresence>
         {isOpen && (
           <motion.div
-            className="fixed bottom-0 right-0 z-50 w-[400px] max-w-[95vw] h-[500px] max-h-[80vh] bg-card rounded-tl-lg shadow-xl flex flex-col border overflow-hidden"
+            className="fixed bottom-0 right-0 z-50 w-full md:w-[400px] md:max-w-[95vw] md:h-[500px] h-[80vh] bg-card rounded-t-lg md:rounded-tl-lg shadow-xl flex flex-col border overflow-hidden"
             initial={{ opacity: 0, y: 20, scale: 0.9 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 20, scale: 0.9 }}
@@ -246,19 +339,15 @@ const DocumentChat = ({ documentText, documentId, documentTitle }: DocumentChatP
                         : 'bg-muted'
                     }`}
                   >
-                    {message.role === 'assistant' ? (
-                      typingComplete[message.id] ? (
-                        <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                      ) : (
-                        <Typewriter 
-                          text={message.content} 
-                          delay={15} 
-                          onComplete={() => handleTypewriterComplete(message.id)} 
-                          cursor={true}
-                        />
-                      )
+                    {message.role === 'assistant' && !typingComplete[message.id] ? (
+                      <Typewriter 
+                        text={message.content} 
+                        delay={15} 
+                        onComplete={() => handleTypewriterComplete(message.id)} 
+                        cursor={true}
+                      />
                     ) : (
-                      <p className="text-sm">{message.content}</p>
+                      <p className="text-sm whitespace-pre-wrap">{message.content}</p>
                     )}
                     <p className="text-xs opacity-70 mt-1 text-right">
                       {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -296,12 +385,18 @@ const DocumentChat = ({ documentText, documentId, documentTitle }: DocumentChatP
             
             {/* Chat input */}
             <div className="p-3 border-t border-border bg-background">
+              {!hasApiKey && (
+                <div className="mb-2 px-2 py-1 bg-yellow-500/10 border border-yellow-500/20 rounded text-yellow-500 text-xs">
+                  API key required. Set your OpenRouter API key in AI Tools tab.
+                </div>
+              )}
               <div className="flex items-center">
                 <Button
                   size="icon"
                   variant="ghost"
                   className="h-8 w-8"
                   onClick={toggleSpeechRecognition}
+                  disabled={!hasApiKey}
                   aria-label={isListening ? "Stop listening" : "Start voice input"}
                 >
                   <Mic className={`h-4 w-4 ${isListening ? 'text-primary animate-pulse' : ''}`} />
@@ -309,18 +404,19 @@ const DocumentChat = ({ documentText, documentId, documentTitle }: DocumentChatP
                 
                 <input
                   type="text"
-                  placeholder="Ask me anything..."
+                  placeholder={hasApiKey ? "Ask me anything..." : "Set API key in AI Tools tab first"}
                   className="flex-1 p-2 bg-background border-0 focus:outline-none focus:ring-0"
                   value={inputMessage}
                   onChange={handleInputChange}
                   onKeyPress={handleKeyPress}
+                  disabled={!hasApiKey}
                 />
                 
                 <Button
                   size="sm"
                   className="ml-2"
                   onClick={sendMessage}
-                  disabled={!inputMessage.trim() || isTyping}
+                  disabled={!inputMessage.trim() || isTyping || !hasApiKey}
                   aria-label="Send message"
                 >
                   <Send className="h-4 w-4" />

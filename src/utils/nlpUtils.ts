@@ -1,10 +1,10 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { generateDocumentChatResponse } from '@/utils/openRouterUtils';
+import { generateDocumentChatResponse, generateDocumentSummary } from '@/utils/openRouterUtils';
 
 export const generateSummary = async (documentId: string, text: string) => {
   try {
-    console.log(`Generating summary for document ${documentId}`);
+    console.log(`Generating detailed summary for document ${documentId}`);
     
     if (!text || text.trim().length < 10) {
       console.log('Text is too short for summarization');
@@ -24,48 +24,35 @@ export const generateSummary = async (documentId: string, text: string) => {
 
     // Call OpenRouter API through our wrapper
     try {
-      const response = await fetch('/api/ai/summarize', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${accessToken}`
-        },
-        body: JSON.stringify({
-          documentId,
-          text: text.slice(0, 15000) // Limit text length for API
-        })
-      });
+      // Use the OpenRouter utils directly
+      const summary = await generateDocumentSummary(text);
       
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`API error: ${response.status} - ${errorText}`);
+      // Once we have the summary, save it to the document in Supabase
+      if (documentId) {
+        try {
+          const { error } = await supabase
+            .from('documents')
+            .update({ summary })
+            .eq('id', documentId);
+            
+          if (error) {
+            console.error('Error saving summary to document:', error);
+          } else {
+            console.log('Summary saved successfully to document ID:', documentId);
+          }
+        } catch (dbError) {
+          console.error('Database error when saving summary:', dbError);
+          // Continue even if saving to DB fails
+        }
       }
-      
-      const data = await response.json();
-      
-      if (!data.summary) {
-        throw new Error('No summary returned from API');
-      }
-      
-      // Forward the successful result
-      return { 
-        success: true, 
-        summary: data.summary 
-      };
-    } catch (apiError) {
-      console.error('API error for summary:', apiError);
-      
-      // Fallback to direct API call
-      console.log('Falling back to direct API call for summarization');
-      
-      // Use the OpenRouter utils directly as a fallback
-      const { generateDocumentSummary } = await import('@/utils/openRouterUtils');
-      const summary = await generateDocumentSummary(text.slice(0, 15000));
       
       return {
         success: true,
         summary
       };
+    } catch (apiError) {
+      console.error('API error for summary:', apiError);
+      throw apiError;
     }
     
   } catch (error) {
@@ -102,43 +89,8 @@ export const generateFlashcards = async (documentId: string, text: string) => {
       throw new Error('Authentication required for document processing');
     }
 
-    // Call OpenRouter API through our wrapper
     try {
-      const response = await fetch('/api/ai/flashcards', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${accessToken}`
-        },
-        body: JSON.stringify({
-          documentId,
-          text: text.slice(0, 15000) // Limit text length for API
-        })
-      });
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`API error: ${response.status} - ${errorText}`);
-      }
-      
-      const data = await response.json();
-      
-      if (!Array.isArray(data.flashcards) || data.flashcards.length === 0) {
-        throw new Error('No valid flashcards returned from API');
-      }
-      
-      // Forward the successful result
-      return { 
-        success: true, 
-        flashcards: data.flashcards 
-      };
-    } catch (apiError) {
-      console.error('API error for flashcards:', apiError);
-      
-      // Fallback to direct API call
-      console.log('Falling back to direct API call for flashcard generation');
-      
-      // Use the OpenRouter utils directly as a fallback
+      // Use the OpenRouter utils directly
       const { generateFlashcards: generateFlashcardsFromOpenRouter } = await import('@/utils/openRouterUtils');
       const flashcards = await generateFlashcardsFromOpenRouter(text.slice(0, 15000));
       
@@ -146,6 +98,9 @@ export const generateFlashcards = async (documentId: string, text: string) => {
         success: true,
         flashcards
       };
+    } catch (apiError) {
+      console.error('API error for flashcards:', apiError);
+      throw apiError;
     }
   } catch (error) {
     console.error('Error generating flashcards:', error);

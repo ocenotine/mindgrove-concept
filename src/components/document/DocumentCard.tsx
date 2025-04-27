@@ -18,15 +18,13 @@ interface DocumentCardProps {
 const DocumentCard = ({ document, className }: DocumentCardProps) => {
   const [isBookmarked, setIsBookmarked] = useState(false);
   const { user } = useAuthStore();
-  const [canAccess, setCanAccess] = useState(true);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const navigate = useNavigate();
-  
-  const isShared = document.userId && document.userId !== user?.id;
   
   // Format the date to show how long ago it was last accessed
   const getLastAccessedTime = () => {
     try {
+      if (!document.lastAccessed) return 'recently';
       return formatDistanceToNow(new Date(document.lastAccessed), { addSuffix: true });
     } catch (error) {
       return 'recently';
@@ -45,22 +43,20 @@ const DocumentCard = ({ document, className }: DocumentCardProps) => {
     if (isMenuOpen) {
       e.preventDefault();
     } else {
+      e.preventDefault();
+      // Use navigate directly instead of Link to ensure proper navigation
       navigate(`/document/${document.id}`);
     }
   };
 
-  if (!canAccess) {
-    return null; // Don't display documents the user can't access
-  }
-
   return (
-    <Link to={`/document/${document.id}`} onClick={handleCardClick}>
+    <div onClick={handleCardClick} className="cursor-pointer">
       <motion.div
         whileHover={{ y: -5 }}
         transition={{ duration: 0.2 }}
       >
         <Card 
-          className={`h-full transition-all duration-300 hover:shadow-md ${className}`}
+          className={`h-full transition-all duration-300 hover:shadow-md ${className || ''}`}
           isHoverable
           isInteractive
         >
@@ -107,7 +103,7 @@ const DocumentCard = ({ document, className }: DocumentCardProps) => {
           </CardFooter>
         </Card>
       </motion.div>
-    </Link>
+    </div>
   );
 };
 

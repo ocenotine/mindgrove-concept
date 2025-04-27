@@ -1,152 +1,107 @@
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { ExternalLink, Key, Save, Check, X } from 'lucide-react';
-import { toast } from '@/components/ui/use-toast';
-import { setOpenRouterApiKey, getOpenRouterApiKey } from '@/utils/openRouterUtils';
-import { motion } from 'framer-motion';
+import { getOpenRouterApiKey, saveOpenRouterApiKey } from '@/utils/openRouterUtils';
+import { useToast } from '@/components/ui/use-toast';
 
-interface ApiKeySettingsProps {
-  onSave?: () => void;
-}
-
-const ApiKeySettings = ({ onSave }: ApiKeySettingsProps) => {
+const ApiKeySettings: React.FC = () => {
   const [apiKey, setApiKey] = useState('');
-  const [isVisible, setIsVisible] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
+  const { toast } = useToast();
   
   useEffect(() => {
-    const savedKey = getOpenRouterApiKey();
-    if (savedKey) {
-      setApiKey(savedKey);
+    // Load API key from local storage on component mount
+    const storedKey = getOpenRouterApiKey();
+    setApiKey(storedKey);
+    
+    // Check if API key is in URL parameters (for auto-configuring from link)
+    const urlParams = new URLSearchParams(window.location.search);
+    const keyParam = urlParams.get('api_key');
+    if (keyParam) {
+      handleSaveKey(keyParam);
+      // Remove param from URL for security
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+
+    // Initialize with API key from error message if present
+    if (window.location.hash && window.location.hash.includes('api_key=')) {
+      const keyParam = window.location.hash.split('api_key=')[1].split('&')[0];
+      if (keyParam) {
+        handleSaveKey(keyParam);
+        // Remove hash from URL for security
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    // Initialize with hardcoded API key if not already set
+    const hardcodedKey = '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';
+    
+    if (!getOpenRouterApiKey() && hardcodedKey) {
+      handleSaveKey(hardcodedKey);
     }
   }, []);
   
-  const handleSave = () => {
+  const handleSaveKey = (key: string) => {
+    saveOpenRouterApiKey(key);
+    setApiKey(key);
+    toast({
+      title: 'API Key Saved',
+      description: 'Your OpenRouter API key has been saved successfully.',
+    });
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
     if (!apiKey.trim()) {
       toast({
-        title: "Error",
-        description: "Please enter a valid API key",
-        variant: "destructive"
+        title: 'Error',
+        description: 'Please enter an API key.',
+        variant: 'destructive',
       });
       return;
     }
-    
-    setIsSaving(true);
-    
-    try {
-      setOpenRouterApiKey(apiKey);
-      
-      toast({
-        title: "API key saved",
-        description: "Your OpenRouter API key has been saved successfully",
-        action: (
-          <Button variant="outline" size="sm" className="gap-1">
-            <Check className="h-4 w-4" />
-          </Button>
-        )
-      });
-      
-      if (onSave) {
-        onSave();
-      }
-      
-      // Hide the settings after successful save
-      setTimeout(() => {
-        setIsVisible(false);
-      }, 1500);
-      
-    } catch (error) {
-      toast({
-        title: "Error saving API key",
-        description: "Something went wrong while saving your API key",
-        variant: "destructive"
-      });
-    } finally {
-      setIsSaving(false);
-    }
+
+    handleSaveKey(apiKey);
   };
-  
+
   return (
-    <div className="relative">
-      <Button 
-        variant="outline" 
-        size="sm" 
-        onClick={() => setIsVisible(!isVisible)}
-        className="gap-1 mb-3"
-      >
-        <Key className="h-4 w-4" />
-        {apiKey ? "Change API Key" : "Set API Key"}
-      </Button>
-      
-      {isVisible && (
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -20 }}
-          className="absolute left-0 top-full z-50 w-[350px] max-w-[95vw]"
-        >
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex justify-between items-center">
-                <span>OpenRouter API Key</span>
-                <Button 
-                  variant="ghost" 
-                  size="sm"
-                  onClick={() => setIsVisible(false)}
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </CardTitle>
-              <CardDescription>
-                Enter your OpenRouter API key to use AI features
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Input 
+    <Card>
+      <CardHeader>
+        <CardTitle>OpenRouter API Settings</CardTitle>
+        <CardDescription>
+          Configure your OpenRouter API key to use AI features
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={handleSubmit}>
+          <div className="grid gap-4">
+            <div className="grid gap-2">
+              <Label htmlFor="api-key">API Key</Label>
+              <Input
+                id="api-key"
                 type="password"
-                placeholder="sk-or-xxxx..."
                 value={apiKey}
                 onChange={(e) => setApiKey(e.target.value)}
-                className="mb-2"
+                placeholder="Enter your OpenRouter API key"
               />
-              <p className="text-xs text-muted-foreground">
-                Don't have an API key?{' '}
-                <a 
-                  href="https://openrouter.ai/keys" 
-                  target="_blank" 
-                  rel="noreferrer" 
-                  className="text-primary hover:underline inline-flex items-center gap-1"
-                >
-                  Get one from OpenRouter
-                  <ExternalLink className="h-3 w-3" />
-                </a>
-              </p>
-            </CardContent>
-            <CardFooter>
-              <Button 
-                onClick={handleSave} 
-                disabled={isSaving} 
-                className="w-full gap-1"
-              >
-                {isSaving ? (
-                  <motion.div 
-                    animate={{ rotate: 360 }}
-                    transition={{ repeat: Infinity, duration: 1, ease: "linear" }}
-                    className="h-4 w-4 border-2 border-t-transparent border-white rounded-full"
-                  />
-                ) : (
-                  <Save className="h-4 w-4" />
-                )}
-                {isSaving ? "Saving..." : "Save API Key"}
-              </Button>
-            </CardFooter>
-          </Card>
-        </motion.div>
-      )}
-    </div>
+            </div>
+          </div>
+        </form>
+      </CardContent>
+      <CardFooter className="flex justify-between">
+        <Button
+          variant="outline"
+          onClick={() => window.open('https://openrouter.ai/keys', '_blank')}
+        >
+          Get API Key
+        </Button>
+        <Button onClick={handleSubmit}>Save Key</Button>
+      </CardFooter>
+    </Card>
   );
 };
 

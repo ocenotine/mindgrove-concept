@@ -50,6 +50,44 @@ export type Database = {
           },
         ]
       }
+      document_chats: {
+        Row: {
+          content: string
+          created_at: string | null
+          document_id: string | null
+          id: string
+          role: string
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          content: string
+          created_at?: string | null
+          document_id?: string | null
+          id?: string
+          role: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          content?: string
+          created_at?: string | null
+          document_id?: string | null
+          id?: string
+          role?: string
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_chats_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       documents: {
         Row: {
           content: string | null
@@ -193,6 +231,7 @@ export type Database = {
           logo_url: string | null
           name: string
           selar_co_id: string | null
+          subscription_expiry: string | null
           updated_at: string | null
         }
         Insert: {
@@ -204,6 +243,7 @@ export type Database = {
           logo_url?: string | null
           name: string
           selar_co_id?: string | null
+          subscription_expiry?: string | null
           updated_at?: string | null
         }
         Update: {
@@ -215,6 +255,7 @@ export type Database = {
           logo_url?: string | null
           name?: string
           selar_co_id?: string | null
+          subscription_expiry?: string | null
           updated_at?: string | null
         }
         Relationships: []

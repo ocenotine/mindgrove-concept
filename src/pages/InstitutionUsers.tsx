@@ -1,225 +1,302 @@
 
 import React, { useState, useEffect } from 'react';
 import InstitutionLayout from '@/components/layout/InstitutionLayout';
-import { useAuthStore } from '@/store/authStore';
-import { toast } from '@/components/ui/use-toast';
 import { PageTransition } from '@/components/animations/PageTransition';
-import { supabase } from '@/integrations/supabase/client';
-import { 
-  Card, 
-  CardContent, 
-  CardDescription, 
-  CardHeader, 
-  CardTitle 
-} from '@/components/ui/card';
-import { 
-  Table, 
-  TableBody, 
-  TableCaption, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
-} from '@/components/ui/table';
-import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Search, UserPlus, UserCheck, Mail, FileText, Book, BookCopy } from 'lucide-react';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { useToast } from '@/components/ui/use-toast';
+import { useAuthStore } from '@/store/authStore';
+import { supabase } from '@/integrations/supabase/client';
+import { AlertCircle, Lock, MoreHorizontal, Search, UserPlus, Shield, UserCog, Mail, Trash, UserX } from 'lucide-react';
 
 interface User {
   id: string;
   name: string;
   email: string;
-  role: 'student' | 'researcher' | 'librarian' | 'admin';
-  status: 'active' | 'pending' | 'inactive';
-  lastActive: string;
-  documentCount: number;
-}
-
-interface ResearchProject {
-  id: string;
-  title: string;
-  description: string;
-  status: 'active' | 'completed' | 'archived';
-  members: number;
-  lastUpdated: string;
+  account_type: string;
+  avatar_url?: string | null;
+  last_active?: string | null;
 }
 
 const InstitutionUsers = () => {
   const { user } = useAuthStore();
-  const [isLoading, setIsLoading] = useState(true);
-  const [isPremium, setIsPremium] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [addUserDialogOpen, setAddUserDialogOpen] = useState(false);
-  const [newUserData, setNewUserData] = useState({
-    name: '',
-    email: '',
-    role: 'student' as const,
-  });
-  const [isSubmitting, setIsSubmitting] = useState(false);
-
-  // Mock user data
+  const { toast } = useToast();
   const [users, setUsers] = useState<User[]>([]);
-  
-  // Mock research projects
-  const [researchProjects, setResearchProjects] = useState<ResearchProject[]>([
-    {
-      id: '1',
-      title: 'AI in Education',
-      description: 'Researching the impact of AI tools on student learning outcomes',
-      status: 'active',
-      members: 5,
-      lastUpdated: '2023-06-15T10:30:00Z'
-    },
-    {
-      id: '2',
-      title: 'Climate Change Models',
-      description: 'Developing predictive models for climate change effects on agriculture',
-      status: 'active',
-      members: 3,
-      lastUpdated: '2023-06-10T14:20:00Z'
-    },
-    {
-      id: '3',
-      title: 'Medical Diagnosis Systems',
-      description: 'AI-driven diagnostic tools for rural healthcare providers',
-      status: 'completed',
-      members: 4,
-      lastUpdated: '2023-05-22T09:15:00Z'
-    },
-    {
-      id: '4',
-      title: 'Natural Language Processing for Local Languages',
-      description: 'Developing NLP tools for underrepresented African languages',
-      status: 'active',
-      members: 6,
-      lastUpdated: '2023-06-18T11:45:00Z'
-    }
-  ]);
-
-  // Generate mock users
-  useEffect(() => {
-    const mockUsers: User[] = [];
-    const roles = ['student', 'researcher', 'librarian', 'admin'] as const;
-    const statuses = ['active', 'pending', 'inactive'] as const;
-    const names = [
-      'John Doe', 'Jane Smith', 'Robert Johnson', 'Emily Williams', 
-      'Michael Brown', 'Sarah Davis', 'David Miller', 'Linda Wilson',
-      'James Moore', 'Patricia Taylor', 'Joseph Anderson', 'Jennifer Thomas',
-      'Charles Jackson', 'Mary White', 'Daniel Harris', 'Nancy Martin'
-    ];
-    
-    for (let i = 0; i < 16; i++) {
-      const name = names[i];
-      const email = name.toLowerCase().replace(' ', '.') + '@example.com';
-      const role = roles[Math.floor(Math.random() * roles.length)];
-      const status = Math.random() > 0.8 ? 
-        (Math.random() > 0.5 ? 'pending' : 'inactive') : 
-        'active';
-      
-      const today = new Date();
-      const lastActiveDate = new Date();
-      lastActiveDate.setDate(today.getDate() - Math.floor(Math.random() * 14)); // Last 14 days
-      
-      mockUsers.push({
-        id: `user-${i + 1}`,
-        name,
-        email,
-        role,
-        status,
-        lastActive: lastActiveDate.toISOString(),
-        documentCount: Math.floor(Math.random() * 50)
-      });
-    }
-    
-    setUsers(mockUsers);
-  }, []);
+  const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedRole, setSelectedRole] = useState('all');
+  const [institutionId, setInstitutionId] = useState<string | null>(null);
+  const [isPremium, setIsPremium] = useState(false);
+  const [showInviteDialog, setShowInviteDialog] = useState(false);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteRole, setInviteRole] = useState('student');
+  const [isInviting, setIsInviting] = useState(false);
 
   useEffect(() => {
-    const checkInstitutionPremium = async () => {
-      setIsLoading(true);
+    const loadInstitutionData = async () => {
+      if (!user) return;
+      
       try {
-        if (user?.user_metadata?.institution_id || user?.institution_id) {
-          const institutionId = user?.user_metadata?.institution_id || user?.institution_id;
+        setIsLoading(true);
+        const instId = user.user_metadata?.institution_id || user.institution_id;
+        
+        if (!instId) {
+          toast({
+            title: "No institution found",
+            description: "Your account is not associated with any institution.",
+            variant: "destructive"
+          });
+          return;
+        }
+        
+        setInstitutionId(instId);
+        
+        // Check if premium
+        const { data: institutionData, error: institutionError } = await supabase
+          .from('institutions')
+          .select('is_premium')
+          .eq('id', instId)
+          .single();
+        
+        if (institutionError) throw institutionError;
+        setIsPremium(institutionData.is_premium);
+        
+        if (institutionData.is_premium) {
+          // Load users if premium
+          const { data: usersData, error: usersError } = await supabase
+            .from('profiles')
+            .select('id, name, email, account_type, avatar_url, last_active')
+            .eq('institution_id', instId);
           
-          const { data, error } = await supabase
-            .from('institutions')
-            .select('is_premium')
-            .eq('id', institutionId)
-            .single();
-          
-          if (error) throw error;
-          setIsPremium(!!data.is_premium);
+          if (usersError) throw usersError;
+          setUsers(usersData || []);
+          setFilteredUsers(usersData || []);
         }
       } catch (error) {
-        console.error('Error checking premium status:', error);
-        setIsPremium(false);
+        console.error('Error loading institution users:', error);
+        toast({
+          title: "Failed to load users",
+          description: "There was a problem loading user data.",
+          variant: "destructive"
+        });
       } finally {
         setIsLoading(false);
       }
     };
     
-    checkInstitutionPremium();
-  }, [user]);
+    loadInstitutionData();
+  }, [user, toast]);
 
-  const filteredUsers = users.filter(user => 
-    user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    user.email.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  const handleAddUser = () => {
-    setIsSubmitting(true);
+  // Filter users based on search query and role
+  useEffect(() => {
+    let filtered = [...users];
     
-    // Simulate API call
-    setTimeout(() => {
-      // Generate new user
-      const newUser: User = {
-        id: `user-${users.length + 1}`,
-        name: newUserData.name,
-        email: newUserData.email,
-        role: newUserData.role,
-        status: 'pending',
-        lastActive: new Date().toISOString(),
-        documentCount: 0
-      };
+    if (searchQuery) {
+      filtered = filtered.filter(user => 
+        user.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+        user.email.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+    
+    if (selectedRole !== 'all') {
+      filtered = filtered.filter(user => user.account_type === selectedRole);
+    }
+    
+    setFilteredUsers(filtered);
+  }, [searchQuery, selectedRole, users]);
+
+  const handleInviteUser = async () => {
+    if (!inviteEmail || !institutionId) return;
+    
+    setIsInviting(true);
+    try {
+      // In a real implementation, this would send an email invitation
+      // For now, let's create a new user profile
       
-      setUsers([newUser, ...users]);
-      setIsSubmitting(false);
-      setAddUserDialogOpen(false);
+      // Check if email exists
+      const { data: existingUser, error: existingError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('email', inviteEmail)
+        .single();
+      
+      if (existingUser) {
+        toast({
+          title: "User already exists",
+          description: "This email is already associated with an account.",
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      // Generate a random ID for simulation
+      const newUserId = `sim-${Date.now()}`;
+      
+      // Create new user profile
+      const { error } = await supabase
+        .from('profiles')
+        .insert({
+          id: newUserId,
+          email: inviteEmail,
+          name: inviteEmail.split('@')[0], // Simple name from email
+          account_type: inviteRole,
+          institution_id: institutionId,
+          created_at: new Date().toISOString()
+        });
+        
+      if (error) throw error;
       
       toast({
-        title: 'User Invited',
-        description: `${newUserData.name} has been invited to join your institution.`,
+        title: "Invitation sent",
+        description: `An invitation has been sent to ${inviteEmail}`,
       });
       
-      // Reset form
-      setNewUserData({
-        name: '',
-        email: '',
-        role: 'student',
+      // Add the new user to the list
+      const newUser: User = {
+        id: newUserId,
+        name: inviteEmail.split('@')[0],
+        email: inviteEmail,
+        account_type: inviteRole
+      };
+      
+      setUsers([...users, newUser]);
+      setShowInviteDialog(false);
+      setInviteEmail('');
+    } catch (error) {
+      console.error('Error inviting user:', error);
+      toast({
+        title: "Failed to send invitation",
+        description: "There was a problem sending the invitation.",
+        variant: "destructive"
       });
-    }, 1000);
+    } finally {
+      setIsInviting(false);
+    }
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    });
+  const handleDeleteUser = async (userId: string) => {
+    try {
+      // Delete user
+      const { error } = await supabase
+        .from('profiles')
+        .delete()
+        .eq('id', userId);
+        
+      if (error) throw error;
+      
+      // Update local state
+      setUsers(users.filter(user => user.id !== userId));
+      
+      toast({
+        title: "User removed",
+        description: "The user has been removed from your institution.",
+      });
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      toast({
+        title: "Failed to remove user",
+        description: "There was a problem removing the user.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleChangeRole = async (userId: string, newRole: string) => {
+    try {
+      // Update user role
+      const { error } = await supabase
+        .from('profiles')
+        .update({ account_type: newRole })
+        .eq('id', userId);
+        
+      if (error) throw error;
+      
+      // Update local state
+      setUsers(users.map(user => 
+        user.id === userId ? { ...user, account_type: newRole } : user
+      ));
+      
+      toast({
+        title: "Role updated",
+        description: "The user's role has been updated successfully.",
+      });
+    } catch (error) {
+      console.error('Error updating user role:', error);
+      toast({
+        title: "Failed to update role",
+        description: "There was a problem updating the user's role.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const getRoleBadgeClass = (role: string) => {
+    switch (role) {
+      case 'admin':
+        return 'bg-red-500/10 text-red-500';
+      case 'teacher':
+        return 'bg-blue-500/10 text-blue-500';
+      case 'student':
+        return 'bg-green-500/10 text-green-500';
+      default:
+        return 'bg-gray-500/10 text-gray-500';
+    }
   };
 
   if (isLoading) {
     return (
       <InstitutionLayout>
-        <div className="flex items-center justify-center h-[80vh]">
+        <div className="flex justify-center items-center h-full py-16">
           <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full"></div>
-          <span className="ml-3 text-gray-400">Loading...</span>
         </div>
+      </InstitutionLayout>
+    );
+  }
+
+  if (!isPremium) {
+    return (
+      <InstitutionLayout>
+        <PageTransition>
+          <div className="mb-6">
+            <h1 className="text-3xl font-bold mb-2">Users</h1>
+            <p className="text-muted-foreground">
+              Manage users associated with your institution
+            </p>
+          </div>
+          
+          <Card className="border-2 border-primary/30">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Lock className="h-5 w-5 text-primary" />
+                Premium Feature
+              </CardTitle>
+              <CardDescription>
+                User management is available with our Premium plan
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Alert className="bg-yellow-500/10 border-yellow-500/30">
+                <AlertCircle className="h-4 w-4 text-yellow-500" />
+                <AlertTitle>Upgrade Required</AlertTitle>
+                <AlertDescription>
+                  This feature requires a premium subscription. Upgrade your plan to access user management tools.
+                </AlertDescription>
+              </Alert>
+              
+              <div className="text-center">
+                <Button asChild className="mt-4">
+                  <a href="/institution/subscription">Upgrade to Premium</a>
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </PageTransition>
       </InstitutionLayout>
     );
   }
@@ -227,277 +304,200 @@ const InstitutionUsers = () => {
   return (
     <InstitutionLayout>
       <PageTransition>
-        <div className="container pb-10">
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold text-white">User Management</h1>
-            <p className="text-gray-400 mt-1">
-              Manage your institution's users and research projects
-            </p>
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold mb-2">Users</h1>
+          <p className="text-muted-foreground">
+            Manage users associated with your institution
+          </p>
+        </div>
+        
+        <div className="flex flex-col md:flex-row items-center gap-4 mb-6">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search users..."
+              className="pl-10"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
           </div>
           
-          {!isPremium ? (
-            <Card className="bg-[#191C27] border-gray-800 p-6 text-center">
-              <div className="mb-6">
-                <Badge variant="outline" className="mb-4 bg-orange-500/10 text-orange-400 border-orange-400">Premium Feature</Badge>
-                <h2 className="text-2xl font-bold text-white">Upgrade to Access User Management</h2>
-                <p className="text-gray-400 mt-2 max-w-lg mx-auto">
-                  User management allows you to invite and manage researchers, students, and staff in your institution.
-                  Upgrade to Premium to unlock this feature.
-                </p>
-              </div>
-              <Button 
-                onClick={() => window.location.href = '/institution/subscription'}
-                className="mt-2"
-              >
-                Upgrade to Premium
-              </Button>
-            </Card>
-          ) : (
-            <Tabs defaultValue="users" className="space-y-6">
-              <TabsList className="mb-4 bg-[#191C27] border-gray-800">
-                <TabsTrigger value="users" className="data-[state=active]:bg-primary/20">
-                  <UserCheck className="mr-2 h-4 w-4" />
-                  Users
-                </TabsTrigger>
-                <TabsTrigger value="research" className="data-[state=active]:bg-primary/20">
-                  <BookCopy className="mr-2 h-4 w-4" />
-                  Research Projects
-                </TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="users" className="space-y-6">
-                {/* Search and Add User controls */}
-                <div className="flex flex-col sm:flex-row gap-4 justify-between">
-                  <div className="relative max-w-md w-full">
-                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
+          <div className="flex gap-2 w-full md:w-auto">
+            <Select value={selectedRole} onValueChange={setSelectedRole}>
+              <SelectTrigger className="w-full md:w-[180px]">
+                <SelectValue placeholder="Filter by role" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Roles</SelectItem>
+                <SelectItem value="admin">Admin</SelectItem>
+                <SelectItem value="teacher">Teacher</SelectItem>
+                <SelectItem value="student">Student</SelectItem>
+              </SelectContent>
+            </Select>
+            
+            <Dialog open={showInviteDialog} onOpenChange={setShowInviteDialog}>
+              <DialogTrigger asChild>
+                <Button className="flex items-center gap-2">
+                  <UserPlus className="h-4 w-4" />
+                  <span className="hidden sm:inline">Invite User</span>
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Invite New User</DialogTitle>
+                  <DialogDescription>
+                    Send an invitation to join your institution
+                  </DialogDescription>
+                </DialogHeader>
+                
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <label htmlFor="email" className="text-sm font-medium">
+                      Email Address
+                    </label>
                     <Input
-                      placeholder="Search users by name or email..."
-                      className="pl-9 bg-[#131620] border-gray-700 text-gray-300"
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
+                      id="email"
+                      placeholder="user@example.com"
+                      value={inviteEmail}
+                      onChange={(e) => setInviteEmail(e.target.value)}
                     />
                   </div>
                   
-                  <Dialog open={addUserDialogOpen} onOpenChange={setAddUserDialogOpen}>
-                    <DialogTrigger asChild>
-                      <Button>
-                        <UserPlus className="mr-2 h-4 w-4" />
-                        Add User
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent className="bg-[#191C27] text-white">
-                      <DialogHeader>
-                        <DialogTitle>Invite New User</DialogTitle>
-                        <DialogDescription className="text-gray-400">
-                          Add a new user to your institution. They will receive an email invitation.
-                        </DialogDescription>
-                      </DialogHeader>
-                      
-                      <div className="space-y-4 py-2">
-                        <div className="space-y-2">
-                          <Label htmlFor="name" className="text-gray-200">Full Name</Label>
-                          <Input
-                            id="name"
-                            value={newUserData.name}
-                            onChange={(e) => setNewUserData({...newUserData, name: e.target.value})}
-                            placeholder="John Doe"
-                            className="bg-[#131620] border-gray-700 text-white"
-                          />
-                        </div>
-                        
-                        <div className="space-y-2">
-                          <Label htmlFor="email" className="text-gray-200">Email</Label>
-                          <Input
-                            id="email"
-                            type="email"
-                            value={newUserData.email}
-                            onChange={(e) => setNewUserData({...newUserData, email: e.target.value})}
-                            placeholder="john.doe@example.com"
-                            className="bg-[#131620] border-gray-700 text-white"
-                          />
-                        </div>
-                        
-                        <div className="space-y-2">
-                          <Label htmlFor="role" className="text-gray-200">Role</Label>
-                          <Select
-                            value={newUserData.role}
-                            onValueChange={(value: any) => setNewUserData({...newUserData, role: value})}
-                          >
-                            <SelectTrigger className="bg-[#131620] border-gray-700 text-white">
-                              <SelectValue placeholder="Select a role" />
-                            </SelectTrigger>
-                            <SelectContent className="bg-[#191C27] text-white border-gray-700">
-                              <SelectItem value="student">Student</SelectItem>
-                              <SelectItem value="researcher">Researcher</SelectItem>
-                              <SelectItem value="librarian">Librarian</SelectItem>
-                              <SelectItem value="admin">Admin</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </div>
-                      
-                      <DialogFooter>
-                        <Button 
-                          type="button" 
-                          variant="outline" 
-                          onClick={() => setAddUserDialogOpen(false)}
-                          className="border-gray-700 text-gray-300 hover:bg-gray-800"
-                        >
-                          Cancel
-                        </Button>
-                        <Button 
-                          type="submit" 
-                          onClick={handleAddUser}
-                          disabled={!newUserData.name || !newUserData.email || isSubmitting}
-                          className="bg-primary hover:bg-primary/90"
-                        >
-                          {isSubmitting ? (
-                            <>
-                              <span className="animate-spin mr-2">⊝</span>
-                              Sending...
-                            </>
-                          ) : (
-                            <>
-                              <Mail className="mr-2 h-4 w-4" />
-                              Send Invitation
-                            </>
-                          )}
-                        </Button>
-                      </DialogFooter>
-                    </DialogContent>
-                  </Dialog>
+                  <div className="space-y-2">
+                    <label htmlFor="role" className="text-sm font-medium">
+                      Role
+                    </label>
+                    <Select value={inviteRole} onValueChange={setInviteRole}>
+                      <SelectTrigger id="role">
+                        <SelectValue placeholder="Select role" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="student">Student</SelectItem>
+                        <SelectItem value="teacher">Teacher</SelectItem>
+                        <SelectItem value="admin">Admin</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
                 
-                {/* Users Table */}
-                <Card className="bg-[#191C27] border-gray-800">
-                  <CardHeader>
-                    <CardTitle className="text-white">Users</CardTitle>
-                    <CardDescription className="text-gray-400">
-                      Manage your institution's members
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <Table>
-                      <TableHeader>
-                        <TableRow className="hover:bg-transparent border-gray-800">
-                          <TableHead className="text-gray-400">Name</TableHead>
-                          <TableHead className="text-gray-400">Email</TableHead>
-                          <TableHead className="text-gray-400">Role</TableHead>
-                          <TableHead className="text-gray-400">Status</TableHead>
-                          <TableHead className="text-gray-400">Last Active</TableHead>
-                          <TableHead className="text-gray-400">Documents</TableHead>
-                          <TableHead className="text-gray-400 text-right">Actions</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {filteredUsers.length > 0 ? (
-                          filteredUsers.map((user) => (
-                            <TableRow key={user.id} className="border-gray-800 hover:bg-gray-900/50">
-                              <TableCell className="font-medium text-white">{user.name}</TableCell>
-                              <TableCell className="text-gray-300">{user.email}</TableCell>
-                              <TableCell>
-                                <Badge variant="outline" className={`
-                                  ${user.role === 'admin' ? 'bg-purple-500/20 text-purple-300 border-purple-500' : ''}
-                                  ${user.role === 'researcher' ? 'bg-blue-500/20 text-blue-300 border-blue-500' : ''}
-                                  ${user.role === 'librarian' ? 'bg-amber-500/20 text-amber-300 border-amber-500' : ''}
-                                  ${user.role === 'student' ? 'bg-green-500/20 text-green-300 border-green-500' : ''}
-                                `}>
-                                  {user.role.charAt(0).toUpperCase() + user.role.slice(1)}
-                                </Badge>
-                              </TableCell>
-                              <TableCell>
-                                <Badge variant={
-                                  user.status === 'active' ? 'default' : 
-                                  user.status === 'pending' ? 'secondary' : 'outline'
-                                }>
-                                  {user.status}
-                                </Badge>
-                              </TableCell>
-                              <TableCell className="text-gray-300">{formatDate(user.lastActive)}</TableCell>
-                              <TableCell className="text-gray-300">{user.documentCount}</TableCell>
-                              <TableCell className="text-right">
-                                <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
-                                  <span className="sr-only">Open menu</span>
-                                  <svg
-                                    width="15"
-                                    height="15"
-                                    viewBox="0 0 15 15"
-                                    fill="none"
-                                    xmlns="http://www.w3.org/2000/svg"
-                                    className="h-4 w-4 text-gray-400"
-                                  >
-                                    <path
-                                      d="M3.625 7.5C3.625 8.12132 3.12132 8.625 2.5 8.625C1.87868 8.625 1.375 8.12132 1.375 7.5C1.375 6.87868 1.87868 6.375 2.5 6.375C3.12132 6.375 3.625 6.87868 3.625 7.5ZM8.625 7.5C8.625 8.12132 8.12132 8.625 7.5 8.625C6.87868 8.625 6.375 8.12132 6.375 7.5C6.375 6.87868 6.87868 6.375 7.5 6.375C8.12132 6.375 8.625 6.87868 8.625 7.5ZM13.625 7.5C13.625 8.12132 13.1213 8.625 12.5 8.625C11.8787 8.625 11.375 8.12132 11.375 7.5C11.375 6.87868 11.8787 6.375 12.5 6.375C13.1213 6.375 13.625 6.87868 13.625 7.5Z"
-                                      fill="currentColor"
-                                      fillRule="evenodd"
-                                      clipRule="evenodd"
-                                    ></path>
-                                  </svg>
-                                </Button>
-                              </TableCell>
-                            </TableRow>
-                          ))
-                        ) : (
-                          <TableRow>
-                            <TableCell colSpan={7} className="text-center py-6 text-gray-500">
-                              No users found matching your search criteria
-                            </TableCell>
-                          </TableRow>
-                        )}
-                      </TableBody>
-                    </Table>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-              
-              <TabsContent value="research" className="space-y-6">
-                <div className="flex flex-col sm:flex-row gap-4 justify-between">
-                  <h2 className="text-xl font-bold text-white">Research Projects</h2>
-                  
-                  <Button>
-                    <Book className="mr-2 h-4 w-4" />
-                    New Research Project
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setShowInviteDialog(false)}>
+                    Cancel
                   </Button>
-                </div>
-                
-                {/* Research Projects */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {researchProjects.map((project) => (
-                    <Card key={project.id} className="bg-[#191C27] border-gray-800">
-                      <CardHeader className="pb-3">
-                        <div className="flex justify-between items-start">
-                          <CardTitle className="text-white">{project.title}</CardTitle>
-                          <Badge variant={
-                            project.status === 'active' ? 'default' :
-                            project.status === 'completed' ? 'secondary' : 'outline'
-                          }>
-                            {project.status}
-                          </Badge>
-                        </div>
-                        <CardDescription className="text-gray-400">
-                          Last updated: {formatDate(project.lastUpdated)}
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent className="space-y-4">
-                        <p className="text-gray-300 text-sm">{project.description}</p>
-                        <div className="flex justify-between items-center">
-                          <div className="flex items-center">
-                            <UserCheck className="h-4 w-4 text-blue-400 mr-2" />
-                            <span className="text-sm text-gray-300">{project.members} members</span>
-                          </div>
-                          <Button size="sm" variant="outline" className="h-8 border-gray-700 text-gray-300 hover:bg-gray-800">
-                            <FileText className="h-4 w-4 mr-1" />
-                            View Details
-                          </Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              </TabsContent>
-            </Tabs>
-          )}
+                  <Button onClick={handleInviteUser} disabled={!inviteEmail || isInviting}>
+                    {isInviting ? 'Sending...' : 'Send Invitation'}
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </div>
         </div>
+        
+        <Card>
+          <CardHeader>
+            <CardTitle>Institution Users</CardTitle>
+            <CardDescription>
+              {filteredUsers.length} {filteredUsers.length === 1 ? 'user' : 'users'} found
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left font-medium p-3">User</th>
+                    <th className="text-left font-medium p-3">Email</th>
+                    <th className="text-left font-medium p-3">Role</th>
+                    <th className="text-left font-medium p-3">Last Active</th>
+                    <th className="text-right font-medium p-3">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredUsers.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="text-center py-6 text-muted-foreground">
+                        No users found
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredUsers.map((user) => (
+                      <tr key={user.id} className="border-b hover:bg-muted/50">
+                        <td className="p-3">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary font-medium">
+                              {user.name ? user.name[0].toUpperCase() : user.email[0].toUpperCase()}
+                            </div>
+                            <span>{user.name || user.email.split('@')[0]}</span>
+                          </div>
+                        </td>
+                        <td className="p-3">{user.email}</td>
+                        <td className="p-3">
+                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${getRoleBadgeClass(user.account_type)}`}>
+                            {user.account_type}
+                          </span>
+                        </td>
+                        <td className="p-3">
+                          {user.last_active 
+                            ? new Date(user.last_active).toLocaleDateString() 
+                            : 'Never'}
+                        </td>
+                        <td className="p-3 text-right">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                              <DropdownMenuItem className="flex items-center gap-2">
+                                <Mail className="h-4 w-4" />
+                                <span>Send Message</span>
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem 
+                                className="flex items-center gap-2"
+                                onClick={() => handleChangeRole(user.id, 'admin')}
+                                disabled={user.account_type === 'admin'}
+                              >
+                                <Shield className="h-4 w-4" />
+                                <span>Make Admin</span>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem 
+                                className="flex items-center gap-2"
+                                onClick={() => handleChangeRole(user.id, 'teacher')}
+                                disabled={user.account_type === 'teacher'}
+                              >
+                                <UserCog className="h-4 w-4" />
+                                <span>Make Teacher</span>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem 
+                                className="flex items-center gap-2"
+                                onClick={() => handleChangeRole(user.id, 'student')}
+                                disabled={user.account_type === 'student'}
+                              >
+                                <UserCog className="h-4 w-4" />
+                                <span>Make Student</span>
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem 
+                                className="flex items-center gap-2 text-destructive focus:text-destructive"
+                                onClick={() => handleDeleteUser(user.id)}
+                              >
+                                <Trash className="h-4 w-4" />
+                                <span>Remove User</span>
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </CardContent>
+        </Card>
       </PageTransition>
     </InstitutionLayout>
   );

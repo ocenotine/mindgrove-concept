@@ -208,7 +208,7 @@ const Login = () => {
               <ParallaxScroll direction="up" speed={0.3}>
                 <div className="text-center">
                   <img 
-                    src="/lovable-uploads/d501d0da-a7b8-48c8-82f1-fea9624331d3.png" 
+                    src="//mindgrove.png/d501d0da-a7b8-48c8-82f1-fea9624331d3.png" 
                     alt="MindGrove AI Research" 
                     className="mx-auto max-w-full h-auto mb-6"
                   />

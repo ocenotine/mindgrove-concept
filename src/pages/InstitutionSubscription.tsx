@@ -1,354 +1,410 @@
 
 import { useState, useEffect } from 'react';
 import InstitutionLayout from '@/components/layout/InstitutionLayout';
+import { PageTransition } from '@/components/animations/PageTransition';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useAuthStore } from '@/store/authStore';
 import { supabase } from '@/integrations/supabase/client';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { CheckIcon, XIcon } from 'lucide-react';
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
+import { Check, AlertCircle, CreditCard, Gift, Calendar, Users, Lock } from 'lucide-react';
 import { toast } from '@/components/ui/use-toast';
-import { PageTransition } from '@/components/animations/PageTransition';
-import { InstitutionData } from '@/types/institution';
-import { format, addDays } from 'date-fns';
 
 const InstitutionSubscription = () => {
   const { user } = useAuthStore();
-  const [institutionData, setInstitutionData] = useState<InstitutionData>({
-    id: '',
-    name: '',
-    domain: '',
-    logo_url: null,
-    is_premium: false,
-    branding_colors: {
-      primary: '#6C72CB',
-      secondary: '#CB69C1'
-    },
-    created_at: '',
-    updated_at: '',
-    selar_co_id: null,
-    subscription_expiry: null
-  });
-  const [loading, setLoading] = useState(true);
-  const [tokenDialogOpen, setTokenDialogOpen] = useState(false);
-  const [groveToken, setGroveToken] = useState('');
-  const [processingToken, setProcessingToken] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isPremium, setIsPremium] = useState(false);
+  const [subscriptionData, setSubscriptionData] = useState<any>(null);
+  const [institutionId, setInstitutionId] = useState<string>('');
+  const [redeemCode, setRedeemCode] = useState('');
+  const [isRedeeming, setIsRedeeming] = useState(false);
   
   useEffect(() => {
-    const fetchInstitutionData = async () => {
-      if (!user?.institution_id) return;
+    const loadSubscriptionData = async () => {
+      if (!user) return;
       
       try {
-        setLoading(true);
-        const { data, error } = await supabase
+        setIsLoading(true);
+        // Get institution ID
+        const instId = user.user_metadata?.institution_id || user.institution_id;
+        
+        if (!instId) {
+          toast({
+            title: "No institution found",
+            description: "Your account is not associated with any institution.",
+            variant: "destructive"
+          });
+          return;
+        }
+        
+        setInstitutionId(instId);
+        
+        // Get institution data
+        const { data: institutionData, error: institutionError } = await supabase
           .from('institutions')
-          .select('*')
-          .eq('id', user.institution_id)
+          .select('is_premium, subscription_expiry')
+          .eq('id', instId)
           .single();
         
-        if (error) throw error;
+        if (institutionError) throw institutionError;
         
-        if (data) {
-          // Parse branding colors from JSON if needed
-          let brandingColors = {
-            primary: '#6C72CB',
-            secondary: '#CB69C1'
-          };
+        setIsPremium(institutionData.is_premium);
+        
+        // Get subscription data if available
+        if (institutionData.is_premium) {
+          const { data: subscriptionData, error: subscriptionError } = await supabase
+            .from('subscriptions')
+            .select('*')
+            .eq('institution_id', instId)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single();
           
-          if (data.branding_colors) {
-            if (typeof data.branding_colors === 'string') {
-              try {
-                brandingColors = JSON.parse(data.branding_colors);
-              } catch (e) {
-                console.error('Error parsing branding colors:', e);
-              }
-            } else if (typeof data.branding_colors === 'object') {
-              brandingColors = data.branding_colors as any;
-            }
+          if (!subscriptionError) {
+            setSubscriptionData(subscriptionData);
           }
-          
-          const institutionWithTypedData: InstitutionData = {
-            ...data,
-            branding_colors: brandingColors,
-            subscription_expiry: data.subscription_expiry || null
-          };
-          
-          setInstitutionData(institutionWithTypedData);
         }
       } catch (error) {
-        console.error('Error fetching institution data:', error);
-        toast({
-          title: 'Error',
-          description: 'Could not load subscription data.',
-          variant: 'destructive'
-        });
+        console.error('Error loading subscription data:', error);
       } finally {
-        setLoading(false);
+        setIsLoading(false);
       }
     };
     
-    fetchInstitutionData();
-  }, [user?.institution_id]);
-  
-  const redeemGroveToken = async () => {
-    if (!user?.institution_id) return;
+    loadSubscriptionData();
+  }, [user]);
+
+  const handleRedeemCode = async () => {
+    if (!redeemCode || !institutionId) return;
+    
+    setIsRedeeming(true);
     
     try {
-      setProcessingToken(true);
-      
-      if (groveToken.trim().toUpperCase() !== 'THEGROVE') {
-        throw new Error('Invalid token');
+      // Check if code is valid
+      if (redeemCode.toUpperCase() !== 'THEGROVE') {
+        toast({
+          title: 'Invalid redemption code',
+          description: 'Please check your code and try again.',
+          variant: 'destructive',
+        });
+        return;
       }
       
-      // Set the institution to premium
-      const expiryDate = addDays(new Date(), 30); // 30-day subscription
+      // Calculate expiry date (1 year from now)
+      const expiryDate = new Date();
+      expiryDate.setFullYear(expiryDate.getFullYear() + 1);
       
-      const { error } = await supabase
+      // Update institution to premium
+      const { error: updateError } = await supabase
         .from('institutions')
         .update({
           is_premium: true,
-          subscription_expiry: expiryDate.toISOString()
+          subscription_expiry: expiryDate.toISOString(),
         })
-        .eq('id', user.institution_id);
+        .eq('id', institutionId);
+        
+      if (updateError) throw updateError;
       
-      if (error) throw error;
+      // Create subscription record
+      const { error: subscriptionError } = await supabase
+        .from('subscriptions')
+        .insert({
+          institution_id: institutionId,
+          plan_type: 'premium',
+          status: 'active',
+          starts_at: new Date().toISOString(),
+          expires_at: expiryDate.toISOString(),
+          selar_co_order_id: `REDEEM-${Date.now()}`
+        });
+        
+      if (subscriptionError) throw subscriptionError;
       
-      // Update local state
-      setInstitutionData({
-        ...institutionData,
-        is_premium: true,
-        subscription_expiry: expiryDate.toISOString()
+      setIsPremium(true);
+      toast({
+        title: 'Redemption Successful',
+        description: 'Your account has been upgraded to Premium!',
+        variant: 'default',
       });
       
-      toast({
-        title: 'Premium Activated',
-        description: 'Your institution is now on the premium plan!'
-      });
+      // Reload page after short delay
+      setTimeout(() => {
+        window.location.reload();
+      }, 2000);
       
-      setTokenDialogOpen(false);
-    } catch (error: any) {
-      console.error('Error redeeming token:', error);
+    } catch (error) {
+      console.error('Error redeeming code:', error);
       toast({
-        title: 'Error',
-        description: error.message || 'Could not redeem token. Please try again.',
-        variant: 'destructive'
+        title: 'Redemption failed',
+        description: 'An error occurred while activating your subscription.',
+        variant: 'destructive',
       });
     } finally {
-      setProcessingToken(false);
+      setIsRedeeming(false);
     }
   };
-  
-  const getSubscriptionStatus = () => {
-    if (!institutionData.is_premium) {
-      return 'Free';
-    }
-    
-    if (institutionData.subscription_expiry) {
-      const expiryDate = new Date(institutionData.subscription_expiry);
-      if (expiryDate > new Date()) {
-        return 'Premium';
-      }
-    }
-    
-    return 'Expired';
-  };
-  
-  const getRemainingDays = () => {
-    if (!institutionData.subscription_expiry) return 0;
-    
-    const expiryDate = new Date(institutionData.subscription_expiry);
-    const today = new Date();
-    const diffTime = expiryDate.getTime() - today.getTime();
-    return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  };
+
+  if (isLoading) {
+    return (
+      <InstitutionLayout>
+        <div className="flex justify-center items-center h-full py-16">
+          <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full"></div>
+        </div>
+      </InstitutionLayout>
+    );
+  }
 
   return (
     <InstitutionLayout>
       <PageTransition>
-        <div className="space-y-6">
-          <h1 className="text-3xl font-bold tracking-tight">Subscription</h1>
-          
-          <div className="grid gap-6 md:grid-cols-2">
-            <Card className="bg-card/50">
-              <CardHeader>
-                <CardTitle className="flex justify-between items-center">
-                  <span>Current Plan</span>
-                  <span className={`px-3 py-1 text-sm rounded-full ${
-                    institutionData.is_premium ? 'bg-primary/20 text-primary' : 'bg-muted text-muted-foreground'
-                  }`}>
-                    {getSubscriptionStatus()}
-                  </span>
-                </CardTitle>
-                <CardDescription>
-                  {institutionData.is_premium && institutionData.subscription_expiry ? (
-                    <>Your subscription expires on {format(new Date(institutionData.subscription_expiry), 'PPP')}.</>
-                  ) : (
-                    <>You are currently on the Basic plan.</>
-                  )}
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
-                  {institutionData.is_premium && (
-                    <div className="text-3xl font-bold">
-                      {getRemainingDays()} days remaining
-                    </div>
-                  )}
-                  <p className="text-muted-foreground">
-                    {institutionData.is_premium 
-                      ? 'Manage your premium features and get the most out of MindGrove.' 
-                      : 'Upgrade to Premium to unlock all features.'}
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold mb-2">Subscription</h1>
+          <p className="text-muted-foreground">
+            Manage your institution subscription plan and billing information
+          </p>
+        </div>
+
+        {/* Current Plan */}
+        <Card className="mb-8 border-2 border-primary/30 bg-primary/5">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <CreditCard className="h-5 w-5 text-primary" />
+              Current Plan
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col md:flex-row justify-between gap-4">
+              <div>
+                <h3 className="text-xl font-bold">
+                  {isPremium ? 'Premium Plan' : 'Basic Plan'}
+                </h3>
+                {isPremium ? (
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Your subscription {subscriptionData?.expires_at ? `expires on ${new Date(subscriptionData.expires_at).toLocaleDateString()}` : 'is active'}
                   </p>
-                </div>
-              </CardContent>
-              <CardFooter>
-                {!institutionData.is_premium && (
-                  <Button onClick={() => setTokenDialogOpen(true)} className="mr-2">
-                    Upgrade Now
-                  </Button>
+                ) : (
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Limited features available. Upgrade for full access.
+                  </p>
                 )}
-                <Button variant="outline">View Usage</Button>
-              </CardFooter>
-            </Card>
-            
-            <div className="space-y-6">
-              <div className="grid gap-4 md:grid-cols-2">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Basic</CardTitle>
-                    <div className="text-3xl font-bold">Free</div>
-                  </CardHeader>
-                  <CardContent>
-                    <ul className="space-y-2">
-                      <li className="flex items-start">
-                        <CheckIcon className="mr-2 h-5 w-5 text-green-500 flex-shrink-0" />
-                        <span>Basic AI chat</span>
-                      </li>
-                      <li className="flex items-start">
-                        <CheckIcon className="mr-2 h-5 w-5 text-green-500 flex-shrink-0" />
-                        <span>Up to 5 users</span>
-                      </li>
-                      <li className="flex items-start">
-                        <XIcon className="mr-2 h-5 w-5 text-muted-foreground flex-shrink-0" />
-                        <span className="text-muted-foreground">User management</span>
-                      </li>
-                      <li className="flex items-start">
-                        <XIcon className="mr-2 h-5 w-5 text-muted-foreground flex-shrink-0" />
-                        <span className="text-muted-foreground">Advanced analytics</span>
-                      </li>
-                    </ul>
-                  </CardContent>
-                  <CardFooter>
-                    <Button variant="outline" disabled>Current Plan</Button>
-                  </CardFooter>
-                </Card>
-                
-                <Card className={`border-primary/50 ${institutionData.is_premium ? 'bg-primary/5' : ''}`}>
-                  <CardHeader>
-                    <CardTitle>Premium</CardTitle>
-                    <div className="text-3xl font-bold">$49<span className="text-lg font-normal">/month</span></div>
-                  </CardHeader>
-                  <CardContent>
-                    <ul className="space-y-2">
-                      <li className="flex items-start">
-                        <CheckIcon className="mr-2 h-5 w-5 text-green-500 flex-shrink-0" />
-                        <span>Unlimited AI chat</span>
-                      </li>
-                      <li className="flex items-start">
-                        <CheckIcon className="mr-2 h-5 w-5 text-green-500 flex-shrink-0" />
-                        <span>Unlimited users</span>
-                      </li>
-                      <li className="flex items-start">
-                        <CheckIcon className="mr-2 h-5 w-5 text-green-500 flex-shrink-0" />
-                        <span>User management</span>
-                      </li>
-                      <li className="flex items-start">
-                        <CheckIcon className="mr-2 h-5 w-5 text-green-500 flex-shrink-0" />
-                        <span>Advanced analytics</span>
-                      </li>
-                    </ul>
-                  </CardContent>
-                  <CardFooter>
-                    {institutionData.is_premium ? (
-                      <Button variant="outline" disabled>Current Plan</Button>
-                    ) : (
-                      <Button onClick={() => setTokenDialogOpen(true)}>Upgrade</Button>
-                    )}
-                  </CardFooter>
-                </Card>
               </div>
-              
-              <Card>
+              {!isPremium && (
+                <Button>
+                  Upgrade to Premium
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Tabs defaultValue="plans">
+          <TabsList className="mb-6">
+            <TabsTrigger value="plans">Plan Options</TabsTrigger>
+            <TabsTrigger value="redeem">Redeem Code</TabsTrigger>
+            {isPremium && (
+              <TabsTrigger value="billing">Billing</TabsTrigger>
+            )}
+          </TabsList>
+
+          <TabsContent value="plans">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Basic Plan */}
+              <Card className={`border ${!isPremium ? 'border-primary' : ''}`}>
                 <CardHeader>
-                  <CardTitle>Enterprise</CardTitle>
-                  <CardDescription>For large institutions with custom needs</CardDescription>
+                  <CardTitle>Basic Plan</CardTitle>
+                  <CardDescription>Free tier for small institutions</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <p>Contact our sales team for a custom quote and tailored solutions.</p>
+                  <div className="mb-4">
+                    <span className="text-3xl font-bold">$0</span>
+                    <span className="text-muted-foreground">/month</span>
+                  </div>
+                  <ul className="space-y-2">
+                    <li className="flex items-center">
+                      <Check className="h-4 w-4 mr-2 text-green-500" />
+                      <span>Up to 10 users</span>
+                    </li>
+                    <li className="flex items-center">
+                      <Check className="h-4 w-4 mr-2 text-green-500" />
+                      <span>Basic document management</span>
+                    </li>
+                    <li className="flex items-center">
+                      <Check className="h-4 w-4 mr-2 text-green-500" />
+                      <span>Limited AI features</span>
+                    </li>
+                    <li className="flex items-center opacity-50">
+                      <Lock className="h-4 w-4 mr-2" />
+                      <span>User management</span>
+                    </li>
+                    <li className="flex items-center opacity-50">
+                      <Lock className="h-4 w-4 mr-2" />
+                      <span>Advanced analytics</span>
+                    </li>
+                  </ul>
                 </CardContent>
                 <CardFooter>
-                  <Button variant="outline">Contact Sales</Button>
+                  <Button variant="outline" className="w-full" disabled={!isPremium}>
+                    {!isPremium ? 'Current Plan' : 'Downgrade'}
+                  </Button>
+                </CardFooter>
+              </Card>
+
+              {/* Premium Plan */}
+              <Card className={`border ${isPremium ? 'border-primary' : ''}`}>
+                <CardHeader>
+                  <CardTitle>Premium Plan</CardTitle>
+                  <CardDescription>Full-featured for growing institutions</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="mb-4">
+                    <span className="text-3xl font-bold">$99</span>
+                    <span className="text-muted-foreground">/month</span>
+                  </div>
+                  <ul className="space-y-2">
+                    <li className="flex items-center">
+                      <Check className="h-4 w-4 mr-2 text-green-500" />
+                      <span>Unlimited users</span>
+                    </li>
+                    <li className="flex items-center">
+                      <Check className="h-4 w-4 mr-2 text-green-500" />
+                      <span>Advanced document management</span>
+                    </li>
+                    <li className="flex items-center">
+                      <Check className="h-4 w-4 mr-2 text-green-500" />
+                      <span>Full AI features</span>
+                    </li>
+                    <li className="flex items-center">
+                      <Check className="h-4 w-4 mr-2 text-green-500" />
+                      <span>User management</span>
+                    </li>
+                    <li className="flex items-center">
+                      <Check className="h-4 w-4 mr-2 text-green-500" />
+                      <span>Advanced analytics</span>
+                    </li>
+                  </ul>
+                </CardContent>
+                <CardFooter>
+                  <Button className="w-full" disabled={isPremium}>
+                    {isPremium ? 'Current Plan' : 'Upgrade Now'}
+                  </Button>
                 </CardFooter>
               </Card>
             </div>
-          </div>
-        </div>
-        
-        <Dialog open={tokenDialogOpen} onOpenChange={setTokenDialogOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Upgrade to Premium</DialogTitle>
-              <DialogDescription>
-                Choose how you'd like to activate your premium subscription.
-              </DialogDescription>
-            </DialogHeader>
-            
-            <div className="grid gap-4 py-4">
-              <div className="space-y-4">
-                <h3 className="font-medium">Option 1: Redeem Grove Token</h3>
-                <div className="flex items-center space-x-2">
-                  <Input
-                    placeholder="Enter your token"
-                    value={groveToken}
-                    onChange={(e) => setGroveToken(e.target.value)}
-                  />
-                  <Button onClick={redeemGroveToken} disabled={processingToken}>
-                    {processingToken ? 'Redeeming...' : 'Redeem'}
+          </TabsContent>
+
+          <TabsContent value="redeem">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Gift className="h-5 w-5 text-primary" />
+                  Redeem Promotional Code
+                </CardTitle>
+                <CardDescription>
+                  Have a promotional code? Redeem it here to upgrade your plan.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-col md:flex-row gap-4">
+                  <div className="flex-1">
+                    <Label htmlFor="promo-code">Promotional Code</Label>
+                    <Input
+                      id="promo-code"
+                      placeholder="Enter your code"
+                      value={redeemCode}
+                      onChange={(e) => setRedeemCode(e.target.value)}
+                    />
+                  </div>
+                  <div className="self-end">
+                    <Button 
+                      onClick={handleRedeemCode} 
+                      disabled={!redeemCode || isRedeeming || isPremium}
+                    >
+                      {isRedeeming ? 'Redeeming...' : 'Redeem'}
+                    </Button>
+                  </div>
+                </div>
+                
+                {isPremium && (
+                  <Alert className="mt-4">
+                    <AlertCircle className="h-4 w-4" />
+                    <AlertTitle>Already on Premium Plan</AlertTitle>
+                    <AlertDescription>
+                      Your institution is already subscribed to the Premium plan.
+                    </AlertDescription>
+                  </Alert>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+          
+          {isPremium && (
+            <TabsContent value="billing">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Billing Information</CardTitle>
+                  <CardDescription>
+                    View and manage your billing details and history
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div>
+                        <h3 className="text-lg font-medium mb-2">Subscription Details</h3>
+                        <ul className="space-y-2 text-sm">
+                          <li className="flex justify-between">
+                            <span className="text-muted-foreground">Plan:</span>
+                            <span>Premium Plan</span>
+                          </li>
+                          <li className="flex justify-between">
+                            <span className="text-muted-foreground">Status:</span>
+                            <span className="text-green-500 font-medium">Active</span>
+                          </li>
+                          <li className="flex justify-between">
+                            <span className="text-muted-foreground">Renewal Date:</span>
+                            <span>{subscriptionData?.expires_at ? new Date(subscriptionData.expires_at).toLocaleDateString() : 'N/A'}</span>
+                          </li>
+                          <li className="flex justify-between">
+                            <span className="text-muted-foreground">Payment Method:</span>
+                            <span>Promotional Code</span>
+                          </li>
+                        </ul>
+                      </div>
+                      
+                      <div>
+                        <h3 className="text-lg font-medium mb-2">Features Included</h3>
+                        <ul className="space-y-2">
+                          <li className="flex items-center">
+                            <Calendar className="h-4 w-4 mr-2 text-primary" />
+                            <span>Annual billing cycle</span>
+                          </li>
+                          <li className="flex items-center">
+                            <Users className="h-4 w-4 mr-2 text-primary" />
+                            <span>Unlimited users</span>
+                          </li>
+                          <li className="flex items-center">
+                            <Check className="h-4 w-4 mr-2 text-primary" />
+                            <span>User management system</span>
+                          </li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+                <CardFooter className="flex justify-between">
+                  <Button variant="outline" onClick={() => window.print()}>
+                    Print Receipt
                   </Button>
-                </div>
-              </div>
-              
-              <div className="my-2">
-                <div className="relative">
-                  <div className="absolute inset-0 flex items-center">
-                    <span className="w-full border-t" />
-                  </div>
-                  <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-background px-2 text-muted-foreground">Or</span>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="space-y-4">
-                <h3 className="font-medium">Option 2: Pay Online</h3>
-                <Button 
-                  onClick={() => window.open('https://selar.com/o54g54', '_blank')}
-                  variant="outline"
-                  className="w-full"
-                >
-                  Proceed to Payment
-                </Button>
-              </div>
-            </div>
-            
-            <DialogFooter>
-              <Button variant="outline" onClick={() => setTokenDialogOpen(false)}>
-                Cancel
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
+                  <Button variant="outline">
+                    Cancel Subscription
+                  </Button>
+                </CardFooter>
+              </Card>
+            </TabsContent>
+          )}
+        </Tabs>
       </PageTransition>
     </InstitutionLayout>
   );
