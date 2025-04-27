@@ -7,10 +7,12 @@ import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from '@/components/ui/use-toast';
-import { FileText, Download, Save } from 'lucide-react';
+import { FileText, Download, Save, Edit, Play, Share, Trash } from 'lucide-react';
 import { useDocuments } from '@/hooks/useDocuments';
 import { useAuthStore } from '@/store/authStore';
+import { supabase } from '@/integrations/supabase/client';
 import { generateFlashcards } from '@/utils/nlpUtils';
+import { useEffect } from 'react';
 
 interface Question {
   id: string;
@@ -18,6 +20,15 @@ interface Question {
   text: string;
   options?: string[];
   correctAnswer: string | boolean;
+}
+
+interface SavedQuiz {
+  id: string;
+  documentId: string;
+  name: string;
+  questions: Question[];
+  createdAt: string;
+  lastTaken?: string;
 }
 
 export function QuizGenerator() {
@@ -28,13 +39,54 @@ export function QuizGenerator() {
   const [generatedQuestions, setGeneratedQuestions] = useState<Question[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedQuizName, setGeneratedQuizName] = useState('');
+  const [savedQuizzes, setSavedQuizzes] = useState<SavedQuiz[]>([]);
   
   // Get real documents from user
   const { documents } = useDocuments();
   const { user } = useAuthStore();
   
   // Filter documents to only show the user's documents
-  const userDocuments = documents.filter(doc => doc.user_id === user?.id);
+  const userDocuments = documents.filter(doc => doc.userId === user?.id);
+  
+  // Load saved quizzes when component mounts
+  useEffect(() => {
+    const loadSavedQuizzes = async () => {
+      if (!user?.id) return;
+      
+      // Try to load from Supabase first
+      try {
+        const { data, error } = await supabase
+          .from('quizzes')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false });
+        
+        if (error) {
+          console.error('Error loading quizzes from Supabase:', error);
+        } else if (data && data.length > 0) {
+          setSavedQuizzes(data.map(quiz => ({
+            id: quiz.id,
+            documentId: quiz.document_id || '',
+            name: quiz.name,
+            questions: quiz.questions as Question[],
+            createdAt: quiz.created_at,
+            lastTaken: quiz.last_taken || 'Never'
+          })));
+          return;
+        }
+      } catch (err) {
+        console.error('Failed to load quizzes from Supabase:', err);
+      }
+      
+      // Fallback to localStorage
+      const storedQuizzes = localStorage.getItem('savedQuizzes');
+      if (storedQuizzes) {
+        setSavedQuizzes(JSON.parse(storedQuizzes));
+      }
+    };
+    
+    loadSavedQuizzes();
+  }, [user?.id]);
   
   const handleSelectDocument = (id: string) => {
     setSelectedDocument(id);
@@ -58,7 +110,7 @@ export function QuizGenerator() {
         return;
       }
       
-      // Use real NLP utils to generate flashcards, which we'll convert to quiz questions
+      // Generate flashcards from the document content using OpenRouter API
       const result = await generateFlashcards(document.id, document.content);
       
       if (!result.success || !result.flashcards || result.flashcards.length === 0) {
@@ -66,10 +118,12 @@ export function QuizGenerator() {
       }
       
       // Convert flashcards to quiz questions
-      const questionTypes = ['mcq', 'truefalse', 'shortanswer'];
+      const questionTypeArray = ['mcq', 'truefalse', 'shortanswer'];
       const questions: Question[] = result.flashcards.slice(0, numberOfQuestions).map((card, index) => {
         // Determine question type based on the questionTypes array and distribute evenly
-        const type = questionTypes[index % questionTypes.length] as 'mcq' | 'truefalse' | 'shortanswer';
+        const type = questionTypes.includes(questionTypeArray[index % questionTypeArray.length]) 
+          ? questionTypeArray[index % questionTypeArray.length] as 'mcq' | 'truefalse' | 'shortanswer'
+          : questionTypes[0] as 'mcq' | 'truefalse' | 'shortanswer';
         
         // Create basic question structure
         const question: Question = {
@@ -129,18 +183,47 @@ export function QuizGenerator() {
     }
     
     try {
-      // In a real app, this would save to database
-      // For now, we'll save to localStorage
-      const savedQuizzes = JSON.parse(localStorage.getItem('savedQuizzes') || '[]');
-      const quizToSave = {
-        id: Date.now().toString(),
+      const quizId = Date.now().toString();
+      const newQuiz: SavedQuiz = {
+        id: quizId,
         documentId: selectedDocument,
         name: generatedQuizName,
         questions: generatedQuestions,
         createdAt: new Date().toISOString()
       };
       
-      localStorage.setItem('savedQuizzes', JSON.stringify([...savedQuizzes, quizToSave]));
+      // Try to save to Supabase first
+      if (user?.id) {
+        try {
+          const { error } = await supabase
+            .from('quizzes')
+            .insert({
+              id: quizId,
+              user_id: user.id,
+              document_id: selectedDocument,
+              name: generatedQuizName,
+              questions: generatedQuestions,
+              created_at: new Date().toISOString()
+            });
+          
+          if (error) {
+            console.error('Error saving quiz to Supabase:', error);
+            throw error;
+          }
+        } catch (err) {
+          console.error("Failed to save quiz to Supabase:", err);
+          // If Supabase fails, fall back to localStorage
+          const savedQuizzes = JSON.parse(localStorage.getItem('savedQuizzes') || '[]');
+          localStorage.setItem('savedQuizzes', JSON.stringify([...savedQuizzes, newQuiz]));
+        }
+      } else {
+        // Save to localStorage if no user
+        const savedQuizzes = JSON.parse(localStorage.getItem('savedQuizzes') || '[]');
+        localStorage.setItem('savedQuizzes', JSON.stringify([...savedQuizzes, newQuiz]));
+      }
+      
+      // Update state
+      setSavedQuizzes(prev => [newQuiz, ...prev]);
       
       toast({
         title: "Quiz saved!",
@@ -150,6 +233,44 @@ export function QuizGenerator() {
       console.error("Error saving quiz:", error);
       toast({
         title: "Failed to save quiz",
+        description: "Please try again",
+        variant: "destructive"
+      });
+    }
+  };
+  
+  const handleDeleteQuiz = async (id: string) => {
+    try {
+      // Try to delete from Supabase
+      if (user?.id) {
+        try {
+          const { error } = await supabase
+            .from('quizzes')
+            .delete()
+            .eq('id', id)
+            .eq('user_id', user.id);
+          
+          if (error) throw error;
+        } catch (err) {
+          console.error("Failed to delete quiz from Supabase:", err);
+        }
+      }
+      
+      // Also remove from localStorage just in case
+      const savedQuizzesLocal = JSON.parse(localStorage.getItem('savedQuizzes') || '[]');
+      localStorage.setItem('savedQuizzes', JSON.stringify(savedQuizzesLocal.filter((q: SavedQuiz) => q.id !== id)));
+      
+      // Update state
+      setSavedQuizzes(prev => prev.filter(q => q.id !== id));
+      
+      toast({
+        title: "Quiz deleted",
+        description: "The quiz has been removed"
+      });
+    } catch (error) {
+      console.error("Error deleting quiz:", error);
+      toast({
+        title: "Failed to delete quiz",
         description: "Please try again",
         variant: "destructive"
       });

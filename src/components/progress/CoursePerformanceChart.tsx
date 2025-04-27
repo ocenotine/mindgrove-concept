@@ -14,20 +14,19 @@ type PerformanceData = {
 export default function CoursePerformanceChart({ period }: { period: 'day' | 'week' | 'month' }) {
   const { user } = useAuthStore();
   const [aiChatCount, setAiChatCount] = useState(0);
+  const [documentCount, setDocumentCount] = useState(0);
+  const [flashcardCount, setFlashcardCount] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
   
   useEffect(() => {
-    // Fetch AI chat count from document_chats table
-    const fetchAiChatCount = async () => {
+    // Fetch real data counts from Supabase
+    const fetchActivityData = async () => {
       if (!user?.id) return;
       
+      setIsLoading(true);
+      
       try {
-        let query = supabase
-          .from('document_chats')
-          .select('*', { count: 'exact' })
-          .eq('user_id', user.id)
-          .eq('role', 'user');
-        
-        // Apply period filter
+        // Get time period filter
         const now = new Date();
         let startDate = new Date();
         
@@ -39,28 +38,61 @@ export default function CoursePerformanceChart({ period }: { period: 'day' | 'we
           startDate.setMonth(now.getMonth() - 1); // Last 30 days
         }
         
-        query = query.gte('created_at', startDate.toISOString());
+        const startDateIso = startDate.toISOString();
         
-        const { count, error } = await query;
+        // Fetch AI chat count
+        const { count: chatCount, error: chatError } = await supabase
+          .from('document_chats')
+          .select('*', { count: 'exact' })
+          .eq('user_id', user.id)
+          .eq('role', 'user')
+          .gte('created_at', startDateIso);
         
-        if (error) {
-          console.error('Error fetching AI chat count:', error);
-          return;
+        if (chatError) {
+          console.error('Error fetching AI chat count:', chatError);
+        } else {
+          setAiChatCount(chatCount || 0);
         }
         
-        setAiChatCount(count || 0);
+        // Fetch document count
+        const { count: docsCount, error: docsError } = await supabase
+          .from('documents')
+          .select('*', { count: 'exact' })
+          .eq('user_id', user.id)
+          .gte('created_at', startDateIso);
+        
+        if (docsError) {
+          console.error('Error fetching document count:', docsError);
+        } else {
+          setDocumentCount(docsCount || 0);
+        }
+        
+        // Fetch flashcard count
+        const { count: cardsCount, error: cardsError } = await supabase
+          .from('flashcards')
+          .select('*', { count: 'exact' })
+          .eq('user_id', user.id)
+          .gte('created_at', startDateIso);
+        
+        if (cardsError) {
+          console.error('Error fetching flashcard count:', cardsError);
+        } else {
+          setFlashcardCount(cardsCount || 0);
+        }
       } catch (error) {
-        console.error('Error in fetchAiChatCount:', error);
+        console.error('Error in fetchActivityData:', error);
+      } finally {
+        setIsLoading(false);
       }
     };
     
-    fetchAiChatCount();
+    fetchActivityData();
   }, [user?.id, period]);
   
-  // Real data based on user stats
+  // Create data array for chart
   const data: PerformanceData[] = [
-    { name: 'Documents', value: user?.document_count || 0, color: '#6C72CB' },
-    { name: 'Flashcards', value: user?.flashcard_count || 0, color: '#CB69C1' },
+    { name: 'Documents', value: documentCount, color: '#6C72CB' },
+    { name: 'Flashcards', value: flashcardCount, color: '#CB69C1' },
     { name: 'AI Chats', value: aiChatCount, color: '#FEAC5E' },
   ];
   
@@ -70,6 +102,7 @@ export default function CoursePerformanceChart({ period }: { period: 'day' | 'we
         <CardTitle>Course Performance</CardTitle>
         <CardDescription>
           Your activity summary for this {period}
+          {isLoading && ' (Loading...)'}
         </CardDescription>
       </CardHeader>
       <CardContent className="pl-2">
