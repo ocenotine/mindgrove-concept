@@ -1,214 +1,246 @@
+
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import MainLayout from '@/components/layout/MainLayout';
+import { PageTransition } from '@/components/animations/PageTransition';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAuthStore } from '@/store/authStore';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/components/ui/use-toast';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { Edit, Check } from 'lucide-react';
-import MainLayout from '@/components/layout/MainLayout';
-import { PageTransition } from '@/components/animations/PageTransition';
+import { UserCircle, Loader2 } from 'lucide-react';
 
-const EditProfile = () => {
+export default function EditProfile() {
+  const navigate = useNavigate();
   const { user } = useAuthStore();
+  
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [name, setName] = useState('');
-  const [avatarUrl, setAvatarUrl] = useState('');
+  const [email, setEmail] = useState('');
   const [bio, setBio] = useState('');
-  const [isEditing, setIsEditing] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  
   useEffect(() => {
-    if (user) {
-      setName(user.user_metadata?.name || '');
-      setAvatarUrl(user.user_metadata?.avatarUrl || '');
-      // Fetch bio from the 'profiles' table
-      const fetchProfile = async () => {
-        try {
-          const { data, error } = await supabase
-            .from('profiles')
-            .select('bio')
-            .eq('id', user.id)
-            .single();
-
-          if (error) {
-            console.error('Error fetching profile:', error);
-          } else if (data) {
-            setBio(data.bio || '');
-          }
-        } catch (error) {
-          console.error('Error fetching profile:', error);
+    const fetchProfile = async () => {
+      if (!user) {
+        navigate('/login');
+        return;
+      }
+      
+      try {
+        setLoading(true);
+        
+        // Get user profile from the profiles table
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .single();
+          
+        if (error) throw error;
+        
+        if (profile) {
+          setName(profile.name || '');
+          setEmail(profile.email || user.email || '');
+          setBio(profile.bio || '');
+          setAvatarUrl(profile.avatar_url || null);
         }
-      };
-      fetchProfile();
-    }
-  }, [user]);
-
-  const handleSubmit = async (e) => {
+      } catch (error) {
+        console.error('Error fetching profile:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to load your profile information',
+          variant: 'destructive',
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    fetchProfile();
+  }, [user, navigate]);
+  
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (!user) return;
+    
+    setSaving(true);
     try {
-      const { error } = await supabase.auth.updateUser({
-        // Use avatarUrl instead of avatar_url to match the UserWithMetadata type
-        data: {
-          name: name || user?.user_metadata?.name,
-          avatarUrl: avatarUrl || user?.user_metadata?.avatarUrl
-        }
-      });
-      
-      if (error) throw error;
-      
-      // Update the profile in the database
-      const { error: profileError } = await supabase
+      // Update profile
+      const { error } = await supabase
         .from('profiles')
         .update({
           name,
+          bio,
           avatar_url: avatarUrl,
-          bio
+          updated_at: new Date().toISOString(),
         })
-        .eq('id', user?.id);
-      
-      if (profileError) throw profileError;
+        .eq('id', user.id);
+        
+      if (error) throw error;
       
       toast({
         title: 'Profile updated',
-        description: 'Your profile information has been updated.'
+        description: 'Your profile information has been updated successfully.',
       });
+      
+      navigate('/profile');
     } catch (error) {
       console.error('Error updating profile:', error);
       toast({
-        title: 'Error updating profile',
-        description: error.message || 'Failed to update profile. Please try again.',
-        variant: 'destructive'
+        title: 'Error',
+        description: 'Failed to update your profile',
+        variant: 'destructive',
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+  
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+    
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${user.id}-${Date.now()}.${fileExt}`;
+      const filePath = `avatars/${fileName}`;
+      
+      // Upload the file
+      const { error: uploadError } = await supabase
+        .storage
+        .from('avatars')
+        .upload(filePath, file);
+        
+      if (uploadError) throw uploadError;
+      
+      // Get the public URL
+      const { data } = supabase
+        .storage
+        .from('avatars')
+        .getPublicUrl(filePath);
+        
+      setAvatarUrl(data.publicUrl);
+    } catch (error) {
+      console.error('Error uploading avatar:', error);
+      toast({
+        title: 'Upload failed',
+        description: 'Failed to upload your avatar',
+        variant: 'destructive',
       });
     }
   };
-
-  const handleAvatarChange = (e) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      // Implement upload to storage and get URL
-      const uploadAvatar = async () => {
-        setIsLoading(true);
-        try {
-          const filename = `${user?.id}-${Date.now()}.${file.name.split('.').pop()}`;
-          const { data, error } = await supabase
-            .storage
-            .from('avatars')
-            .upload(filename, file, {
-              cacheControl: '3600',
-              upsert: false
-            });
-
-          if (error) {
-            throw error;
-          }
-
-          const publicUrl = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/avatars/${data.path}`;
-          setAvatarUrl(publicUrl);
-          toast({
-            title: 'Avatar updated',
-            description: 'Your avatar has been updated.'
-          });
-        } catch (error) {
-          console.error('Error uploading avatar:', error);
-          toast({
-            title: 'Error uploading avatar',
-            description: error.message || 'Failed to upload avatar. Please try again.',
-            variant: 'destructive'
-          });
-        } finally {
-          setIsLoading(false);
-        }
-      };
-      uploadAvatar();
-    }
-  };
+  
+  if (loading) {
+    return (
+      <MainLayout>
+        <PageTransition>
+          <div className="flex justify-center items-center h-full">
+            <Loader2 className="h-8 w-8 text-primary animate-spin" />
+          </div>
+        </PageTransition>
+      </MainLayout>
+    );
+  }
 
   return (
     <MainLayout>
       <PageTransition>
-        <div className="container mx-auto py-8">
-          <Card className="max-w-md mx-auto">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-lg font-medium">Edit Profile</CardTitle>
-              <Button variant="ghost" onClick={() => setIsEditing(!isEditing)}>
-                {isEditing ? (
-                  <>
-                    <Check className="mr-2 h-4 w-4" />
-                    Save
-                  </>
-                ) : (
-                  <>
-                    <Edit className="mr-2 h-4 w-4" />
-                    Edit Profile
-                  </>
-                )}
-              </Button>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div className="flex flex-col items-center space-y-2">
+        <div className="container max-w-2xl mx-auto px-4 py-8">
+          <h1 className="text-3xl font-bold mb-6">Edit Your Profile</h1>
+          
+          <Card>
+            <CardContent className="pt-6">
+              <form onSubmit={handleSubmit} className="space-y-6">
+                {/* Avatar */}
+                <div className="flex flex-col items-center space-y-4">
                   <Avatar className="h-24 w-24">
-                    {avatarUrl ? (
-                      <AvatarImage src={avatarUrl} alt={name} />
-                    ) : (
-                      <AvatarFallback>{name?.slice(0, 2).toUpperCase()}</AvatarFallback>
-                    )}
+                    <AvatarImage src={avatarUrl || undefined} />
+                    <AvatarFallback>
+                      <UserCircle className="h-12 w-12" />
+                    </AvatarFallback>
                   </Avatar>
-                  {isEditing && (
-                    <>
-                      <Label htmlFor="avatar-upload" className="cursor-pointer hover:text-primary">
-                        Upload New Avatar
-                      </Label>
-                      <Input
-                        type="file"
-                        id="avatar-upload"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={handleAvatarChange}
-                        disabled={isLoading}
-                      />
-                      {isLoading && <p className="text-sm text-muted-foreground">Uploading...</p>}
-                    </>
-                  )}
+                  
+                  <div>
+                    <Label htmlFor="avatar" className="cursor-pointer bg-secondary hover:bg-secondary/80 text-secondary-foreground px-4 py-2 rounded-md">
+                      Change Avatar
+                    </Label>
+                    <Input 
+                      id="avatar" 
+                      type="file" 
+                      accept="image/*" 
+                      className="hidden"
+                      onChange={handleAvatarChange}
+                    />
+                  </div>
                 </div>
-                <div>
+                
+                {/* Name */}
+                <div className="space-y-2">
                   <Label htmlFor="name">Name</Label>
                   <Input
-                    type="text"
                     id="name"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    disabled={!isEditing}
+                    placeholder="Your name"
                   />
                 </div>
-                <div>
-                  <Label htmlFor="bio">Bio</Label>
+                
+                {/* Email */}
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
                   <Input
+                    id="email"
+                    value={email}
+                    disabled
+                    className="bg-muted"
+                  />
+                  <p className="text-xs text-muted-foreground">Contact support to change your email address</p>
+                </div>
+                
+                {/* Bio */}
+                <div className="space-y-2">
+                  <Label htmlFor="bio">Bio</Label>
+                  <Textarea
                     id="bio"
-                    type="text"
                     value={bio}
                     onChange={(e) => setBio(e.target.value)}
-                    disabled={!isEditing}
+                    placeholder="Write a short bio about yourself"
+                    className="min-h-32"
                   />
                 </div>
-                {isEditing && (
-                  <Button type="submit" className="w-full" disabled={isLoading}>
-                    {isLoading ? 'Updating...' : 'Update Profile'}
+                
+                <div className="flex justify-end space-x-2 pt-4">
+                  <Button 
+                    type="button"
+                    variant="outline"
+                    onClick={() => navigate('/profile')}
+                  >
+                    Cancel
                   </Button>
-                )}
+                  <Button 
+                    type="submit"
+                    disabled={saving}
+                  >
+                    {saving ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Saving...
+                      </>
+                    ) : 'Save Profile'}
+                  </Button>
+                </div>
               </form>
             </CardContent>
-            <CardDescription className="px-4 py-2 text-center text-sm text-muted-foreground">
-              Your profile information is visible to other users.
-            </CardDescription>
           </Card>
         </div>
       </PageTransition>
     </MainLayout>
   );
-};
-
-export default EditProfile;
+}

@@ -34,7 +34,10 @@ const DocumentCard = ({ document, className }: DocumentCardProps) => {
   // Format the date to show how long ago it was last accessed
   const getLastAccessedTime = () => {
     try {
-      return formatDistanceToNow(new Date(document.lastAccessed), { addSuffix: true });
+      if (document.lastAccessed) {
+        return formatDistanceToNow(new Date(document.lastAccessed), { addSuffix: true });
+      }
+      return 'recently';
     } catch (error) {
       return 'recently';
     }

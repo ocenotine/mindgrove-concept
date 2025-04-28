@@ -1,6 +1,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { generateDocumentChatResponse, generateDocumentSummary } from '@/utils/openRouterUtils';
+import { generateDocumentChatResponse, generateDocumentSummary as generateOpenRouterSummary, generateFlashcards as generateOpenRouterFlashcards } from '@/utils/openRouterUtils';
 
 export const generateSummary = async (documentId: string, text: string) => {
   try {
@@ -14,18 +14,9 @@ export const generateSummary = async (documentId: string, text: string) => {
       };
     }
 
-    // Get the access token for API request
-    const { data: { session } } = await supabase.auth.getSession();
-    const accessToken = session?.access_token;
-    
-    if (!accessToken) {
-      throw new Error('Authentication required for document processing');
-    }
-
-    // Call OpenRouter API through our wrapper
     try {
-      // Use the OpenRouter utils directly
-      const summary = await generateDocumentSummary(text);
+      // Call OpenRouter API directly
+      const summary = await generateOpenRouterSummary(text);
       
       // Once we have the summary, save it to the document in Supabase
       if (documentId) {
@@ -81,18 +72,31 @@ export const generateFlashcards = async (documentId: string, text: string) => {
       };
     }
 
-    // Get the access token for API request
-    const { data: { session } } = await supabase.auth.getSession();
-    const accessToken = session?.access_token;
-    
-    if (!accessToken) {
-      throw new Error('Authentication required for document processing');
-    }
-
     try {
       // Use the OpenRouter utils directly
-      const { generateFlashcards: generateFlashcardsFromOpenRouter } = await import('@/utils/openRouterUtils');
-      const flashcards = await generateFlashcardsFromOpenRouter(text.slice(0, 15000));
+      const flashcards = await generateOpenRouterFlashcards(text);
+      
+      // Save flashcards to database if authenticated
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        
+        if (user && documentId) {
+          for (const flashcard of flashcards) {
+            await supabase
+              .from('flashcards')
+              .insert({
+                document_id: documentId,
+                front_content: flashcard.question,
+                back_content: flashcard.answer,
+                user_id: user.id
+              });
+          }
+          console.log(`Saved ${flashcards.length} flashcards to database`);
+        }
+      } catch (dbError) {
+        console.error('Error saving flashcards to database:', dbError);
+        // Continue even if saving to DB fails
+      }
       
       return {
         success: true,

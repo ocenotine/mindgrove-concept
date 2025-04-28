@@ -1,432 +1,159 @@
 
-import React, { useState, useRef, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { MessageSquare, Send, X, Mic, Sparkles } from 'lucide-react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { toast } from '@/components/ui/use-toast';
-import Typewriter from '@/components/chat/Typewriter';
-import { getOpenRouterApiKey } from '@/utils/openRouterUtils';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { Send, Bot, User, MessagesSquare } from 'lucide-react';
 import { chatWithDocument } from '@/utils/nlpUtils';
-import { supabase } from '@/integrations/supabase/client';
+import { toast } from '@/components/ui/use-toast';
+import { getOpenRouterApiKey } from '@/utils/openRouterUtils';
+import { TypingIndicator } from '@/components/animations/TypingIndicator';
 
 interface Message {
-  id: string;
-  content: string;
-  role: 'user' | 'assistant';
-  timestamp: Date;
-}
-
-interface ChatHistoryMessage {
   role: 'user' | 'assistant';
   content: string;
 }
 
 interface DocumentChatProps {
-  documentText: string;
   documentId: string;
-  documentTitle: string;
+  documentText: string;
 }
 
-const DocumentChat = ({ documentText, documentId, documentTitle }: DocumentChatProps) => {
-  const [isOpen, setIsOpen] = useState(false);
+const DocumentChat: React.FC<DocumentChatProps> = ({ documentId, documentText }) => {
   const [messages, setMessages] = useState<Message[]>([]);
-  const [inputMessage, setInputMessage] = useState('');
-  const [isTyping, setIsTyping] = useState(false);
-  const [typingComplete, setTypingComplete] = useState<Record<string, boolean>>({});
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const [isListening, setIsListening] = useState(false);
-  const [speechRecognition, setSpeechRecognition] = useState<any>(null);
-  const chatContentRef = useRef<HTMLDivElement>(null);
-  const [chatHistory, setChatHistory] = useState<ChatHistoryMessage[]>([]);
+  const [input, setInput] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
-  // Check if API key is set
-  const [hasApiKey, setHasApiKey] = useState(false);
-  
-  useEffect(() => {
-    const apiKey = getOpenRouterApiKey();
-    setHasApiKey(!!apiKey);
-  }, []);
+  const handleSendMessage = async () => {
+    if (!input.trim() || isLoading) return;
 
-  // Initialize chat with greeting
-  useEffect(() => {
-    if (messages.length === 0) {
-      const initialMessage: Message = {
-        id: `assistant-${Date.now()}`,
-        content: documentTitle ? 
-          `👋 Hello! I'm your MindGrove assistant. I can answer questions about "${documentTitle}" or any general academic questions. What would you like to know?` :
-          `👋 Hello! I'm your MindGrove assistant. How can I help you with your academic questions today?`,
-        role: 'assistant',
-        timestamp: new Date()
-      };
-      setMessages([initialMessage]);
-    }
-  }, [documentTitle, messages.length]);
-
-  // Load previous chat messages from database if available
-  useEffect(() => {
-    const loadChatHistory = async () => {
-      try {
-        if (documentId) {
-          const { data, error } = await supabase
-            .from('document_chats')
-            .select('*')
-            .eq('document_id', documentId)
-            .order('created_at', { ascending: true });
-            
-          if (!error && data && data.length > 0) {
-            const loadedMessages = data.map(msg => ({
-              id: msg.id,
-              content: msg.content,
-              role: msg.role as 'user' | 'assistant',
-              timestamp: new Date(msg.created_at)
-            }));
-            
-            setMessages(prev => {
-              // Only load if no messages except the greeting
-              if (prev.length <= 1) {
-                return [...prev, ...loadedMessages];
-              }
-              return prev;
-            });
-            
-            // Build chat history for context
-            const history = data.map(msg => ({
-              role: msg.role as 'user' | 'assistant',
-              content: msg.content
-            }));
-            
-            setChatHistory(history);
-          }
-        }
-      } catch (error) {
-        console.error("Error loading chat history:", error);
-      }
-    };
+    const userMessage = input.trim();
+    setInput('');
     
-    loadChatHistory();
-  }, [documentId]);
-
-  // Scroll to bottom when new messages arrive
-  useEffect(() => {
-    if (messagesEndRef.current) {
-      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [messages, typingComplete]);
-
-  // Set up speech recognition if available
-  useEffect(() => {
-    if (typeof window !== 'undefined' && ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window)) {
-      const SpeechRecognitionAPI = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-      const recognition = new SpeechRecognitionAPI();
-      recognition.continuous = false;
-      recognition.interimResults = true;
-      recognition.lang = 'en-US';
-      
-      recognition.onresult = (event: any) => {
-        const transcript = Array.from(event.results)
-          .map(result => (result as any)[0])
-          .map(result => result.transcript)
-          .join('');
-        
-        setInputMessage(transcript);
-      };
-      
-      recognition.onend = () => {
-        setIsListening(false);
-      };
-      
-      setSpeechRecognition(recognition);
-    }
-  }, []);
-
-  const toggleChat = () => {
-    setIsOpen(!isOpen);
-  };
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setInputMessage(e.target.value);
-  };
-
-  const handleKeyPress = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey && inputMessage.trim()) {
-      e.preventDefault();
-      sendMessage();
-    }
-  };
-
-  const toggleSpeechRecognition = () => {
-    if (!speechRecognition) {
-      toast({
-        title: "Speech recognition not supported",
-        description: "Your browser doesn't support speech recognition.",
-      });
-      return;
-    }
-
-    if (isListening) {
-      speechRecognition.stop();
-      setIsListening(false);
-    } else {
-      speechRecognition.start();
-      setIsListening(true);
-      toast({
-        title: "Listening...",
-        description: "Speak now and your words will appear in the input field.",
-      });
-    }
-  };
-
-  const sendMessage = async () => {
-    if (!inputMessage.trim()) return;
-    
-    // Check if API key is set
+    // Check if API key exists
     const apiKey = getOpenRouterApiKey();
     if (!apiKey) {
       toast({
         title: "API Key Required",
-        description: "Please set your OpenRouter API key in the settings to use the chat feature.",
+        description: "Please set your OpenRouter API key to use the chat feature.",
         variant: "destructive"
       });
       return;
     }
 
-    const userMessage: Message = {
-      id: `user-${Date.now()}`,
-      content: inputMessage,
-      role: 'user',
-      timestamp: new Date()
-    };
-
-    setMessages(prev => [...prev, userMessage]);
-    setInputMessage('');
-    setIsTyping(true);
-
+    // Add user message
+    setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
+    
+    setIsLoading(true);
     try {
-      // Save user message to database
-      try {
-        await supabase.from('document_chats').insert({
-          document_id: documentId,
-          role: 'user',
-          content: userMessage.content,
-        });
-      } catch (dbError) {
-        console.error("Error saving user message to database:", dbError);
-        // Continue even if saving fails
+      // Call API to get response
+      const response = await chatWithDocument(documentId, documentText, userMessage);
+      
+      if (!response.success) {
+        throw new Error(response.error || "Failed to generate response");
       }
       
-      // Update chat history
-      const updatedHistory: ChatHistoryMessage[] = [...chatHistory, { role: 'user', content: userMessage.content }];
-      setChatHistory(updatedHistory);
-      
-      let response;
-      
-      // Use our nlpUtils for chat functionality
-      const result = await chatWithDocument(documentId, documentText, inputMessage);
-      
-      if (!result.success) {
-        throw new Error(result.error || "Failed to generate response");
-      }
-      
-      const botResponse: Message = {
-        id: `assistant-${Date.now()}`,
-        content: result.response,
-        role: 'assistant',
-        timestamp: new Date()
-      };
-      
-      // Save bot response to database
-      try {
-        await supabase.from('document_chats').insert({
-          document_id: documentId,
-          role: 'assistant',
-          content: botResponse.content
-        });
-      } catch (dbError) {
-        console.error("Error saving bot response to database:", dbError);
-        // Continue even if saving fails
-      }
-      
-      // Update chat history
-      setChatHistory([...updatedHistory, { role: 'assistant', content: botResponse.content }]);
-      
-      setMessages(prev => [...prev, botResponse]);
+      // Add assistant message
+      setMessages(prev => [...prev, { role: 'assistant', content: response.response }]);
     } catch (error) {
-      console.error("Error generating response:", error);
+      console.error("Error in document chat:", error);
       toast({
-        title: "Error",
-        description: "Failed to generate a response. Please try again.",
+        title: "Chat Error",
+        description: error instanceof Error ? error.message : "Failed to generate a response",
         variant: "destructive"
       });
-      
-      // Add fallback response
-      const errorResponse: Message = {
-        id: `assistant-${Date.now()}`,
-        content: "I'm sorry, I encountered an issue while processing your question. Please try again or rephrase your question.",
-        role: 'assistant',
-        timestamp: new Date()
-      };
-      
-      setMessages(prev => [...prev, errorResponse]);
     } finally {
-      setIsTyping(false);
+      setIsLoading(false);
     }
   };
 
-  const handleTypewriterComplete = (messageId: string) => {
-    setTypingComplete(prev => ({
-      ...prev,
-      [messageId]: true
-    }));
-  };
-
   return (
-    <div className="document-chat">
-      {/* Chat button */}
-      <motion.button
-        className="fixed bottom-20 right-6 z-50 flex items-center justify-center w-12 h-12 rounded-full bg-primary text-white shadow-lg hover:bg-primary/90 transition-colors"
-        onClick={toggleChat}
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
-        aria-label="Chat with AI assistant"
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.5 }}
-      >
-        <MessageSquare className="h-5 w-5" />
-      </motion.button>
+    <Card className="h-[500px] flex flex-col">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <MessagesSquare className="h-5 w-5 text-primary" />
+          Chat with Document
+        </CardTitle>
+      </CardHeader>
       
-      {/* Chat window */}
-      <AnimatePresence>
-        {isOpen && (
-          <motion.div
-            className="fixed bottom-0 right-0 z-50 w-full md:w-[400px] md:max-w-[95vw] md:h-[500px] h-[80vh] bg-card rounded-t-lg md:rounded-tl-lg shadow-xl flex flex-col border overflow-hidden"
-            initial={{ opacity: 0, y: 20, scale: 0.9 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 20, scale: 0.9 }}
-            transition={{ duration: 0.2 }}
-          >
-            {/* Chat header */}
-            <div className="bg-primary p-3 text-white flex items-center justify-between">
-              <div className="flex items-center">
-                <Sparkles className="h-4 w-4 mr-2" />
-                <h2 className="font-medium text-sm">MindGrove Assistant</h2>
-              </div>
-              <Button 
-                onClick={toggleChat}
-                size="sm"
-                variant="ghost"
-                className="h-8 w-8 p-0 text-white hover:text-white/80 hover:bg-transparent"
-                aria-label="Close chat"
+      <CardContent className="flex-1 overflow-y-auto mb-2">
+        <div className="space-y-4">
+          {messages.length === 0 ? (
+            <div className="text-center text-muted-foreground py-6">
+              <Bot className="h-8 w-8 mx-auto mb-2 opacity-50" />
+              <p>Ask questions about this document</p>
+            </div>
+          ) : (
+            messages.map((message, index) => (
+              <div 
+                key={index} 
+                className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
               >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-            
-            {/* Chat messages */}
-            <div 
-              className="flex-1 overflow-y-auto p-4 bg-card/30"
-              ref={chatContentRef}
-            >
-              {messages.map((message) => (
-                <div
-                  key={message.id}
-                  className={`mb-4 flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                <div 
+                  className={`
+                    ${message.role === 'user' 
+                      ? 'bg-primary text-primary-foreground' 
+                      : 'bg-muted'
+                    }
+                    rounded-lg px-4 py-2 max-w-[75%] break-words
+                  `}
                 >
-                  <div
-                    className={`max-w-[80%] rounded-lg p-3 ${
-                      message.role === 'user'
-                        ? 'bg-primary text-primary-foreground'
-                        : 'bg-muted'
-                    }`}
-                  >
-                    {message.role === 'assistant' && !typingComplete[message.id] ? (
-                      <Typewriter 
-                        text={message.content} 
-                        delay={15} 
-                        onComplete={() => handleTypewriterComplete(message.id)} 
-                        cursor={true}
-                      />
+                  <div className="flex items-center mb-1">
+                    {message.role === 'user' ? (
+                      <>
+                        <span className="font-medium">You</span>
+                        <User className="h-3 w-3 ml-1" />
+                      </>
                     ) : (
-                      <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                      <>
+                        <Bot className="h-3 w-3 mr-1" />
+                        <span className="font-medium">AI Assistant</span>
+                      </>
                     )}
-                    <p className="text-xs opacity-70 mt-1 text-right">
-                      {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </p>
                   </div>
+                  <div className="whitespace-pre-line">{message.content}</div>
                 </div>
-              ))}
-              
-              {isTyping && (
-                <div className="mb-4 flex justify-start">
-                  <div className="max-w-[80%] rounded-lg p-3 bg-muted">
-                    <div className="flex space-x-1">
-                      <motion.span 
-                        animate={{ y: [0, -5, 0] }} 
-                        transition={{ repeat: Infinity, duration: 1, repeatDelay: 0.2 }}
-                        className="h-2 w-2 bg-primary/70 rounded-full"
-                      />
-                      <motion.span 
-                        animate={{ y: [0, -5, 0] }} 
-                        transition={{ repeat: Infinity, duration: 1, delay: 0.2, repeatDelay: 0.2 }}
-                        className="h-2 w-2 bg-primary/70 rounded-full"
-                      />
-                      <motion.span 
-                        animate={{ y: [0, -5, 0] }} 
-                        transition={{ repeat: Infinity, duration: 1, delay: 0.4, repeatDelay: 0.2 }}
-                        className="h-2 w-2 bg-primary/70 rounded-full"
-                      />
-                    </div>
-                  </div>
+              </div>
+            ))
+          )}
+          
+          {isLoading && (
+            <div className="flex justify-start">
+              <div className="bg-muted rounded-lg px-4 py-2">
+                <div className="flex items-center">
+                  <Bot className="h-3 w-3 mr-1" />
+                  <span className="font-medium">AI Assistant</span>
                 </div>
-              )}
-              
-              <div ref={messagesEndRef} />
-            </div>
-            
-            {/* Chat input */}
-            <div className="p-3 border-t border-border bg-background">
-              {!hasApiKey && (
-                <div className="mb-2 px-2 py-1 bg-yellow-500/10 border border-yellow-500/20 rounded text-yellow-500 text-xs">
-                  API key required. Set your OpenRouter API key in AI Tools tab.
-                </div>
-              )}
-              <div className="flex items-center">
-                <Button
-                  size="icon"
-                  variant="ghost"
-                  className="h-8 w-8"
-                  onClick={toggleSpeechRecognition}
-                  disabled={!hasApiKey}
-                  aria-label={isListening ? "Stop listening" : "Start voice input"}
-                >
-                  <Mic className={`h-4 w-4 ${isListening ? 'text-primary animate-pulse' : ''}`} />
-                </Button>
-                
-                <input
-                  type="text"
-                  placeholder={hasApiKey ? "Ask me anything..." : "Set API key in AI Tools tab first"}
-                  className="flex-1 p-2 bg-background border-0 focus:outline-none focus:ring-0"
-                  value={inputMessage}
-                  onChange={handleInputChange}
-                  onKeyPress={handleKeyPress}
-                  disabled={!hasApiKey}
-                />
-                
-                <Button
-                  size="sm"
-                  className="ml-2"
-                  onClick={sendMessage}
-                  disabled={!inputMessage.trim() || isTyping || !hasApiKey}
-                  aria-label="Send message"
-                >
-                  <Send className="h-4 w-4" />
-                </Button>
+                <TypingIndicator />
               </div>
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
+          )}
+        </div>
+      </CardContent>
+      
+      <CardFooter className="border-t pt-4">
+        <div className="flex w-full gap-2">
+          <Input
+            placeholder="Ask questions about this document..."
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                handleSendMessage();
+              }
+            }}
+            disabled={isLoading}
+          />
+          <Button 
+            onClick={handleSendMessage}
+            disabled={!input.trim() || isLoading}
+          >
+            <Send className="h-4 w-4" />
+            <span className="sr-only">Send</span>
+          </Button>
+        </div>
+      </CardFooter>
+    </Card>
   );
 };
 

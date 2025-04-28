@@ -5,14 +5,20 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { getOpenRouterApiKey } from '@/utils/openRouterUtils';
+import { useNavigate } from 'react-router-dom';
 
 const ApiKeyReminder = () => {
   const [hasApiKey, setHasApiKey] = useState(false);
+  const navigate = useNavigate();
   
   useEffect(() => {
     const apiKey = getOpenRouterApiKey();
     setHasApiKey(!!apiKey);
   }, []);
+
+  const handleSetApiKey = () => {
+    navigate('/settings');
+  };
   
   if (hasApiKey) {
     return (
@@ -60,6 +66,14 @@ const ApiKeyReminder = () => {
                 onClick={() => window.open('https://openrouter.ai/keys', '_blank')}
               >
                 <ExternalLink className="h-3 w-3 mr-1" /> Get OpenRouter Key
+              </Button>
+              <Button 
+                variant="default"
+                size="sm"
+                className="text-xs h-7 px-2"
+                onClick={handleSetApiKey}
+              >
+                Set API Key
               </Button>
             </div>
           </AlertDescription>

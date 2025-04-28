@@ -1,18 +1,12 @@
 
 import { supabase } from '@/integrations/supabase/client';
 
-// Function to retrieve the API key from local storage
+// Function to retrieve the API key from local storage or use the default one
 export const getOpenRouterApiKey = (): string => {
-  // Use the provided API key or check local storage
-  return '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';
+  return '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';
 };
 
-// Function to save the API key to local storage
-export const saveOpenRouterApiKey = (apiKey: string): void => {
-  localStorage.setItem('openrouter_api_key', apiKey);
-};
-
-// Function to play a notification sound
+// Play a notification sound
 export const playNotificationSound = async (): Promise<void> => {
   try {
     const audio = new Audio('/sounds/notification.mp3');
@@ -26,11 +20,8 @@ export const playNotificationSound = async (): Promise<void> => {
 export const generateGeneralChatResponse = async (message: string): Promise<string> => {
   const apiKey = getOpenRouterApiKey();
   
-  if (!apiKey) {
-    throw new Error('OpenRouter API key is not set');
-  }
-  
   try {
+    console.log("Generating general chat response");
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -56,13 +47,14 @@ export const generateGeneralChatResponse = async (message: string): Promise<stri
     const data = await response.json();
     
     if (!response.ok) {
+      console.error('OpenRouter API error:', data);
       throw new Error(data.error?.message || 'Failed to generate response');
     }
     
     return data.choices[0].message.content;
   } catch (error) {
     console.error('Error generating AI response:', error);
-    throw new Error('Failed to generate AI response. Please check your API key and try again.');
+    throw new Error('Failed to generate AI response. Please try again.');
   }
 };
 
@@ -70,16 +62,13 @@ export const generateGeneralChatResponse = async (message: string): Promise<stri
 export const generateDocumentChatResponse = async (documentText: string, userMessage: string): Promise<string> => {
   const apiKey = getOpenRouterApiKey();
   
-  if (!apiKey) {
-    throw new Error('OpenRouter API key is not set');
-  }
-  
   // Truncate document text to prevent token limits
-  const truncatedText = documentText.length > 3000 
-    ? documentText.substring(0, 3000) + '...' 
+  const truncatedText = documentText.length > 5000 
+    ? documentText.substring(0, 5000) + '...' 
     : documentText;
   
   try {
+    console.log("Generating document chat response");
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -105,6 +94,7 @@ export const generateDocumentChatResponse = async (documentText: string, userMes
     const data = await response.json();
     
     if (!response.ok) {
+      console.error('OpenRouter API error:', data);
       throw new Error(data.error?.message || 'Failed to generate response');
     }
     
@@ -119,16 +109,12 @@ export const generateDocumentChatResponse = async (documentText: string, userMes
 export const generateDocumentSummary = async (documentText: string): Promise<string> => {
   const apiKey = getOpenRouterApiKey();
   
-  if (!apiKey) {
-    throw new Error('OpenRouter API key is not set');
-  }
-  
   // Process document text to handle larger documents
-  // We'll break it into chunks if it's very large to ensure we get a comprehensive summary
   const chunkSize = 12000; // Characters per chunk
   let summary = "";
   
   try {
+    console.log("Generating document summary");
     // If the text is small enough for a single request
     if (documentText.length <= chunkSize) {
       const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -156,6 +142,7 @@ export const generateDocumentSummary = async (documentText: string): Promise<str
       const data = await response.json();
       
       if (!response.ok) {
+        console.error('OpenRouter API error:', data);
         throw new Error(data.error?.message || 'Failed to generate summary');
       }
       
@@ -197,6 +184,7 @@ export const generateDocumentSummary = async (documentText: string): Promise<str
         const data = await response.json();
         
         if (!response.ok) {
+          console.error('OpenRouter API error:', data);
           throw new Error(data.error?.message || `Failed to summarize part ${i+1}`);
         }
         
@@ -231,6 +219,7 @@ export const generateDocumentSummary = async (documentText: string): Promise<str
       const finalData = await finalResponse.json();
       
       if (!finalResponse.ok) {
+        console.error('OpenRouter API error:', finalData);
         throw new Error(finalData.error?.message || 'Failed to generate final summary');
       }
       
@@ -248,16 +237,14 @@ export const generateDocumentSummary = async (documentText: string): Promise<str
 export const generateFlashcards = async (documentText: string): Promise<Array<{question: string, answer: string}>> => {
   const apiKey = getOpenRouterApiKey();
   
-  if (!apiKey) {
-    throw new Error('OpenRouter API key is not set');
-  }
-  
-  // Truncate document text to prevent token limits
-  const truncatedText = documentText.length > 3000 
-    ? documentText.substring(0, 3000) + '...' 
+  // Handle larger documents by focusing on the most important parts
+  const maxLength = 10000; // Maximum characters to process
+  const processedText = documentText.length > maxLength 
+    ? documentText.substring(0, maxLength) + '...' 
     : documentText;
   
   try {
+    console.log("Generating flashcards");
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -269,20 +256,21 @@ export const generateFlashcards = async (documentText: string): Promise<Array<{q
         messages: [
           {
             role: 'system',
-            content: 'You are a flashcard generation assistant. Create a series of question-answer pairs based on the document content.'
+            content: 'You are a flashcard generation assistant specialized in creating educational study cards. Generate 5-10 high-quality flashcards that cover the most important concepts from the document. Each flashcard should have a clear question on one side and a comprehensive answer on the other.'
           },
           {
             role: 'user',
-            content: `Generate 5-10 flashcards (question and answer pairs) from this document: ${truncatedText}. Format your response as a JSON array with "question" and "answer" properties for each flashcard.`
+            content: `Generate 5-10 flashcards (question and answer pairs) from this document: ${processedText}. Format your response as a valid JSON array with "question" and "answer" properties for each flashcard. The response should be valid JSON that can be parsed.`
           }
         ],
-        max_tokens: 800
+        max_tokens: 1000
       })
     });
 
     const data = await response.json();
     
     if (!response.ok) {
+      console.error('OpenRouter API error:', data);
       throw new Error(data.error?.message || 'Failed to generate flashcards');
     }
     
@@ -299,18 +287,132 @@ export const generateFlashcards = async (documentText: string): Promise<Array<{q
         // If no JSON array is found, parse the entire response
         flashcards = JSON.parse(content);
       }
+      
+      if (!Array.isArray(flashcards)) {
+        if (flashcards?.flashcards && Array.isArray(flashcards.flashcards)) {
+          flashcards = flashcards.flashcards;
+        } else if (flashcards?.cards && Array.isArray(flashcards.cards)) {
+          flashcards = flashcards.cards;
+        } else {
+          throw new Error("Response is not an array of flashcards");
+        }
+      }
     } catch (parseError) {
-      console.error('Failed to parse flashcard data:', parseError);
-      // Create a basic flashcard if parsing fails
-      flashcards = [{
-        question: "What is this document about?",
-        answer: "This document covers key concepts in the subject matter."
-      }];
+      console.error('Failed to parse flashcard data:', parseError, content);
+      // Create basic flashcards if parsing fails
+      flashcards = [
+        {
+          question: "What are the main topics covered in this document?",
+          answer: "The document covers key concepts related to the subject matter."
+        },
+        {
+          question: "Why is this information important?",
+          answer: "This information provides essential knowledge for understanding the topic."
+        }
+      ];
     }
     
     return flashcards;
   } catch (error) {
     console.error('Error generating flashcards:', error);
     throw new Error('Failed to generate flashcards');
+  }
+};
+
+// Function to generate quiz questions
+export const generateQuiz = async (documentText: string, numQuestions: number = 5, difficulty: string = 'medium'): Promise<Array<{question: string, options: string[], answer: string, explanation: string}>> => {
+  const apiKey = getOpenRouterApiKey();
+  
+  // Handle larger documents by focusing on the most important parts
+  const maxLength = 10000; // Maximum characters to process
+  const processedText = documentText.length > maxLength 
+    ? documentText.substring(0, maxLength) + '...' 
+    : documentText;
+  
+  try {
+    console.log("Generating quiz questions");
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: 'openai/gpt-3.5-turbo',
+        messages: [
+          {
+            role: 'system',
+            content: `You are a quiz generation assistant specialized in creating educational multiple-choice questions. Generate ${numQuestions} ${difficulty}-difficulty quiz questions that cover important concepts from the document. Each question should have 4 options with one correct answer and an explanation of why it's correct.`
+          },
+          {
+            role: 'user',
+            content: `Generate ${numQuestions} multiple-choice quiz questions from this document: ${processedText}. Format your response as a valid JSON array with "question", "options" (array of 4 choices), "answer" (the correct option text), and "explanation" properties for each question. The response should be valid JSON that can be parsed.`
+          }
+        ],
+        max_tokens: 1200
+      })
+    });
+
+    const data = await response.json();
+    
+    if (!response.ok) {
+      console.error('OpenRouter API error:', data);
+      throw new Error(data.error?.message || 'Failed to generate quiz');
+    }
+    
+    // Try to parse the response as JSON or extract JSON from text
+    const content = data.choices[0].message.content;
+    let quiz = [];
+    
+    try {
+      // Try to find a JSON array in the response
+      const jsonMatch = content.match(/\[[\s\S]*\]/);
+      if (jsonMatch) {
+        quiz = JSON.parse(jsonMatch[0]);
+      } else {
+        // If no JSON array is found, parse the entire response
+        quiz = JSON.parse(content);
+      }
+      
+      if (!Array.isArray(quiz)) {
+        if (quiz?.questions && Array.isArray(quiz.questions)) {
+          quiz = quiz.questions;
+        } else {
+          throw new Error("Response is not an array of quiz questions");
+        }
+      }
+    } catch (parseError) {
+      console.error('Failed to parse quiz data:', parseError, content);
+      // Create basic quiz questions if parsing fails
+      quiz = [
+        {
+          question: "What is the main topic of this document?",
+          options: [
+            "The main concepts of the subject",
+            "Historical background of the topic",
+            "Practical applications of the knowledge",
+            "Future directions in the field"
+          ],
+          answer: "The main concepts of the subject",
+          explanation: "The document primarily focuses on explaining the core concepts related to the subject matter."
+        },
+        {
+          question: "Why is this information important?",
+          options: [
+            "It provides foundational knowledge",
+            "It's required for certification",
+            "It's purely theoretical",
+            "It's controversial in the field"
+          ],
+          answer: "It provides foundational knowledge",
+          explanation: "The information in this document provides essential foundational knowledge for understanding the topic."
+        }
+      ];
+    }
+    
+    return quiz;
+  } catch (error) {
+    console.error('Error generating quiz:', error);
+    throw new Error('Failed to generate quiz');
   }
 };

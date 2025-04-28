@@ -16,17 +16,17 @@ export default function CoursePerformanceChart({ period }: { period: 'day' | 'we
   const [aiChatCount, setAiChatCount] = useState(0);
   const [documentCount, setDocumentCount] = useState(0);
   const [flashcardCount, setFlashcardCount] = useState(0);
-  const [isLoading, setIsLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
   
   useEffect(() => {
-    // Fetch real data counts from Supabase
+    // Fetch real user activity data from Supabase
     const fetchActivityData = async () => {
       if (!user?.id) return;
       
-      setIsLoading(true);
+      setLoading(true);
       
       try {
-        // Get time period filter
+        // Start date based on period
         const now = new Date();
         let startDate = new Date();
         
@@ -38,7 +38,7 @@ export default function CoursePerformanceChart({ period }: { period: 'day' | 'we
           startDate.setMonth(now.getMonth() - 1); // Last 30 days
         }
         
-        const startDateIso = startDate.toISOString();
+        const startDateStr = startDate.toISOString();
         
         // Fetch AI chat count
         const { count: chatCount, error: chatError } = await supabase
@@ -46,7 +46,7 @@ export default function CoursePerformanceChart({ period }: { period: 'day' | 'we
           .select('*', { count: 'exact' })
           .eq('user_id', user.id)
           .eq('role', 'user')
-          .gte('created_at', startDateIso);
+          .gte('created_at', startDateStr);
         
         if (chatError) {
           console.error('Error fetching AI chat count:', chatError);
@@ -55,41 +55,41 @@ export default function CoursePerformanceChart({ period }: { period: 'day' | 'we
         }
         
         // Fetch document count
-        const { count: docsCount, error: docsError } = await supabase
+        const { count: docCount, error: docError } = await supabase
           .from('documents')
           .select('*', { count: 'exact' })
           .eq('user_id', user.id)
-          .gte('created_at', startDateIso);
+          .gte('created_at', startDateStr);
         
-        if (docsError) {
-          console.error('Error fetching document count:', docsError);
+        if (docError) {
+          console.error('Error fetching document count:', docError);
         } else {
-          setDocumentCount(docsCount || 0);
+          setDocumentCount(docCount || 0);
         }
         
         // Fetch flashcard count
-        const { count: cardsCount, error: cardsError } = await supabase
+        const { count: cardCount, error: cardError } = await supabase
           .from('flashcards')
           .select('*', { count: 'exact' })
           .eq('user_id', user.id)
-          .gte('created_at', startDateIso);
+          .gte('created_at', startDateStr);
         
-        if (cardsError) {
-          console.error('Error fetching flashcard count:', cardsError);
+        if (cardError) {
+          console.error('Error fetching flashcard count:', cardError);
         } else {
-          setFlashcardCount(cardsCount || 0);
+          setFlashcardCount(cardCount || 0);
         }
       } catch (error) {
         console.error('Error in fetchActivityData:', error);
       } finally {
-        setIsLoading(false);
+        setLoading(false);
       }
     };
     
     fetchActivityData();
   }, [user?.id, period]);
   
-  // Create data array for chart
+  // Real data based on fetched stats
   const data: PerformanceData[] = [
     { name: 'Documents', value: documentCount, color: '#6C72CB' },
     { name: 'Flashcards', value: flashcardCount, color: '#CB69C1' },
@@ -102,35 +102,40 @@ export default function CoursePerformanceChart({ period }: { period: 'day' | 'we
         <CardTitle>Course Performance</CardTitle>
         <CardDescription>
           Your activity summary for this {period}
-          {isLoading && ' (Loading...)'}
         </CardDescription>
       </CardHeader>
       <CardContent className="pl-2">
-        <ResponsiveContainer width="100%" height={300}>
-          <BarChart data={data}>
-            <XAxis dataKey="name" />
-            <YAxis />
-            <Tooltip 
-              formatter={(value) => [`${value} activities`, 'Count']}
-              labelStyle={{ color: '#000' }}
-              contentStyle={{ 
-                backgroundColor: 'rgba(255, 255, 255, 0.8)',
-                borderRadius: '0.5rem',
-                border: '1px solid #eaeaea',
-                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
-              }}
-            />
-            <Bar 
-              dataKey="value" 
-              radius={[4, 4, 0, 0]}
-              barSize={40}
-            >
-              {data.map((entry, index) => (
-                <rect key={`cell-${index}`} fill={entry.color} />
-              ))}
-            </Bar>
-          </BarChart>
-        </ResponsiveContainer>
+        {loading ? (
+          <div className="flex items-center justify-center h-[300px]">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+          </div>
+        ) : (
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={data}>
+              <XAxis dataKey="name" />
+              <YAxis />
+              <Tooltip 
+                formatter={(value) => [`${value} activities`, 'Count']}
+                labelStyle={{ color: '#000' }}
+                contentStyle={{ 
+                  backgroundColor: 'rgba(255, 255, 255, 0.8)',
+                  borderRadius: '0.5rem',
+                  border: '1px solid #eaeaea',
+                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                }}
+              />
+              <Bar 
+                dataKey="value" 
+                radius={[4, 4, 0, 0]}
+                barSize={40}
+              >
+                {data.map((entry, index) => (
+                  <rect key={`cell-${index}`} fill={entry.color} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        )}
       </CardContent>
     </Card>
   );

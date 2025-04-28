@@ -28,6 +28,7 @@ interface DocumentState {
   fetchDocuments: () => Promise<Document[]>;
   fetchDocumentById: (id: string) => Promise<Document | null>;
   createDocument: (document: Partial<Document> & { title: string; user_id: string }) => Promise<Document | null>;
+  addDocument: (document: Document) => void;
   uploadDocument: (file: File, title: string, userId: string) => Promise<Document | null>;
   deleteDocument: (id: string) => Promise<boolean>;
   setDocumentSummary: (documentId: string, summary: string) => Promise<void>;
@@ -132,6 +133,12 @@ export const useDocumentStore = create<DocumentState>((set, get) => ({
       set({ error: errorMessage, isLoading: false });
       return null;
     }
+  },
+  
+  addDocument: (document) => {
+    set((state) => ({ 
+      documents: [...state.documents, document]
+    }));
   },
   
   uploadDocument: async (file: File, title: string, userId: string): Promise<Document | null> => {

@@ -1,4 +1,3 @@
-
 import { Link } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -28,111 +27,110 @@ const TermsOfService = () => {
           <h1 className="text-3xl font-bold mb-8">Terms of Service</h1>
           
           <div className="prose prose-lg dark:prose-invert max-w-none">
-            <p>Last Updated: 1st April, 2024</p>
+            <p className="font-semibold">Last Updated: April 27, 2025</p>
             
-            <h2>1. Acceptance of Terms</h2>
+            <h2 className="mt-8 border-b pb-2">1. Acceptance of Terms</h2>
             <p>
-              By creating an account on MindGrove or otherwise accessing or using our services, 
-              you agree to be bound by these Terms of Service ("Terms"). If you do not agree to 
-              these Terms, you may not access or use our services.
-            </p>
-            
-            <h2>2. Description of Services</h2>
-            <p>
-              MindGrove is an AI-powered research assistant platform that helps users organize, 
-              analyze, and learn from research documents. Our services include document analysis, 
-              summary generation, flashcard creation, intelligent search and other related features.
+              By accessing or using MindGrove ("Service"), you agree to these legally binding Terms. 
+              If you're using MindGrove on behalf of an institution, you're binding them to these Terms.
             </p>
             
-            <h2>3. Account Registration</h2>
+            <h2 className="mt-8 border-b pb-2">2. Our Services</h2>
             <p>
-              To use our services, you must create an account. You agree to provide accurate, current, 
-              and complete information during the registration process and to update such information 
-              to keep it accurate, current, and complete. You are responsible for safeguarding your password 
-              and for all activities that occur under your account.
+              MindGrove provides an AI-enhanced learning platform featuring:
             </p>
-            
-            <h2>4. User Content</h2>
-            <p>
-              Our services allow you to upload, submit, store, and share content, including documents, 
-              notes, and other materials ("User Content"). You retain all rights to your User Content, 
-              but you grant us a non-exclusive, transferable, sub-licensable, royalty-free, worldwide 
-              license to use, copy, modify, create derivative works based on, distribute, publicly display, 
-              and publicly perform your User Content in connection with operating and providing our services.
-            </p>
-            <p>
-              You are solely responsible for your User Content and the consequences of sharing it. You 
-              represent and warrant that:
-            </p>
-            <ul>
-              <li>You own or have the necessary rights to use and authorize us to use your User Content</li>
-              <li>Your User Content does not violate the rights of any third party, including intellectual property rights and privacy rights</li>
-              <li>Your User Content does not violate any applicable law or regulation</li>
+            <ul className="list-disc pl-6 space-y-2">
+              <li>Document analysis and summarization</li>
+              <li>Automated flashcard generation</li>
+              <li>Collaborative research tools</li>
+              <li>Personalized learning analytics</li>
             </ul>
             
-            <h2>5. Prohibited Conduct</h2>
+            <h2 className="mt-8 border-b pb-2">3. Your Account</h2>
             <p>
-              You agree not to:
+              You must be at least 13 years old to use MindGrove. When creating an account:
             </p>
-            <ul>
-              <li>Use our services for any illegal purpose or in violation of any local, state, national, or international law</li>
-              <li>Upload or share content that is harmful, threatening, abusive, defamatory, or otherwise objectionable</li>
-              <li>Impersonate any person or entity or falsely state or misrepresent your affiliation with a person or entity</li>
-              <li>Interfere with or disrupt the services or servers or networks connected to the services</li>
-              <li>Attempt to gain unauthorized access to any part of our services</li>
-              <li>Use our services to harvest, collect, or store personal information about others</li>
-              <li>Use our services for any commercial purpose without our prior written consent</li>
+            <ul className="list-disc pl-6 space-y-2">
+              <li>Provide accurate academic information (e.g., valid .edu email if applicable)</li>
+              <li>Maintain account security—notify us immediately of unauthorized use</li>
+              <li>You're responsible for all activity under your account</li>
             </ul>
             
-            <h2>6. Intellectual Property Rights</h2>
+            <h2 className="mt-8 border-b pb-2">4. Your Content</h2>
             <p>
-              The services and their entire contents, features, and functionality (including but not limited to all 
-              information, software, text, displays, images, video, and audio, and the design, selection, and 
-              arrangement thereof) are owned by MindGrove, its licensors, or other providers of such material and 
-              are protected by copyright, trademark, patent, trade secret, and other intellectual property or 
-              proprietary rights laws.
+              You retain ownership of all documents, notes, and materials ("Content") you upload. By using MindGrove, you grant us:
+            </p>
+            <ul className="list-disc pl-6 space-y-2">
+              <li>A license to process your Content to provide our services</li>
+              <li>Permission to use anonymized data to improve our AI models</li>
+            </ul>
+            <p className="mt-4 font-medium">You confirm your Content:</p>
+            <ul className="list-disc pl-6 space-y-2">
+              <li>Doesn't violate copyright or other laws</li>
+              <li>Doesn't contain sensitive personal data (SSNs, medical records, etc.)</li>
+              <li>Complies with your institution's academic policies</li>
+            </ul>
+            
+            <h2 className="mt-8 border-b pb-2">5. Acceptable Use</h2>
+            <p>While using MindGrove, you agree <span className="font-medium">not</span> to:</p>
+            <ul className="list-disc pl-6 space-y-2">
+              <li>Use our AI to generate harmful or deceptive content</li>
+              <li>Reverse engineer or exploit vulnerabilities</li>
+              <li>Create multiple accounts to bypass restrictions</li>
+              <li>Use bots or scrapers without written permission</li>
+              <li>Share access credentials</li>
+            </ul>
+            
+            <h2 className="mt-8 border-b pb-2">6. Intellectual Property</h2>
+            <p>
+              MindGrove owns all rights to our platform, including:
+            </p>
+            <ul className="list-disc pl-6 space-y-2">
+              <li>Software and AI models</li>
+              <li>User interface designs</li>
+              <li>Analytics methodologies</li>
+            </ul>
+            <p className="mt-4">
+              Third-party content (e.g., textbook excerpts) may have separate copyrights.
             </p>
             
-            <h2>7. Termination</h2>
+            <h2 className="mt-8 border-b pb-2">7. Service Changes</h2>
             <p>
-              We may terminate or suspend your access to all or part of the services, without notice, for conduct 
-              that we determine is in violation of these Terms, or for any conduct that we determine, in our sole 
-              discretion, is harmful to us, the services, another user, or a third party.
+              We may modify or discontinue features with 30 days' notice. Paid subscribers will receive pro-rated refunds for significant reductions in service.
             </p>
             
-            <h2>8. Disclaimer of Warranties</h2>
+            <h2 className="mt-8 border-b pb-2">8. Termination</h2>
             <p>
-              THE SERVICES ARE PROVIDED "AS IS" AND "AS AVAILABLE" WITHOUT WARRANTIES OF ANY KIND, EITHER EXPRESS 
-              OR IMPLIED, INCLUDING, BUT NOT LIMITED TO, IMPLIED WARRANTIES OF MERCHANTABILITY, FITNESS FOR A 
-              PARTICULAR PURPOSE, NON-INFRINGEMENT, OR COURSE OF PERFORMANCE.
+              We may suspend accounts for:
+            </p>
+            <ul className="list-disc pl-6 space-y-2">
+              <li>Academic integrity violations</li>
+              <li>Repeated copyright infringement</li>
+              <li>Abusive behavior toward other users</li>
+            </ul>
+            
+            <h2 className="mt-8 border-b pb-2">9. Disclaimers</h2>
+            <p className="font-medium">
+              MindGrove doesn't guarantee:
+            </p>
+            <ul className="list-disc pl-6 space-y-2">
+              <li>Perfect accuracy in AI-generated content</li>
+              <li>Uninterrupted service availability</li>
+              <li>Specific academic outcomes</li>
+            </ul>
+            <p className="mt-4">
+              Always verify critical information with primary sources.
             </p>
             
-            <h2>9. Limitation of Liability</h2>
+            
+            <h2 className="mt-8 border-b pb-2">10. Updates</h2>
             <p>
-              IN NO EVENT SHALL MINDGROVE, ITS OFFICERS, DIRECTORS, EMPLOYEES, OR AGENTS BE LIABLE FOR ANY INDIRECT, 
-              PUNITIVE, INCIDENTAL, SPECIAL, OR CONSEQUENTIAL DAMAGES ARISING OUT OF OR IN ANY WAY CONNECTED WITH 
-              THE USE OF THE SERVICES OR WITH THE DELAY OR INABILITY TO USE THE SERVICES.
+              We'll notify users of material changes via email, Discord or in-app alerts. Continued use after changes constitutes acceptance.
             </p>
             
-            <h2>10. Changes to Terms</h2>
+            <h2 className="mt-8 border-b pb-2">Contact Us</h2>
             <p>
-              We may modify these Terms from time to time. If we make material changes to these Terms, we will notify 
-              you by email or through a notice on our home page. Your continued use of the services after such 
-              notification constitutes your acceptance of the new Terms.
-            </p>
-            
-            <h2>11. Governing Law</h2>
-            <p>
-              These Terms shall be governed by and construed in accordance with the laws of [Your Jurisdiction], 
-              without regard to its conflict of law provisions.
-            </p>
-            
-            <h2>12. Contact Information</h2>
-            <p>
-              If you have any questions about these Terms, please contact us at:
-            </p>
-            <p>
-              <a href="mailto:judextine28@gmail.com">judextine28@gmail.com</a>
+              Questions? Email <a href="mailto:support@mindgrove.ai" className="text-primary hover:underline">judextine28@gmail.com</a>
             </p>
           </div>
         </motion.div>

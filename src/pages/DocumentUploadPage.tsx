@@ -1,172 +1,177 @@
 
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
 import MainLayout from '@/components/layout/MainLayout';
+import { PageTransition } from '@/components/animations/PageTransition';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Upload, Check, AlertCircle } from 'lucide-react';
 import PDFUploader from '@/components/document/PDFUploader';
-import Card, { CardHeader, CardTitle, CardContent } from '@/components/common/Card';
-import Button from '@/components/common/Button';
-import { FileUp, UploadCloud, Settings, Book, Sparkles } from 'lucide-react';
 import { toast } from '@/components/ui/use-toast';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import ApiKeyReminder from '@/components/document/ApiKeyReminder';
 import { useAuthStore } from '@/store/authStore';
+import { getOpenRouterApiKey } from '@/utils/openRouterUtils';
 
-const DocumentUploadPage = () => {
+export default function DocumentUploadPage() {
   const navigate = useNavigate();
   const { user } = useAuthStore();
-  const [processingOptions, setProcessingOptions] = useState({
+  const [uploadSuccess, setUploadSuccess] = useState(false);
+  const [uploadedDocumentId, setUploadedDocumentId] = useState<string | undefined>(undefined);
+  
+  const [processing, setProcessing] = useState({
     generateSummary: true,
     createFlashcards: true,
     ocrTextRecognition: true
   });
   
-  // Redirect if not logged in
-  if (!user) {
-    navigate('/login');
-    return null;
-  }
+  const handleUploadSuccess = (documentId?: string) => {
+    setUploadSuccess(true);
+    setUploadedDocumentId(documentId);
+    
+    toast({
+      title: "Document uploaded successfully",
+      description: "Your document has been uploaded and processed.",
+    });
+  };
   
-  const toggleOption = (option: keyof typeof processingOptions) => {
-    setProcessingOptions(prev => ({
+  const handleViewDocument = () => {
+    if (uploadedDocumentId) {
+      navigate(`/document/${uploadedDocumentId}`);
+    }
+  };
+  
+  const handleToggleProcessing = (key: keyof typeof processing) => {
+    setProcessing(prev => ({
       ...prev,
-      [option]: !prev[option]
+      [key]: !prev[key]
     }));
   };
-  
-  const handleUploadSuccess = (documentId?: string) => {
-    toast({
-      title: 'Document uploaded successfully',
-      description: 'Your document is being processed and will appear in your library shortly.',
-    });
-    
-    // Redirect to documents page after successful upload
-    setTimeout(() => {
-      navigate('/documents');
-    }, 2000);
-  };
 
+  const hasApiKey = !!getOpenRouterApiKey();
+  
   return (
     <MainLayout>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ duration: 0.5 }}
-      >
-        <div className="mb-8">
+      <PageTransition>
+        <div className="container mx-auto px-4 py-8">
           <h1 className="text-3xl font-bold mb-2">Upload Document</h1>
-          <p className="text-muted-foreground">
-            Upload your research papers or study materials for AI-powered processing
-          </p>
-        </div>
-        
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <FileUp className="h-5 w-5" />
-                  Upload PDF Document
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <PDFUploader 
-                  onSuccess={handleUploadSuccess}
-                  processingOptions={processingOptions} 
-                />
-              </CardContent>
-            </Card>
-          </div>
+          <p className="text-muted-foreground mb-8">Upload and process your study materials</p>
           
-          <div className="lg:col-span-1 space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Settings className="h-5 w-5" />
-                  Processing Options
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Sparkles className="h-4 w-4 text-primary" />
-                      <span>Generate Summary</span>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <Upload className="mr-2 h-5 w-5" />
+                    Upload PDF Document
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {uploadSuccess ? (
+                    <div className="text-center py-8">
+                      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-green-100 dark:bg-green-900 mb-4">
+                        <Check className="h-6 w-6 text-green-600 dark:text-green-300" />
+                      </div>
+                      <h3 className="text-lg font-medium">Document uploaded successfully!</h3>
+                      <p className="text-muted-foreground mt-2 mb-4">Your document has been processed and is ready to view.</p>
+                      <Button onClick={handleViewDocument}>View Document</Button>
                     </div>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input 
-                        type="checkbox" 
-                        className="sr-only peer" 
-                        checked={processingOptions.generateSummary}
-                        onChange={() => toggleOption('generateSummary')}
-                      />
-                      <div className="w-11 h-6 bg-muted peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
-                    </label>
-                  </div>
-                  
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Book className="h-4 w-4 text-primary" />
-                      <span>Create Flashcards</span>
-                    </div>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input 
-                        type="checkbox" 
-                        className="sr-only peer" 
-                        checked={processingOptions.createFlashcards}
-                        onChange={() => toggleOption('createFlashcards')}
-                      />
-                      <div className="w-11 h-6 bg-muted peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
-                    </label>
-                  </div>
-                  
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <UploadCloud className="h-4 w-4 text-primary" />
-                      <span>OCR Text Recognition</span>
-                    </div>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input 
-                        type="checkbox" 
-                        className="sr-only peer" 
-                        checked={processingOptions.ocrTextRecognition}
-                        onChange={() => toggleOption('ocrTextRecognition')}
-                      />
-                      <div className="w-11 h-6 bg-muted peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
-                    </label>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+                  ) : (
+                    <PDFUploader
+                      onUploadSuccess={handleUploadSuccess}
+                    />
+                  )}
+                </CardContent>
+              </Card>
+            </div>
             
-            <Card>
-              <CardHeader>
-                <CardTitle>Tips for Best Results</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-2 text-sm">
-                  <li className="flex items-start gap-2">
-                    <span className="text-primary">•</span>
-                    <span>Ensure your PDF is not password protected</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-primary">•</span>
-                    <span>For best OCR results, upload high-resolution documents</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-primary">•</span>
-                    <span>Make sure text is legible and not handwritten</span>
-                  </li>
-                  <li className="flex items-start gap-2">
-                    <span className="text-primary">•</span>
-                    <span>Allow a few minutes for processing larger documents</span>
-                  </li>
-                </ul>
-              </CardContent>
-            </Card>
+            <div className="space-y-6">
+              {!hasApiKey && <ApiKeyReminder />}
+              
+              <Card>
+                <CardHeader>
+                  <CardTitle>Processing Options</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <Label 
+                          htmlFor="summary"
+                          className="text-base"
+                        >
+                          Generate Summary
+                        </Label>
+                        <p className="text-sm text-muted-foreground">
+                          Create an AI summary of the document
+                        </p>
+                      </div>
+                      <Switch
+                        id="summary"
+                        checked={processing.generateSummary}
+                        onCheckedChange={() => handleToggleProcessing('generateSummary')}
+                        disabled={!hasApiKey}
+                      />
+                    </div>
+                    
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <Label 
+                          htmlFor="flashcards"
+                          className="text-base"
+                        >
+                          Create Flashcards
+                        </Label>
+                        <p className="text-sm text-muted-foreground">
+                          Generate study flashcards from the content
+                        </p>
+                      </div>
+                      <Switch
+                        id="flashcards"
+                        checked={processing.createFlashcards}
+                        onCheckedChange={() => handleToggleProcessing('createFlashcards')}
+                        disabled={!hasApiKey}
+                      />
+                    </div>
+                    
+                    <div className="flex items-center justify-between">
+                      <div className="space-y-0.5">
+                        <Label 
+                          htmlFor="ocr"
+                          className="text-base"
+                        >
+                          OCR Recognition
+                        </Label>
+                        <p className="text-sm text-muted-foreground">
+                          Extract text from scanned documents
+                        </p>
+                      </div>
+                      <Switch
+                        id="ocr"
+                        checked={processing.ocrTextRecognition}
+                        onCheckedChange={() => handleToggleProcessing('ocrTextRecognition')}
+                        disabled={!hasApiKey}
+                      />
+                    </div>
+                    
+                    {!hasApiKey && (
+                      <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-900 p-3 rounded-md mt-2">
+                        <div className="flex items-start">
+                          <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 mr-2" />
+                          <p className="text-xs text-amber-800 dark:text-amber-300">
+                            Add an API key to enable advanced document processing
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </div>
         </div>
-      </motion.div>
+      </PageTransition>
     </MainLayout>
   );
-};
-
-export default DocumentUploadPage;
+}

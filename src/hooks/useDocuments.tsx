@@ -18,14 +18,16 @@ export const useDocuments = () => {
     documents: storeDocuments,
     currentDocument: storeCurrentDocument,
     fetchDocuments: storeFetchDocuments,
-    searchDocuments: searchStoreDocuments
+    searchDocuments: searchStoreDocuments,
+    fetchDocumentById: storeFetchDocumentById,
+    addDocument: storeAddDocument
   } = useDocumentStore();
 
   // Adapt store documents to mock documents
   const documents = adaptStoreDocumentsToMockDocuments(storeDocuments || []);
   const currentDocument = storeCurrentDocument ? adaptToMockDocument(storeCurrentDocument) : null;
 
-  // Add refreshDocuments function that was missing
+  // Add refreshDocuments function
   const refreshDocuments = useCallback(async () => {
     if (!user?.id) {
       console.warn("Cannot refresh documents: No authenticated user");
@@ -48,59 +50,62 @@ export const useDocuments = () => {
     }
   }, [user?.id, storeFetchDocuments]);
 
-  // Initial fetch of documents
-  useEffect(() => {
-    if (user?.id && storeDocuments.length === 0) {
-      refreshDocuments();
+  const fetchDocumentById = useCallback(async (id: string) => {
+    try {
+      const document = await storeFetchDocumentById(id);
+      return document ? adaptToMockDocument(document) : null;
+    } catch (error) {
+      console.error("Error fetching document by ID:", error);
+      toast({
+        title: "Error fetching document",
+        description: "Failed to load the document. Please try again.",
+        variant: "destructive"
+      });
+      return null;
     }
-  }, [user?.id, storeDocuments.length, refreshDocuments]);
+  }, [storeFetchDocumentById]);
 
   const handleSearch = useCallback(async (query: string): Promise<Document[]> => {
-    if (!query.trim()) {
-      setSearchResults([]);
-      return [];
-    }
-    
     setIsSearching(true);
+    
     try {
-      // First, try searching in the local store
       const storeResults = searchStoreDocuments(query);
-      const mockResults = adaptStoreDocumentsToMockDocuments(storeResults || []);
-      
-      // If no local results, search in Supabase
-      if (mockResults.length === 0 && user?.id) {
-        const { data, error } = await supabase
-          .from('documents')
-          .select('*')
-          .eq('user_id', user.id)
-          .or(`title.ilike.%${query}%,content.ilike.%${query}%`);
-        
-        if (error) throw error;
-        
-        const supabaseResults = data?.map(adaptToMockDocument) || [];
-        setSearchResults(supabaseResults);
-        return supabaseResults;
-      }
-      
+      const mockResults = adaptStoreDocumentsToMockDocuments(storeResults);
       setSearchResults(mockResults);
-      setIsSearching(false);
       return mockResults;
     } catch (error) {
-      console.error('Error searching documents:', error);
-      setIsSearching(false);
+      console.error("Error searching documents:", error);
+      toast({
+        title: "Search error",
+        description: "An error occurred while searching documents.",
+        variant: "destructive"
+      });
       return [];
+    } finally {
+      setIsSearching(false);
     }
-  }, [searchStoreDocuments, user?.id]);
+  }, [searchStoreDocuments]);
+
+  const addDocument = useCallback(async (document: any) => {
+    return storeAddDocument(document);
+  }, [storeAddDocument]);
+
+  useEffect(() => {
+    if (user?.id) {
+      refreshDocuments();
+    }
+  }, [user?.id, refreshDocuments]);
 
   return {
-    ...useDocumentStore(),
     documents,
     searchResults,
     isSearching,
     currentDocument,
-    handleSearch,
     lastRefresh,
+    isRefreshing,
     refreshDocuments,
-    isRefreshing
+    fetchDocumentById,
+    addDocument,
+    handleSearch
   };
 };

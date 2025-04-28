@@ -4,45 +4,34 @@ import { Button } from '@/components/ui/button';
 import { BookOpen, PenTool, Sparkles, Loader, AlertCircle } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from '@/components/ui/use-toast';
-import ApiKeyReminder from './ApiKeyReminder';
-import ApiKeySettings from './ApiKeySettings';
 import { motion } from 'framer-motion';
 import { generateSummary, generateFlashcards } from '@/utils/nlpUtils';
-import { getOpenRouterApiKey } from '@/utils/openRouterUtils';
+import { useDocumentStore } from '@/store/documentStore';
+import { useNavigate } from 'react-router-dom';
 
 interface DocumentAIProps {
-  documentText: string;
   documentId: string;
+  documentText: string;
   onSummaryGenerated?: (summary: string) => void;
   onFlashcardsGenerated?: (flashcards: Array<{question: string, answer: string}>) => void;
 }
 
-const DocumentAI = ({ documentText, documentId, onSummaryGenerated, onFlashcardsGenerated }: DocumentAIProps) => {
+const DocumentAI: React.FC<DocumentAIProps> = ({ 
+  documentId, 
+  documentText, 
+  onSummaryGenerated, 
+  onFlashcardsGenerated 
+}) => {
   const [summary, setSummary] = useState<string>('');
   const [flashcards, setFlashcards] = useState<Array<{question: string, answer: string}>>([]);
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
   const [isGeneratingFlashcards, setIsGeneratingFlashcards] = useState(false);
-  const [hasApiKey, setHasApiKey] = useState(false);
   const [progress, setProgress] = useState<number | null>(null);
   const [processingLargeDoc, setProcessingLargeDoc] = useState(false);
-  
-  useEffect(() => {
-    // Check if API key is set
-    const apiKey = getOpenRouterApiKey();
-    setHasApiKey(!!apiKey);
-  }, []);
+  const { setDocumentSummary } = useDocumentStore();
+  const navigate = useNavigate();
   
   const handleGenerateSummary = async () => {
-    const apiKey = getOpenRouterApiKey();
-    if (!apiKey) {
-      toast({
-        title: "API Key Required",
-        description: "Please set your OpenRouter API key in the settings above.",
-        variant: "destructive"
-      });
-      return;
-    }
-    
     if (!documentText || documentText.trim().length < 10) {
       toast({
         title: "Insufficient Content",
@@ -54,11 +43,9 @@ const DocumentAI = ({ documentText, documentId, onSummaryGenerated, onFlashcards
     
     setIsGeneratingSummary(true);
     
-    // Check if this is a large document
     const isLargeDocument = documentText.length > 10000;
     if (isLargeDocument) {
       setProcessingLargeDoc(true);
-      // Start progress simulation for large documents
       setProgress(0);
       const progressInterval = setInterval(() => {
         setProgress(prev => {
@@ -75,7 +62,6 @@ const DocumentAI = ({ documentText, documentId, onSummaryGenerated, onFlashcards
     try {
       console.log("Starting summary generation with text length:", documentText.length);
       
-      // Use our nlpUtils wrapper
       const result = await generateSummary(documentId, documentText);
       if (!result.success) {
         throw new Error(result.error || "Failed to generate summary");
@@ -83,6 +69,9 @@ const DocumentAI = ({ documentText, documentId, onSummaryGenerated, onFlashcards
       
       console.log("Summary generation successful, length:", result.summary.length);
       setSummary(result.summary);
+      
+      // Update the document store with the new summary
+      await setDocumentSummary(documentId, result.summary);
       
       if (onSummaryGenerated) {
         onSummaryGenerated(result.summary);
@@ -113,16 +102,6 @@ const DocumentAI = ({ documentText, documentId, onSummaryGenerated, onFlashcards
   };
   
   const handleGenerateFlashcards = async () => {
-    const apiKey = getOpenRouterApiKey();
-    if (!apiKey) {
-      toast({
-        title: "API Key Required",
-        description: "Please set your OpenRouter API key in the settings above.",
-        variant: "destructive"
-      });
-      return;
-    }
-    
     if (!documentText || documentText.trim().length < 10) {
       toast({
         title: "Insufficient Content",
@@ -136,7 +115,6 @@ const DocumentAI = ({ documentText, documentId, onSummaryGenerated, onFlashcards
     try {
       console.log("Starting flashcard generation with text length:", documentText.length);
       
-      // Use our nlpUtils wrapper
       const result = await generateFlashcards(documentId, documentText);
       if (!result.success) {
         throw new Error(result.error || "Failed to generate flashcards");
@@ -165,11 +143,12 @@ const DocumentAI = ({ documentText, documentId, onSummaryGenerated, onFlashcards
     }
   };
   
+  const handleViewFlashcards = () => {
+    navigate(`/flashcards?document=${documentId}`);
+  };
+  
   return (
     <div className="space-y-6 ai-tools">
-      <ApiKeyReminder />
-      <ApiKeySettings />
-      
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -191,7 +170,7 @@ const DocumentAI = ({ documentText, documentId, onSummaryGenerated, onFlashcards
           <div className="flex flex-col sm:flex-row gap-3 justify-between">
             <Button
               onClick={handleGenerateSummary}
-              disabled={isGeneratingSummary || !hasApiKey}
+              disabled={isGeneratingSummary}
               className="flex items-center gap-2"
             >
               {isGeneratingSummary ? <Loader className="h-4 w-4 animate-spin" /> : <BookOpen className="h-4 w-4" />}
@@ -200,7 +179,7 @@ const DocumentAI = ({ documentText, documentId, onSummaryGenerated, onFlashcards
             
             <Button
               onClick={handleGenerateFlashcards}
-              disabled={isGeneratingFlashcards || !hasApiKey}
+              disabled={isGeneratingFlashcards}
               className="flex items-center gap-2"
               variant="outline"
             >
@@ -221,12 +200,6 @@ const DocumentAI = ({ documentText, documentId, onSummaryGenerated, onFlashcards
                 <span>Processing document...</span>
                 <span>{progress}%</span>
               </div>
-            </div>
-          )}
-          
-          {!hasApiKey && (
-            <div className="p-3 rounded-md bg-yellow-500/10 border border-yellow-500/20 text-yellow-600 text-sm">
-              <p>Please set your OpenRouter API key in the settings above to use these AI tools.</p>
             </div>
           )}
         </CardContent>
@@ -251,17 +224,14 @@ const DocumentAI = ({ documentText, documentId, onSummaryGenerated, onFlashcards
             <CardContent>
               <div className="prose dark:prose-invert max-w-none">
                 {summary.split('\n').map((paragraph, index) => {
-                  // Handle bullet points and lists
                   if (paragraph.trim().startsWith('- ') || paragraph.trim().startsWith('* ')) {
                     return <li key={index} className="ml-4">{paragraph.trim().substring(2)}</li>;
                   }
-                  // Handle numbering
                   else if (/^\d+\.\s/.test(paragraph.trim())) {
                     return <li key={index} className="ml-4">{paragraph.trim().substring(paragraph.trim().indexOf('.') + 1).trim()}</li>;
                   }
-                  // Handle headings
                   else if (paragraph.trim().startsWith('#')) {
-                    const level = paragraph.trim().match(/^#+/)[0].length;
+                    const level = paragraph.trim().match(/^#+/)?.[0].length || 0;
                     const text = paragraph.trim().substring(level).trim();
                     switch (level) {
                       case 1: return <h2 key={index} className="text-xl font-bold mt-4 mb-2">{text}</h2>;
@@ -269,11 +239,9 @@ const DocumentAI = ({ documentText, documentId, onSummaryGenerated, onFlashcards
                       default: return <h4 key={index} className="text-base font-bold mt-2 mb-1">{text}</h4>;
                     }
                   }
-                  // Regular paragraphs
                   else if (paragraph.trim()) {
                     return <p key={index} className="mb-3">{paragraph}</p>;
                   }
-                  // Preserve empty lines as spacing
                   return <div key={index} className="h-2"></div>;
                 })}
               </div>
@@ -314,8 +282,8 @@ const DocumentAI = ({ documentText, documentId, onSummaryGenerated, onFlashcards
               </div>
             </CardContent>
             <CardFooter>
-              <Button variant="outline" className="w-full">
-                Save Flashcards to Your Collection
+              <Button variant="outline" className="w-full" onClick={handleViewFlashcards}>
+                View All Flashcards
               </Button>
             </CardFooter>
           </Card>
