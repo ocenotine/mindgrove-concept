@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { Book, CheckCircle, Loader, AlertCircle } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
-import { supabase, StoredQuiz } from '@/integrations/supabase/client';
+import { supabase, StoredQuiz, QuizQuestion } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/store/authStore';
 import { generateQuizQuestions } from '@/utils/nlpUtils';
 import { useNavigate } from 'react-router-dom';
@@ -16,13 +16,6 @@ interface Document {
   id: string;
   title: string;
   content: string | null;
-}
-
-interface QuizQuestion {
-  question: string;
-  options: string[];
-  answer: string;
-  explanation: string;
 }
 
 interface QuizGeneratorProps {
@@ -95,7 +88,8 @@ const QuizGenerator: React.FC<QuizGeneratorProps> = ({ onQuizGenerated }) => {
         user_id: quiz.user_id,
         document_id: quiz.document_id,
         name: quiz.name,
-        questions: quiz.questions as QuizQuestion[],
+        // Properly cast the JSONB questions array to QuizQuestion[]
+        questions: quiz.questions as unknown as QuizQuestion[],
         difficulty: quiz.difficulty,
         last_taken: quiz.last_taken,
         created_at: quiz.created_at,

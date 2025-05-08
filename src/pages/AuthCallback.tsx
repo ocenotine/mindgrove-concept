@@ -1,7 +1,7 @@
 
 import { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, ensureUserProfile } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/store/authStore';
 import { Loader2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
@@ -45,6 +45,16 @@ export default function AuthCallback() {
           // We have a session, process it
           setSession(data.session);
           setUser(data.session.user);
+          
+          // Create profile if needed
+          if (data.session.user) {
+            console.log("Creating profile if needed for:", data.session.user.email);
+            await ensureUserProfile(
+              data.session.user.id, 
+              data.session.user.email || '', 
+              data.session.user.email === 'admin@mindgrove.com' ? 'admin' : 'student'
+            );
+          }
           
           // If this was an email confirmation/verification
           if (autoLogin || hashParams?.type === 'signup') {

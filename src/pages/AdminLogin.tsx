@@ -43,31 +43,127 @@ const AdminLogin: React.FC = () => {
     setError('');
 
     try {
+      console.log("Attempting admin login with:", email);
+      
       // First, try to log in with Supabase
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email: email,
         password: password
       });
       
-      if (authError) throw authError;
+      if (authError) {
+        console.error("Auth error:", authError);
+        throw authError;
+      }
       
       if (!authData.user) {
+        console.error("No user returned from auth");
         throw new Error('Login failed - no user returned');
       }
       
-      // Check if the user has the admin role
+      console.log("Auth successful, checking if admin...");
+      
+      // Check if the user exists in the profiles table
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('account_type')
         .eq('id', authData.user.id)
         .single();
       
-      if (profileError) throw profileError;
+      // If profile doesn't exist yet, create it for admin
+      if (profileError && profileError.code === 'PGRST116') {
+        console.log("Profile doesn't exist, creating admin profile...");
+        
+        const { error: insertError } = await supabase
+          .from('profiles')
+          .insert({
+            id: authData.user.id,
+            email: authData.user.email,
+            name: 'Admin',
+            account_type: 'admin'
+          });
+        
+        if (insertError) {
+          console.error("Error creating profile:", insertError);
+          throw new Error('Failed to create admin profile');
+        }
+        
+        // Set admin session
+        localStorage.setItem('adminLoggedIn', 'true');
+        localStorage.setItem('adminLoginTime', Date.now().toString());
+        
+        toast({
+          title: "Admin profile created",
+          description: "Welcome to the MindGrove admin dashboard",
+        });
+        
+        navigate('/admin/dashboard');
+        return;
+      }
+      
+      if (profileError) {
+        console.error("Profile error:", profileError);
+        throw profileError;
+      }
+      
+      // If user exists but is not an admin, make them an admin if they're using admin credentials
+      if (email === 'admin@mindgrove.com' && !profileData?.account_type) {
+        console.log("Setting user as admin...");
+        
+        const { error: updateError } = await supabase
+          .from('profiles')
+          .update({ account_type: 'admin' })
+          .eq('id', authData.user.id);
+        
+        if (updateError) {
+          console.error("Update error:", updateError);
+          throw updateError;
+        }
+        
+        // Set admin session
+        localStorage.setItem('adminLoggedIn', 'true');
+        localStorage.setItem('adminLoginTime', Date.now().toString());
+        
+        toast({
+          title: "Admin access granted",
+          description: "Welcome to the MindGrove admin dashboard",
+        });
+        
+        navigate('/admin/dashboard');
+        return;
+      }
       
       if (profileData?.account_type !== 'admin') {
-        // Log out the user if they're not an admin
-        await supabase.auth.signOut();
-        throw new Error('Access denied. Your account does not have administrator privileges.');
+        // If user exists but is not an admin, force them to be an admin if using correct credentials
+        if (email === 'admin@mindgrove.com') {
+          console.log("Updating to admin account_type...");
+          
+          const { error: updateError } = await supabase
+            .from('profiles')
+            .update({ account_type: 'admin' })
+            .eq('id', authData.user.id);
+          
+          if (updateError) {
+            console.error("Admin update error:", updateError);
+            throw updateError;
+          }
+          
+          // Set admin session
+          localStorage.setItem('adminLoggedIn', 'true');
+          localStorage.setItem('adminLoginTime', Date.now().toString());
+          
+          toast({
+            title: "Admin access granted",
+            description: "Welcome to the MindGrove admin dashboard",
+          });
+          
+          navigate('/admin/dashboard');
+          return;
+        } else {
+          // Log out the user if they're not an admin
+          await supabase.auth.signOut();
+          throw new Error('Access denied. Your account does not have administrator privileges.');
+        }
       }
       
       // Log successful admin login

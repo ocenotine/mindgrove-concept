@@ -41,3 +41,44 @@ export type StoredQuiz = {
   created_at?: string;
   updated_at?: string;
 };
+
+// Helper function to create a profile if it doesn't exist
+export const ensureUserProfile = async (userId: string, email: string, accountType: string = 'student') => {
+  try {
+    // Check if profile exists
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .single();
+    
+    if (error && error.code === 'PGRST116') {
+      // Profile doesn't exist, create it
+      const { error: insertError } = await supabase
+        .from('profiles')
+        .insert({
+          id: userId,
+          email: email,
+          account_type: accountType
+        });
+      
+      if (insertError) {
+        console.error("Error creating profile:", insertError);
+      }
+    }
+    
+    // Special handling for admin user
+    if (email === 'admin@mindgrove.com') {
+      const { error: updateError } = await supabase
+        .from('profiles')
+        .update({ account_type: 'admin' })
+        .eq('id', userId);
+      
+      if (updateError) {
+        console.error("Error updating admin:", updateError);
+      }
+    }
+  } catch (err) {
+    console.error("Error in ensureUserProfile:", err);
+  }
+};

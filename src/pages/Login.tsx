@@ -19,8 +19,11 @@ const Login = () => {
 
   useEffect(() => {
     if (isAuthenticated && user) {
+      console.log("User authenticated:", user);
       // Redirect based on account type
       const accountType = user.user_metadata?.account_type || user.account_type;
+      
+      console.log("Account type:", accountType);
       
       if (accountType === 'admin') {
         navigate('/admin/dashboard');
@@ -41,6 +44,7 @@ const Login = () => {
     setIsLoading(true);
     
     try {
+      console.log("Attempting login with:", email);
       await login(email, password);
       
       toast({
