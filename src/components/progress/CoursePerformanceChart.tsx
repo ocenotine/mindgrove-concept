@@ -16,6 +16,7 @@ export default function CoursePerformanceChart({ period }: { period: 'day' | 'we
   const [aiChatCount, setAiChatCount] = useState(0);
   const [documentCount, setDocumentCount] = useState(0);
   const [flashcardCount, setFlashcardCount] = useState(0);
+  const [quizCount, setQuizCount] = useState(0);
   const [loading, setLoading] = useState(true);
   
   useEffect(() => {
@@ -79,6 +80,19 @@ export default function CoursePerformanceChart({ period }: { period: 'day' | 'we
         } else {
           setFlashcardCount(cardCount || 0);
         }
+        
+        // Fetch quiz count
+        const { count: qCount, error: quizError } = await supabase
+          .from('quizzes')
+          .select('*', { count: 'exact' })
+          .eq('user_id', user.id)
+          .gte('created_at', startDateStr);
+        
+        if (quizError) {
+          console.error('Error fetching quiz count:', quizError);
+        } else {
+          setQuizCount(qCount || 0);
+        }
       } catch (error) {
         console.error('Error in fetchActivityData:', error);
       } finally {
@@ -94,6 +108,7 @@ export default function CoursePerformanceChart({ period }: { period: 'day' | 'we
     { name: 'Documents', value: documentCount, color: '#6C72CB' },
     { name: 'Flashcards', value: flashcardCount, color: '#CB69C1' },
     { name: 'AI Chats', value: aiChatCount, color: '#FEAC5E' },
+    { name: 'Quizzes', value: quizCount, color: '#4FB8A5' }
   ];
   
   return (

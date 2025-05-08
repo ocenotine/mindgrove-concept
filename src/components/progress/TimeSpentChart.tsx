@@ -22,9 +22,6 @@ export default function TimeSpentChart({ period }: { period: 'day' | 'week' | 'm
       setLoading(true);
       
       try {
-        // In a real implementation, this would pull from a study_sessions table
-        // For now, we'll generate realistic data based on the user's activity
-        
         // Get number of days based on period
         let days = 0;
         if (period === 'day') {
@@ -35,27 +32,55 @@ export default function TimeSpentChart({ period }: { period: 'day' | 'week' | 'm
           days = 30;
         }
         
-        // Fetch document activity as a proxy for study time
+        // Start date based on period
+        const now = new Date();
+        let startDate = new Date();
+        
+        if (period === 'day') {
+          startDate.setHours(0, 0, 0, 0); // Start of today
+        } else if (period === 'week') {
+          startDate.setDate(now.getDate() - 7); // Last 7 days
+        } else if (period === 'month') {
+          startDate.setMonth(now.getMonth() - 1); // Last 30 days
+        }
+        
+        const startDateStr = startDate.toISOString();
+        
+        // Fetch document activity
         const { data: docs, error: docsError } = await supabase
           .from('documents')
           .select('created_at')
           .eq('user_id', user.id)
+          .gte('created_at', startDateStr)
           .order('created_at', { ascending: true });
           
         if (docsError) {
           console.error('Error fetching document activity:', docsError);
         }
         
-        // Fetch chat activity as another proxy for study time
+        // Fetch chat activity 
         const { data: chats, error: chatsError } = await supabase
           .from('document_chats')
           .select('created_at')
           .eq('user_id', user.id)
           .eq('role', 'user')
+          .gte('created_at', startDateStr)
           .order('created_at', { ascending: true });
           
         if (chatsError) {
           console.error('Error fetching chat activity:', chatsError);
+        }
+        
+        // Fetch quiz activity 
+        const { data: quizzes, error: quizzesError } = await supabase
+          .from('quizzes')
+          .select('created_at')
+          .eq('user_id', user.id)
+          .gte('created_at', startDateStr)
+          .order('created_at', { ascending: true });
+          
+        if (quizzesError) {
+          console.error('Error fetching quiz activity:', quizzesError);
         }
         
         // Generate data points 
@@ -73,7 +98,7 @@ export default function TimeSpentChart({ period }: { period: 'day' | 'week' | 'm
             day: 'numeric'
           });
           
-          // Count activities on this day as a proxy for hours studied
+          // Count activities on this day
           const docsOnDay = (docs || []).filter(doc => 
             new Date(doc.created_at).toISOString().split('T')[0] === dateStr
           ).length;
@@ -82,9 +107,12 @@ export default function TimeSpentChart({ period }: { period: 'day' | 'week' | 'm
             new Date(chat.created_at).toISOString().split('T')[0] === dateStr
           ).length;
           
+          const quizzesOnDay = (quizzes || []).filter(quiz => 
+            new Date(quiz.created_at).toISOString().split('T')[0] === dateStr
+          ).length;
+          
           // Convert activity count to approximate hours
-          // This is a simplification - in a real app, you would track actual study time
-          const activityCount = docsOnDay + chatsOnDay;
+          const activityCount = docsOnDay + chatsOnDay + quizzesOnDay;
           let hours = 0;
           
           if (activityCount > 0) {

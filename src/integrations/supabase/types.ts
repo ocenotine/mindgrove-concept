@@ -314,6 +314,50 @@ export type Database = {
         }
         Relationships: []
       }
+      quizzes: {
+        Row: {
+          created_at: string | null
+          difficulty: string
+          document_id: string | null
+          id: string
+          last_taken: string | null
+          name: string
+          questions: Json
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          difficulty: string
+          document_id?: string | null
+          id?: string
+          last_taken?: string | null
+          name: string
+          questions: Json
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          difficulty?: string
+          document_id?: string | null
+          id?: string
+          last_taken?: string | null
+          name?: string
+          questions?: Json
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quizzes_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       research_groups: {
         Row: {
           created_at: string | null
@@ -513,6 +557,39 @@ export type Database = {
           id?: string
           last_prompt_shown?: string | null
           tour_completed?: boolean | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_wellbeing: {
+        Row: {
+          created_at: string | null
+          date: string
+          focus: number
+          id: string
+          notes: string | null
+          stress: number
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          date?: string
+          focus: number
+          id?: string
+          notes?: string | null
+          stress: number
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          date?: string
+          focus?: number
+          id?: string
+          notes?: string | null
+          stress?: number
           updated_at?: string | null
           user_id?: string
         }

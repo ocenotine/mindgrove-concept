@@ -1,11 +1,11 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
-import { toast } from '@/components/ui/use-toast';
+import { toast } from '@/hooks/use-toast';
 import { PageTransition } from '@/components/animations/PageTransition';
 import { Mail, Lock, ArrowRight, LogIn, Github, ArrowLeft } from 'lucide-react';
 import ParallaxScroll from '@/components/animations/ParallaxScroll';
@@ -207,13 +207,13 @@ const Login = () => {
             </div>
           </div>
           
-          {/* Right side - Decoration with custom image */}
+          {/* Right side - Decoration with image */}
           <div className="hidden md:block md:w-1/2 bg-gradient-to-br from-primary/20 to-primary/30 p-12">
             <div className="h-full flex flex-col justify-center">
               <ParallaxScroll direction="up" speed={0.3}>
                 <div className="text-center">
                   <img 
-                    src="//mindgrove.png/d501d0da-a7b8-48c8-82f1-fea9624331d3.png" 
+                    src="/mindgrove.png" 
                     alt="MindGrove AI Research" 
                     className="mx-auto max-w-full h-auto mb-6"
                   />

@@ -7,11 +7,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { Book, CheckCircle, Loader, AlertCircle } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, StoredQuiz } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/store/authStore';
 import { generateQuizQuestions } from '@/utils/nlpUtils';
 import { useNavigate } from 'react-router-dom';
-import { v4 as uuidv4 } from 'uuid';
 
 interface Document {
   id: string;
@@ -34,6 +33,7 @@ const QuizGenerator: React.FC<QuizGeneratorProps> = ({ onQuizGenerated }) => {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [savedQuizzes, setSavedQuizzes] = useState<StoredQuiz[]>([]);
   const { user } = useAuthStore();
   const navigate = useNavigate();
   
@@ -43,10 +43,11 @@ const QuizGenerator: React.FC<QuizGeneratorProps> = ({ onQuizGenerated }) => {
   const [numQuestions, setNumQuestions] = useState(5);
   const [difficulty, setDifficulty] = useState('medium');
   
-  // Load user's documents
+  // Load user's documents and quizzes
   useEffect(() => {
     if (user) {
       fetchUserDocuments();
+      fetchUserQuizzes();
     }
   }, [user]);
 
@@ -73,12 +74,54 @@ const QuizGenerator: React.FC<QuizGeneratorProps> = ({ onQuizGenerated }) => {
       setIsLoading(false);
     }
   };
+  
+  const fetchUserQuizzes = async () => {
+    if (!user?.id) return;
+    
+    try {
+      const { data, error } = await supabase
+        .from('quizzes')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+        
+      if (error) {
+        throw error;
+      }
+      
+      // Convert data types to match our interface
+      const quizzes: StoredQuiz[] = data?.map(quiz => ({
+        id: quiz.id,
+        user_id: quiz.user_id,
+        document_id: quiz.document_id,
+        name: quiz.name,
+        questions: quiz.questions as QuizQuestion[],
+        difficulty: quiz.difficulty,
+        last_taken: quiz.last_taken,
+        created_at: quiz.created_at,
+        updated_at: quiz.updated_at
+      })) || [];
+      
+      setSavedQuizzes(quizzes);
+    } catch (error) {
+      console.error("Error fetching quizzes:", error);
+    }
+  };
 
   const handleGenerateQuiz = async () => {
     if (!selectedDocumentId || !quizName) {
       toast({
         title: "Missing information",
         description: "Please select a document and enter a quiz name.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (!user?.id) {
+      toast({
+        title: "Authentication required",
+        description: "Please log in to generate quizzes.",
         variant: "destructive",
       });
       return;
@@ -113,25 +156,23 @@ const QuizGenerator: React.FC<QuizGeneratorProps> = ({ onQuizGenerated }) => {
       
       console.log("Generated quiz questions:", result.questions.length);
       
-      // Save the quiz to localStorage (would be to a database in production)
-      const quizId = uuidv4();
-      const newQuiz = {
-        id: quizId,
-        documentId: selectedDocumentId,
-        documentTitle: selectedDocument.title,
-        name: quizName,
-        questions: result.questions,
-        difficulty: difficulty,
-        created_at: new Date().toISOString(),
-        lastTaken: 'Never'
-      };
+      // Save the quiz to Supabase
+      const { error } = await supabase
+        .from('quizzes')
+        .insert({
+          user_id: user.id,
+          document_id: selectedDocumentId,
+          name: quizName,
+          questions: result.questions,
+          difficulty: difficulty
+        });
+        
+      if (error) {
+        throw error;
+      }
       
-      // Get existing quizzes
-      const existingQuizzesStr = localStorage.getItem('savedQuizzes');
-      const existingQuizzes = existingQuizzesStr ? JSON.parse(existingQuizzesStr) : [];
-      
-      // Add new quiz
-      localStorage.setItem('savedQuizzes', JSON.stringify([...existingQuizzes, newQuiz]));
+      // Refresh quizzes
+      await fetchUserQuizzes();
       
       toast({
         title: "Quiz generated successfully",
@@ -142,6 +183,10 @@ const QuizGenerator: React.FC<QuizGeneratorProps> = ({ onQuizGenerated }) => {
       if (onQuizGenerated) {
         onQuizGenerated();
       }
+      
+      // Reset form
+      setQuizName('');
+      setSelectedDocumentId('');
       
       // Navigate to the saved quizzes tab
       setTimeout(() => {
