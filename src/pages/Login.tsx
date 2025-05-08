@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
@@ -7,12 +6,12 @@ import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { toast } from '@/hooks/use-toast';
 import { PageTransition } from '@/components/animations/PageTransition';
-import { Mail, Lock, ArrowRight, LogIn, Github, ArrowLeft } from 'lucide-react';
+import { Mail, Lock, LogIn, Github, ArrowLeft } from 'lucide-react';
 import ParallaxScroll from '@/components/animations/ParallaxScroll';
 
 const Login = () => {
   const navigate = useNavigate();
-  const { login, loginWithGoogle, isAuthenticated, user } = useAuthStore();
+  const { login, loginWithGoogle, isAuthenticated, user, cleanupAuthState } = useAuthStore();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -44,6 +43,9 @@ const Login = () => {
     setIsLoading(true);
     
     try {
+      // Clean up auth state first
+      cleanupAuthState();
+      
       console.log("Attempting login with:", email);
       await login(email, password);
       
@@ -67,6 +69,9 @@ const Login = () => {
 
   const handleGoogleLogin = async () => {
     try {
+      // Clean up auth state first
+      cleanupAuthState();
+      
       await loginWithGoogle();
     } catch (error) {
       console.error("Google login error:", error);
@@ -206,6 +211,12 @@ const Login = () => {
                 Don't have an account?{' '}
                 <Link to="/signup" className="text-primary font-medium hover:underline">
                   Sign up
+                </Link>
+              </p>
+
+              <p className="text-center mt-2 text-sm text-muted-foreground">
+                <Link to="/admin/login" className="text-primary font-medium hover:underline">
+                  Admin login
                 </Link>
               </p>
             </div>

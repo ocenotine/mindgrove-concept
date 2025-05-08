@@ -38,7 +38,12 @@ import { useAuthStore } from '@/store/authStore';
 function App() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { user, isAuthenticated } = useAuthStore();
+  const { user, isAuthenticated, initialize } = useAuthStore();
+  
+  // Initialize auth on app start
+  useEffect(() => {
+    initialize();
+  }, [initialize]);
   
   // Ensure index route redirects correctly
   useEffect(() => {
@@ -51,12 +56,13 @@ function App() {
   useEffect(() => {
     if (isAuthenticated && user) {
       const accountType = user.user_metadata?.account_type || user.account_type;
+      console.log("App.tsx: User authenticated with account type:", accountType);
       const currentPath = location.pathname;
 
       // Redirect to appropriate dashboard based on account type
       if (accountType === 'admin' && 
-          currentPath === '/dashboard' || 
-          currentPath === '/institution/dashboard') {
+          (currentPath === '/dashboard' || 
+          currentPath === '/institution/dashboard')) {
         navigate('/admin/dashboard', { replace: true });
       } else if (accountType === 'institution' && 
                 currentPath === '/dashboard') {

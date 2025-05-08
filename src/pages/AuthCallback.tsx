@@ -74,9 +74,13 @@ export default function AuthCallback() {
                   .eq('id', data.session?.user?.id)
                   .single();
                 
+                console.log("Profile data:", profileData);
+                
                 const accountType = profileData?.account_type || 
                                   data.session?.user?.user_metadata?.account_type || 
                                   'student';
+                
+                console.log("Account type:", accountType);
                 
                 if (accountType === 'admin') {
                   navigate('/admin/dashboard');
@@ -86,6 +90,7 @@ export default function AuthCallback() {
                   navigate('/dashboard');
                 }
               } catch (err) {
+                console.error("Error getting profile:", err);
                 // If there's an error getting the profile, default to student dashboard
                 navigate('/dashboard');
               }
@@ -99,9 +104,13 @@ export default function AuthCallback() {
                 .eq('id', data.session?.user?.id)
                 .single();
               
+              console.log("Profile data for routing:", profileData);
+              
               const accountType = profileData?.account_type || 
                                 data.session?.user?.user_metadata?.account_type || 
                                 'student';
+              
+              console.log("Routing based on account type:", accountType);
               
               if (accountType === 'admin') {
                 navigate('/admin/dashboard');
@@ -111,6 +120,7 @@ export default function AuthCallback() {
                 navigate('/dashboard');
               }
             } catch (err) {
+              console.error("Error routing user:", err);
               // If there's an error getting the profile, default to student dashboard
               navigate('/dashboard');
             }

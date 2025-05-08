@@ -99,6 +99,7 @@ interface AuthState {
   resetPassword: (password: string) => Promise<void>;
   enableTwoFactorAuth: () => Promise<string>;
   verifyTwoFactorAuth: (token: string) => Promise<boolean>;
+  cleanupAuthState: () => void;
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
@@ -259,6 +260,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       // Clean up all auth state
       cleanupAuthState();
       
+      // Remove admin session data
+      localStorage.removeItem('adminLoggedIn');
+      localStorage.removeItem('adminLoginTime');
+      
       // Then tell Supabase to sign out
       const { error } = await supabase.auth.signOut({ 
         scope: 'global' // Sign out from all devices
@@ -306,10 +311,53 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
   
   initialize: async () => {
-    const { setUser, setSession, setLoading } = get();
-    setLoading(true);
-    
     try {
+      const { setUser, setSession, setLoading } = get();
+      setLoading(true);
+      
+      console.log("Initializing auth store...");
+      
+      // First set up auth state change listener
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(
+        async (event, session) => {
+          console.log("Auth state changed:", event, session?.user?.email);
+          
+          if (event === 'SIGNED_IN' && session?.user) {
+            console.log("User signed in:", session.user.email);
+            
+            // Create profile if it doesn't exist
+            try {
+              const { data: { user } } = await supabase.auth.getUser();
+              if (user) {
+                const isAdmin = user.email === 'admin@mindgrove.com';
+                await supabase.from('profiles').upsert({
+                  id: user.id,
+                  email: user.email,
+                  account_type: isAdmin ? 'admin' : (user.user_metadata.account_type || 'student')
+                }).eq('id', user.id);
+              }
+            } catch (err) {
+              console.error("Error ensuring profile exists:", err);
+            }
+          }
+          
+          // Process user metadata from session
+          const user = session?.user ? {
+            ...session.user,
+            name: session.user.user_metadata?.name || session.user.user_metadata?.full_name,
+            account_type: session.user.user_metadata?.account_type || session.user.email === 'admin@mindgrove.com' ? 'admin' : 'student',
+            avatarUrl: session.user.user_metadata?.avatar_url,
+            institution_id: session.user.user_metadata?.institution_id,
+            subscription_tier: 'free',
+            subscription_expiry: null,
+            is_first_login: false
+          } as UserWithMetadata : null;
+          
+          setSession(session);
+          setUser(user);
+        }
+      );
+      
       // Get the current session
       const { data: { session } } = await supabase.auth.getSession();
       
@@ -317,7 +365,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       const user = session?.user ? {
         ...session.user,
         name: session.user.user_metadata?.name || session.user.user_metadata?.full_name,
-        account_type: session.user.user_metadata?.account_type || 'student',
+        account_type: session.user.user_metadata?.account_type || session.user.email === 'admin@mindgrove.com' ? 'admin' : 'student',
         avatarUrl: session.user.user_metadata?.avatar_url,
         institution_id: session.user.user_metadata?.institution_id,
         subscription_tier: 'free',
@@ -328,15 +376,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       setSession(session);
       setUser(user);
       
-      // Set initial last activity
-      set({ lastActivity: Date.now() });
+      console.log("Auth initialized:", user?.email, user?.account_type);
       
       return Promise.resolve();
     } catch (error) {
       console.error("Auth initialization error:", error);
       return Promise.reject(error);
     } finally {
-      setLoading(false);
+      get().setLoading(false);
     }
   },
   
@@ -419,79 +466,18 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       variant: "default"
     });
     return token.length === 6;
-  }
+  },
+  
+  cleanupAuthState
 }));
 
-// Set up auth listener and activity tracker
+// Set up activity tracker
 export const initializeAuth = async () => {
-  const { setUser, setSession, setLoading, updateLastActivity, checkSessionTimeout } = useAuthStore.getState();
+  const { initialize, updateLastActivity, checkSessionTimeout } = useAuthStore.getState();
   
   try {
-    // First set up the auth state change listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        // If the event is PASSWORD_RECOVERY, redirect to reset password page
-        if (event === 'PASSWORD_RECOVERY') {
-          window.location.href = '/#/reset-password';
-          return;
-        }
-        
-        // Handle automatic login after verification
-        if (event === 'USER_UPDATED' && session) {
-          // User's email was verified
-          toast({
-            title: "Email verified",
-            description: "Your email has been verified. You are now logged in.",
-          });
-        }
-        
-        // Process user metadata from session
-        const user = session?.user ? {
-          ...session.user,
-          name: session.user.user_metadata?.name || session.user.user_metadata?.full_name,
-          account_type: session.user.user_metadata?.account_type || 'student',
-          avatarUrl: session.user.user_metadata?.avatar_url,
-          institution_id: session.user.user_metadata?.institution_id,
-          subscription_tier: 'free',
-          subscription_expiry: null,
-          is_first_login: false
-        } as UserWithMetadata : null;
-        
-        setSession(session);
-        setUser(user);
-        setLoading(false);
-        
-        // Update activity timestamp
-        updateLastActivity();
-        
-        // Defer data fetching on sign-in to prevent potential deadlocks
-        if (event === 'SIGNED_IN' && user) {
-          setTimeout(() => {
-            // Additional data fetching can be done here
-            console.log('User signed in:', user.id);
-          }, 0);
-        }
-      }
-    );
-    
-    // Then check for any existing session
-    const { data: { session } } = await supabase.auth.getSession();
-    
-    // Process user metadata from existing session
-    const user = session?.user ? {
-      ...session.user,
-      name: session.user.user_metadata?.name || session.user.user_metadata?.full_name,
-      account_type: session.user.user_metadata?.account_type || 'student',
-      avatarUrl: session.user.user_metadata?.avatar_url,
-      institution_id: session.user.user_metadata?.institution_id,
-      subscription_tier: 'free',
-      subscription_expiry: null,
-      is_first_login: false
-    } as UserWithMetadata : null;
-    
-    setSession(session);
-    setUser(user);
-    setLoading(false);
+    // Initialize auth
+    await initialize();
     
     // Set up activity listeners to track user activity
     const activityEvents = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart'];
@@ -504,7 +490,6 @@ export const initializeAuth = async () => {
     const timeoutCheckInterval = setInterval(checkSessionTimeout, 60000); // Check every minute
     
     return () => {
-      subscription.unsubscribe();
       activityEvents.forEach(event => {
         window.removeEventListener(event, updateLastActivity);
       });
@@ -512,6 +497,5 @@ export const initializeAuth = async () => {
     };
   } catch (error) {
     console.error("Auth initialization error:", error);
-    setLoading(false);
   }
 };

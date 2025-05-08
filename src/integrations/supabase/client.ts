@@ -9,7 +9,13 @@ const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiO
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
-export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+  auth: {
+    storage: localStorage,
+    persistSession: true,
+    autoRefreshToken: true
+  }
+});
 
 // Add custom database types for our new tables
 export type WellbeingData = {
@@ -54,6 +60,7 @@ export const ensureUserProfile = async (userId: string, email: string, accountTy
     
     if (error && error.code === 'PGRST116') {
       // Profile doesn't exist, create it
+      console.log("Creating new profile for user:", userId, email, accountType);
       const { error: insertError } = await supabase
         .from('profiles')
         .insert({
@@ -64,11 +71,18 @@ export const ensureUserProfile = async (userId: string, email: string, accountTy
       
       if (insertError) {
         console.error("Error creating profile:", insertError);
+      } else {
+        console.log("Profile created successfully");
       }
+    } else if (error) {
+      console.error("Error checking profile:", error);
+    } else {
+      console.log("Profile exists:", data);
     }
     
     // Special handling for admin user
     if (email === 'admin@mindgrove.com') {
+      console.log("Updating account_type to admin for:", email);
       const { error: updateError } = await supabase
         .from('profiles')
         .update({ account_type: 'admin' })
@@ -76,6 +90,8 @@ export const ensureUserProfile = async (userId: string, email: string, accountTy
       
       if (updateError) {
         console.error("Error updating admin:", updateError);
+      } else {
+        console.log("Admin profile updated successfully");
       }
     }
   } catch (err) {
