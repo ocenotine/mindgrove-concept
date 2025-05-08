@@ -10,9 +10,10 @@ import PDFUploader from '@/components/document/PDFUploader';
 import DocumentCardSkeleton from '@/components/document/DocumentCardSkeleton';
 import { Button } from '@/components/ui/button';
 import { Plus, Upload, RefreshCcw } from 'lucide-react';
+import { toast } from '@/components/ui/use-toast';
 
 export default function DocumentsPage() {
-  const { documents, searchResults, isSearching, handleSearch, refreshDocuments, isRefreshing } = useDocuments();
+  const { documents, searchResults, isSearching, handleSearch, refreshDocuments, isRefreshing, isLoading } = useDocuments();
 
   useEffect(() => {
     // Refresh documents when page loads
@@ -21,6 +22,10 @@ export default function DocumentsPage() {
 
   const handleRefresh = useCallback(() => {
     refreshDocuments();
+    toast({
+      title: "Refreshing documents",
+      description: "Your documents are being refreshed from the database."
+    });
   }, [refreshDocuments]);
 
   return (
@@ -40,7 +45,7 @@ export default function DocumentsPage() {
                 variant="outline"
                 size="sm"
                 onClick={handleRefresh}
-                disabled={isRefreshing}
+                disabled={isRefreshing || isLoading}
               >
                 <RefreshCcw className={`h-4 w-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
                 Refresh
@@ -69,14 +74,14 @@ export default function DocumentsPage() {
               Your Documents
             </h2>
             
-            {isSearching ? (
+            {isLoading || isRefreshing ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {[1, 2, 3].map((i) => (
                   <DocumentCardSkeleton key={i} />
                 ))}
               </div>
             ) : (
-              <DocumentList documents={searchResults.length > 0 ? searchResults : documents} />
+              <DocumentList documents={documents} />
             )}
           </div>
         </div>

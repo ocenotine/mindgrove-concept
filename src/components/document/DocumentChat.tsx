@@ -1,18 +1,16 @@
 
-import React, { useState } from 'react';
-import { Button } from '@/components/ui/button';
+import React, { useState, useRef, useEffect } from 'react';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { Send, Bot, User, MessagesSquare } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Send, Bot, User, Loader } from 'lucide-react';
+import { toast } from '@/hooks/use-toast';
 import { chatWithDocument } from '@/utils/nlpUtils';
-import { toast } from '@/components/ui/use-toast';
-import { getOpenRouterApiKey } from '@/utils/openRouterUtils';
+import { ChatMessage } from '@/types/chat';
 import { TypingIndicator } from '@/components/animations/TypingIndicator';
-
-interface Message {
-  role: 'user' | 'assistant';
-  content: string;
-}
+import { supabase } from '@/integrations/supabase/client';
+import { useAuthStore } from '@/store/authStore';
+import { v4 as uuidv4 } from 'uuid';
 
 interface DocumentChatProps {
   documentId: string;
@@ -20,136 +18,218 @@ interface DocumentChatProps {
 }
 
 const DocumentChat: React.FC<DocumentChatProps> = ({ documentId, documentText }) => {
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [input, setInput] = useState('');
+  const [message, setMessage] = useState('');
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isInitialPromptShown, setIsInitialPromptShown] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const { user } = useAuthStore();
+  
+  // Load existing chat messages when component mounts
+  useEffect(() => {
+    if (documentId && user) {
+      loadChatHistory();
+    }
+    
+    // If we have no messages, suggest some initial prompts
+    if (!isInitialPromptShown) {
+      setIsInitialPromptShown(true);
+      const initialMessage: ChatMessage = {
+        id: uuidv4(),
+        role: 'assistant',
+        content: 'Hello! I can help you understand this document better. You can ask me questions like "What are the main topics?", "Explain the key findings", or "Summarize the conclusion".',
+        timestamp: new Date(),
+      };
+      setMessages([initialMessage]);
+    }
+  }, [documentId, user]);
+
+  // Scroll to bottom when messages update
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
+
+  // Load chat history from Supabase
+  const loadChatHistory = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('document_chats')
+        .select('*')
+        .eq('document_id', documentId)
+        .eq('user_id', user?.id)
+        .order('created_at', { ascending: true });
+        
+      if (error) throw error;
+      
+      if (data && data.length > 0) {
+        const formattedMessages: ChatMessage[] = data.map(chat => ({
+          id: chat.id,
+          role: chat.role as 'user' | 'assistant',
+          content: chat.content,
+          timestamp: new Date(chat.created_at),
+        }));
+        setMessages(formattedMessages);
+      }
+    } catch (error) {
+      console.error('Error loading chat history:', error);
+    }
+  };
+
+  // Save message to Supabase
+  const saveChatMessage = async (message: ChatMessage) => {
+    if (!user) return;
+    
+    try {
+      await supabase.from('document_chats').insert({
+        id: message.id,
+        document_id: documentId,
+        user_id: user.id,
+        role: message.role,
+        content: message.content,
+      });
+    } catch (error) {
+      console.error('Error saving chat message:', error);
+    }
+  };
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
 
   const handleSendMessage = async () => {
-    if (!input.trim() || isLoading) return;
-
-    const userMessage = input.trim();
-    setInput('');
+    if (!message.trim() || isLoading) return;
     
-    // Check if API key exists
-    const apiKey = getOpenRouterApiKey();
-    if (!apiKey) {
-      toast({
-        title: "API Key Required",
-        description: "Please set your OpenRouter API key to use the chat feature.",
-        variant: "destructive"
-      });
-      return;
-    }
+    const userMessage: ChatMessage = {
+      id: uuidv4(),
+      role: 'user',
+      content: message.trim(),
+      timestamp: new Date(),
+    };
 
-    // Add user message
-    setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
-    
+    setMessages(prev => [...prev, userMessage]);
+    setMessage('');
     setIsLoading(true);
+
     try {
-      // Call API to get response
-      const response = await chatWithDocument(documentId, documentText, userMessage);
+      // Save user message to database
+      await saveChatMessage(userMessage);
       
-      if (!response.success) {
-        throw new Error(response.error || "Failed to generate response");
+      // Generate AI response
+      const response = await chatWithDocument(documentId, documentText, userMessage.content);
+      
+      if (response.success) {
+        const assistantMessage: ChatMessage = {
+          id: uuidv4(),
+          role: 'assistant',
+          content: response.response,
+          timestamp: new Date(),
+        };
+        
+        setMessages(prev => [...prev, assistantMessage]);
+        
+        // Save assistant message to database
+        await saveChatMessage(assistantMessage);
+      } else {
+        throw new Error(response.error || 'Failed to generate response');
       }
-      
-      // Add assistant message
-      setMessages(prev => [...prev, { role: 'assistant', content: response.response }]);
     } catch (error) {
-      console.error("Error in document chat:", error);
+      console.error('Chat error:', error);
       toast({
-        title: "Chat Error",
-        description: error instanceof Error ? error.message : "Failed to generate a response",
-        variant: "destructive"
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to generate a response.',
+        variant: 'destructive',
       });
     } finally {
       setIsLoading(false);
+      scrollToBottom();
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
     }
   };
 
   return (
-    <Card className="h-[500px] flex flex-col">
-      <CardHeader>
+    <Card className="h-full flex flex-col">
+      <CardHeader className="pb-3">
         <CardTitle className="flex items-center gap-2">
-          <MessagesSquare className="h-5 w-5 text-primary" />
-          Chat with Document
+          <Bot className="h-5 w-5 text-primary" />
+          Document AI Chat
         </CardTitle>
+        <CardDescription>
+          Ask questions about this document
+        </CardDescription>
       </CardHeader>
-      
-      <CardContent className="flex-1 overflow-y-auto mb-2">
+      <CardContent className="flex-grow overflow-y-auto max-h-[400px] scrollbar-thin pb-0">
         <div className="space-y-4">
-          {messages.length === 0 ? (
-            <div className="text-center text-muted-foreground py-6">
-              <Bot className="h-8 w-8 mx-auto mb-2 opacity-50" />
-              <p>Ask questions about this document</p>
-            </div>
-          ) : (
-            messages.map((message, index) => (
+          {messages.map((msg) => (
+            <div 
+              key={msg.id}
+              className={`flex items-start gap-3 ${
+                msg.role === 'assistant' ? 'justify-start' : 'justify-end'
+              }`}
+            >
               <div 
-                key={index} 
-                className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                className={`flex gap-3 max-w-[80%] ${
+                  msg.role === 'assistant' ? 'flex-row' : 'flex-row-reverse'
+                }`}
               >
+                <div className={`p-2 rounded-full ${
+                  msg.role === 'assistant' 
+                    ? 'bg-primary/10 text-primary' 
+                    : 'bg-muted text-foreground'
+                }`}>
+                  {msg.role === 'assistant' ? (
+                    <Bot className="h-5 w-5" />
+                  ) : (
+                    <User className="h-5 w-5" />
+                  )}
+                </div>
                 <div 
-                  className={`
-                    ${message.role === 'user' 
-                      ? 'bg-primary text-primary-foreground' 
-                      : 'bg-muted'
-                    }
-                    rounded-lg px-4 py-2 max-w-[75%] break-words
-                  `}
+                  className={`p-3 rounded-lg text-sm ${
+                    msg.role === 'assistant'
+                      ? 'bg-muted/60 border border-border/40'
+                      : 'bg-primary text-primary-foreground'
+                  }`}
                 >
-                  <div className="flex items-center mb-1">
-                    {message.role === 'user' ? (
-                      <>
-                        <span className="font-medium">You</span>
-                        <User className="h-3 w-3 ml-1" />
-                      </>
-                    ) : (
-                      <>
-                        <Bot className="h-3 w-3 mr-1" />
-                        <span className="font-medium">AI Assistant</span>
-                      </>
-                    )}
-                  </div>
-                  <div className="whitespace-pre-line">{message.content}</div>
+                  {msg.content}
                 </div>
               </div>
-            ))
-          )}
-          
+            </div>
+          ))}
           {isLoading && (
-            <div className="flex justify-start">
-              <div className="bg-muted rounded-lg px-4 py-2">
-                <div className="flex items-center">
-                  <Bot className="h-3 w-3 mr-1" />
-                  <span className="font-medium">AI Assistant</span>
-                </div>
+            <div className="flex items-start gap-3">
+              <div className="p-2 rounded-full bg-primary/10 text-primary">
+                <Bot className="h-5 w-5" />
+              </div>
+              <div className="p-3 rounded-lg bg-muted/60 border border-border/40">
                 <TypingIndicator />
               </div>
             </div>
           )}
+          <div ref={messagesEndRef} />
         </div>
       </CardContent>
-      
-      <CardFooter className="border-t pt-4">
-        <div className="flex w-full gap-2">
+      <CardFooter className="border-t pt-4 mt-4">
+        <div className="flex w-full items-center space-x-2">
           <Input
-            placeholder="Ask questions about this document..."
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                handleSendMessage();
-              }
-            }}
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder="Ask a question about this document..."
             disabled={isLoading}
+            className="flex-1"
           />
           <Button 
+            type="submit" 
+            size="icon"
+            disabled={isLoading || !message.trim()}
             onClick={handleSendMessage}
-            disabled={!input.trim() || isLoading}
           >
-            <Send className="h-4 w-4" />
-            <span className="sr-only">Send</span>
+            {isLoading ? <Loader className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
           </Button>
         </div>
       </CardFooter>

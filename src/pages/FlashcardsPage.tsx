@@ -8,22 +8,23 @@ import MainLayout from '@/components/layout/MainLayout';
 import FlashcardDeck from '@/components/flashcards/FlashcardDeck';
 import { motion } from 'framer-motion';
 import { PlusCircle, Layers, Sparkles } from 'lucide-react';
-import { toast } from '@/components/ui/use-toast';
+import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/store/authStore';
 
-interface Flashcard {
+// Define a consistent Flashcard interface across the app
+export interface Flashcard {
   id: string;
   question: string;
   answer: string;
-  front_content?: string;
-  back_content?: string;
   documentId?: string;
   document_id?: string;
   createdAt?: string;
   created_at?: string;
   userId?: string;
   user_id?: string;
+  front_content?: string;
+  back_content?: string;
 }
 
 const FlashcardsPage = () => {
@@ -61,8 +62,10 @@ const FlashcardsPage = () => {
       // Map database fields to our flashcard interface
       const formattedFlashcards = data.map(card => ({
         id: card.id,
-        question: card.front_content || card.question || '',
-        answer: card.back_content || card.answer || '',
+        question: card.front_content || '',
+        answer: card.back_content || '',
+        front_content: card.front_content || '',
+        back_content: card.back_content || '',
         documentId: card.document_id || '',
         createdAt: card.created_at || '',
         userId: card.user_id || ''

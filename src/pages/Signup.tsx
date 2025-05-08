@@ -1,12 +1,13 @@
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
-import { toast } from '@/components/ui/use-toast';
+import { toast } from '@/hooks/use-toast';
 import { PageTransition } from '@/components/animations/PageTransition';
-import { Mail, Lock, User, ArrowRight, LogIn, UserPlus, ArrowLeft } from 'lucide-react';
+import { Mail, Lock, User, ArrowRight, UserPlus, ArrowLeft, Check, X } from 'lucide-react';
 import ParallaxScroll from '@/components/animations/ParallaxScroll';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
@@ -26,6 +27,40 @@ const Signup = () => {
   const [domain, setDomain] = useState('');
   
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Password strength validation
+  const [passwordStrength, setPasswordStrength] = useState({
+    minLength: false,
+    hasNumber: false,
+    hasLetter: false,
+    hasSymbol: false
+  });
+  
+  const updatePasswordStrength = (password: string) => {
+    setPasswordStrength({
+      minLength: password.length >= 8,
+      hasNumber: /\d/.test(password),
+      hasLetter: /[a-zA-Z]/.test(password),
+      hasSymbol: /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]+/.test(password)
+    });
+  };
+  
+  useEffect(() => {
+    updatePasswordStrength(studentPassword);
+  }, [studentPassword]);
+  
+  useEffect(() => {
+    updatePasswordStrength(adminPassword);
+  }, [adminPassword]);
+  
+  const isPasswordStrong = (password: string): boolean => {
+    return (
+      password.length >= 8 && 
+      /\d/.test(password) && 
+      /[a-zA-Z]/.test(password) && 
+      /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]+/.test(password)
+    );
+  };
 
   if (isAuthenticated) {
     navigate('/dashboard');
@@ -38,6 +73,17 @@ const Signup = () => {
 
   const handleStudentSignup = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate password strength
+    if (!isPasswordStrong(studentPassword)) {
+      toast({
+        title: "Password too weak",
+        description: "Please create a stronger password with at least 8 characters, including numbers, letters, and symbols.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
     setIsLoading(true);
     
     try {
@@ -63,6 +109,17 @@ const Signup = () => {
   
   const handleInstitutionSignup = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate password strength
+    if (!isPasswordStrong(adminPassword)) {
+      toast({
+        title: "Password too weak",
+        description: "Please create a stronger password with at least 8 characters, including numbers, letters, and symbols.",
+        variant: "destructive"
+      });
+      return;
+    }
+    
     setIsLoading(true);
     
     try {
@@ -102,6 +159,20 @@ const Signup = () => {
       });
     }
   };
+
+  // Password requirement checklist item component
+  const PasswordRequirement = ({ met, label }: { met: boolean; label: string }) => (
+    <div className="flex items-center gap-2 text-xs">
+      {met ? (
+        <Check className="h-3 w-3 text-green-500" />
+      ) : (
+        <X className="h-3 w-3 text-gray-400" />
+      )}
+      <span className={met ? "text-green-600 dark:text-green-400" : "text-muted-foreground"}>
+        {label}
+      </span>
+    </div>
+  );
 
   return (
     <PageTransition>
@@ -177,19 +248,33 @@ const Signup = () => {
                             value={studentPassword}
                             onChange={(e) => setStudentPassword(e.target.value)}
                             required
-                            minLength={6}
                             className="pl-10"
                           />
                         </div>
-                        <p className="text-xs text-muted-foreground">
-                          Must be at least 6 characters
-                        </p>
+                        <div className="mt-2 space-y-1">
+                          <PasswordRequirement 
+                            met={passwordStrength.minLength} 
+                            label="At least 8 characters" 
+                          />
+                          <PasswordRequirement 
+                            met={passwordStrength.hasLetter} 
+                            label="Contains letters" 
+                          />
+                          <PasswordRequirement 
+                            met={passwordStrength.hasNumber} 
+                            label="Contains numbers" 
+                          />
+                          <PasswordRequirement 
+                            met={passwordStrength.hasSymbol} 
+                            label="Contains symbols" 
+                          />
+                        </div>
                       </div>
                       
                       <Button 
                         type="submit" 
                         className="w-full"
-                        disabled={isLoading}
+                        disabled={isLoading || !isPasswordStrong(studentPassword)}
                       >
                         {isLoading ? (
                           <span className="flex items-center">
@@ -308,18 +393,32 @@ const Signup = () => {
                             value={adminPassword}
                             onChange={(e) => setAdminPassword(e.target.value)}
                             required
-                            minLength={6}
                           />
                         </div>
-                        <p className="text-xs text-muted-foreground">
-                          Must be at least 6 characters
-                        </p>
+                        <div className="mt-2 space-y-1">
+                          <PasswordRequirement 
+                            met={passwordStrength.minLength} 
+                            label="At least 8 characters" 
+                          />
+                          <PasswordRequirement 
+                            met={passwordStrength.hasLetter} 
+                            label="Contains letters" 
+                          />
+                          <PasswordRequirement 
+                            met={passwordStrength.hasNumber} 
+                            label="Contains numbers" 
+                          />
+                          <PasswordRequirement 
+                            met={passwordStrength.hasSymbol} 
+                            label="Contains symbols" 
+                          />
+                        </div>
                       </div>
                       
                       <Button 
                         type="submit" 
                         className="w-full"
-                        disabled={isLoading}
+                        disabled={isLoading || !isPasswordStrong(adminPassword)}
                       >
                         {isLoading ? "Creating account..." : "Create institution account"}
                       </Button>

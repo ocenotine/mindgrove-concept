@@ -12,13 +12,21 @@ import { Link } from 'react-router-dom';
 import ContactForm from '@/components/common/ContactForm';
 import LeaderboardCard from '@/components/dashboard/LeaderboardCard';
 import QuoteWidget from '@/components/dashboard/QuoteWidget';
+import { adaptStoreDocumentsToMockDocuments } from '@/utils/documentAdapter';
 
 const Dashboard = () => {
   const { user } = useAuthStore();
-  const { documents } = useDocuments();
+  const { documents, refreshDocuments } = useDocuments();
   
-  // Only show user's actual documents (not demo documents)
-  const recentDocuments = user ? documents.filter(doc => doc.userId === user.id).slice(0, 3) : [];
+  useEffect(() => {
+    // Refresh documents when page loads to get real-time data
+    refreshDocuments();
+  }, [refreshDocuments]);
+  
+  // Only show user's actual documents (filter by user_id)
+  const recentDocuments = user && documents.length > 0 
+    ? adaptStoreDocumentsToMockDocuments(documents.filter(doc => doc.user_id === user.id)).slice(0, 3)
+    : [];
 
   const container = {
     hidden: { opacity: 0 },

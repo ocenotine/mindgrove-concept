@@ -26,10 +26,19 @@ import InstitutionAIChat from './pages/InstitutionAIChat';
 import AuthCallback from './pages/AuthCallback';
 import ProgressPage from './pages/ProgressPage';
 import QuizPage from './pages/QuizPage';
+import AdminLogin from './pages/AdminLogin';
+import AdminDashboard from './pages/AdminDashboard';
+import QuizPractice from './pages/QuizPractice';
+import QuizEdit from './pages/QuizEdit';
+
+// Add BackToTop component
+import BackToTop from './components/ui/BackToTop';
+import { useAuthStore } from '@/store/authStore';
 
 function App() {
   const location = useLocation();
   const navigate = useNavigate();
+  const { user, isAuthenticated } = useAuthStore();
   
   // Ensure index route redirects correctly
   useEffect(() => {
@@ -37,6 +46,24 @@ function App() {
       navigate('/landing', { replace: true });
     }
   }, [location, navigate]);
+  
+  // Handle redirection based on user account type
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      const accountType = user.user_metadata?.account_type || user.account_type;
+      const currentPath = location.pathname;
+
+      // Redirect to appropriate dashboard based on account type
+      if (accountType === 'admin' && 
+          currentPath === '/dashboard' || 
+          currentPath === '/institution/dashboard') {
+        navigate('/admin/dashboard', { replace: true });
+      } else if (accountType === 'institution' && 
+                currentPath === '/dashboard') {
+        navigate('/institution/dashboard', { replace: true });
+      }
+    }
+  }, [isAuthenticated, user, location.pathname, navigate]);
   
   return (
     <Suspense fallback={<div className="h-screen w-screen flex items-center justify-center"><LoadingScreen /></div>}>
@@ -57,6 +84,8 @@ function App() {
         <Route path="/flashcards" element={<FlashcardsPage />} />
         <Route path="/progress" element={<ProgressPage />} />
         <Route path="/quiz" element={<QuizPage />} />
+        <Route path="/quiz/practice/:id" element={<QuizPractice />} />
+        <Route path="/quiz/edit/:id" element={<QuizEdit />} />
         
         {/* Institution Routes */}
         <Route path="/institution/dashboard" element={<InstitutionDashboard />} />
@@ -64,6 +93,10 @@ function App() {
         <Route path="/institution/subscription" element={<InstitutionSubscription />} />
         <Route path="/institution/users" element={<InstitutionUsers />} />
         <Route path="/institution/ai-chat" element={<InstitutionAIChat />} />
+        
+        {/* Admin Routes */}
+        <Route path="/admin/login" element={<AdminLogin />} />
+        <Route path="/admin/dashboard" element={<AdminDashboard />} />
         
         {/* Common Routes */}
         <Route path="/profile" element={<ProfilePage />} />
@@ -74,6 +107,9 @@ function App() {
         {/* 404 Route - MUST be last */}
         <Route path="*" element={<NotFound />} />
       </Routes>
+      
+      {/* Global BackToTop component */}
+      <BackToTop />
     </Suspense>
   );
 }

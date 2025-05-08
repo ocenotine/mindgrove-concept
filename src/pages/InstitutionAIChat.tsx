@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import InstitutionLayout from '@/components/layout/InstitutionLayout';
 import { PageTransition } from '@/components/animations/PageTransition';
@@ -45,12 +44,10 @@ const InstitutionAIChat = () => {
     "Generate citations for recent papers about machine learning in healthcare"
   ];
 
-  // Scroll to bottom of messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [activeSession?.messages]);
 
-  // Check premium status
   useEffect(() => {
     const checkPremiumStatus = async () => {
       try {
@@ -76,7 +73,6 @@ const InstitutionAIChat = () => {
     
     checkPremiumStatus();
     
-    // Create mock chat sessions
     const mockSessions: ChatSession[] = [
       {
         id: '1',
@@ -131,7 +127,6 @@ const InstitutionAIChat = () => {
     
     setIsSending(true);
     
-    // Add user message
     const userMessage: Message = {
       id: Date.now().toString(),
       role: 'user',
@@ -147,7 +142,6 @@ const InstitutionAIChat = () => {
     setActiveSession(updatedSession);
     setInputMessage('');
     
-    // Simulate AI response after a delay
     setTimeout(() => {
       const aiResponses = [
         "Based on recent academic literature, the trends you're asking about show significant growth in the past five years. Several key papers from top journals highlight the importance of this area. Would you like me to provide specific citations?",
@@ -171,7 +165,6 @@ const InstitutionAIChat = () => {
       
       setActiveSession(finalUpdatedSession);
       
-      // Update sessions list
       setChatSessions(prev => 
         prev.map(session => 
           session.id === activeSession!.id ? finalUpdatedSession : session
@@ -222,8 +215,7 @@ const InstitutionAIChat = () => {
     navigator.clipboard.writeText(text);
     toast({
       title: "Copied to clipboard",
-      description: "Text copied successfully",
-      duration: 2000,
+      description: "Text copied successfully"
     });
   };
 
@@ -247,7 +239,6 @@ const InstitutionAIChat = () => {
       <PageTransition>
         <div className="pb-10 h-[calc(100vh-80px)]">
           <div className="flex h-full">
-            {/* Chat Sessions Sidebar */}
             <div className="hidden md:block w-64 border-r border-gray-800 h-full overflow-y-auto pr-2">
               <div className="p-4">
                 <Button
@@ -286,9 +277,7 @@ const InstitutionAIChat = () => {
               </div>
             </div>
             
-            {/* Main Chat Area */}
             <div className="flex-1 flex flex-col h-full overflow-hidden">
-              {/* Chat Header */}
               <div className="border-b border-gray-800 py-3 px-4 flex items-center justify-between">
                 <div>
                   <h2 className="font-semibold text-white">{activeSession?.title}</h2>
@@ -315,7 +304,6 @@ const InstitutionAIChat = () => {
                 </div>
               </div>
               
-              {/* Messages Area */}
               <div className="flex-1 overflow-y-auto p-4 space-y-6">
                 {activeSession?.messages.map((message) => (
                   <div 
@@ -355,7 +343,6 @@ const InstitutionAIChat = () => {
                 <div ref={messagesEndRef} />
               </div>
               
-              {/* Research Prompt Suggestions */}
               {isPremium && (
                 <div className="px-4 py-2 border-t border-gray-800 flex items-center gap-2 overflow-x-auto">
                   {researchPrompts.map((prompt, index) => (
@@ -372,7 +359,6 @@ const InstitutionAIChat = () => {
                 </div>
               )}
               
-              {/* Input Area */}
               <div className="border-t border-gray-800 p-4">
                 <div className="relative">
                   <Textarea

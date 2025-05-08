@@ -1,3 +1,4 @@
+
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDocuments } from '@/hooks/useDocuments';
@@ -5,10 +6,11 @@ import { useAuthStore } from '@/store/authStore';
 import { Button } from '@/components/ui/button';
 import { ArrowRight } from 'lucide-react';
 import BackgroundAnimation from '@/components/animations/BackgroundAnimation';
+import LoadingAnimation from '@/components/animations/LoadingAnimation';
 
 export default function Index() {
   const navigate = useNavigate();
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, loading: authLoading } = useAuthStore();
   const { refreshDocuments } = useDocuments();
 
   useEffect(() => {
@@ -16,8 +18,20 @@ export default function Index() {
     if (isAuthenticated) {
       refreshDocuments();
       navigate('/dashboard');
+    } else if (!authLoading) {
+      // Only navigate to landing if we've confirmed user is not authenticated
+      navigate('/landing', { replace: true });
     }
-  }, [isAuthenticated, navigate, refreshDocuments]);
+  }, [isAuthenticated, authLoading, navigate, refreshDocuments]);
+
+  // Show loading while checking auth status
+  if (authLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <LoadingAnimation />
+      </div>
+    );
+  }
 
   // Only show this page if the user is not authenticated
   // Otherwise they'll be redirected to dashboard by the effect above
@@ -44,4 +58,4 @@ export default function Index() {
       </div>
     </div>
   );
-}
+};

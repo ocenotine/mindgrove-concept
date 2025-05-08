@@ -1,13 +1,13 @@
-
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { BookOpen, PenTool, Sparkles, Loader, AlertCircle } from 'lucide-react';
+import { BookOpen, PenTool, Sparkles, Loader, AlertCircle, Check } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { toast } from '@/components/ui/use-toast';
+import { toast } from '@/hooks/use-toast';
 import { motion } from 'framer-motion';
 import { generateSummary, generateFlashcards } from '@/utils/nlpUtils';
 import { useDocumentStore } from '@/store/documentStore';
 import { useNavigate } from 'react-router-dom';
+import ApiKeyReminder from './ApiKeyReminder';
 
 interface DocumentAIProps {
   documentId: string;
@@ -28,8 +28,25 @@ const DocumentAI: React.FC<DocumentAIProps> = ({
   const [isGeneratingFlashcards, setIsGeneratingFlashcards] = useState(false);
   const [progress, setProgress] = useState<number | null>(null);
   const [processingLargeDoc, setProcessingLargeDoc] = useState(false);
-  const { setDocumentSummary } = useDocumentStore();
+  const { setDocumentSummary, fetchFlashcards } = useDocumentStore();
   const navigate = useNavigate();
+  
+  useEffect(() => {
+    // Initial fetch of document data
+    const loadInitialData = async () => {
+      try {
+        // Load flashcards if any exist
+        const existingFlashcards = await fetchFlashcards(documentId);
+        if (existingFlashcards && existingFlashcards.length > 0) {
+          setFlashcards(existingFlashcards);
+        }
+      } catch (error) {
+        console.error("Error loading initial data:", error);
+      }
+    };
+    
+    loadInitialData();
+  }, [documentId, fetchFlashcards]);
   
   const handleGenerateSummary = async () => {
     if (!documentText || documentText.trim().length < 10) {
@@ -149,6 +166,8 @@ const DocumentAI: React.FC<DocumentAIProps> = ({
   
   return (
     <div className="space-y-6 ai-tools">
+      <ApiKeyReminder />
+      
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">

@@ -5,13 +5,14 @@ import MainLayout from '@/components/layout/MainLayout';
 import { PageTransition } from '@/components/animations/PageTransition';
 import { useDocuments } from '@/hooks/useDocuments';
 import { toast } from '@/components/ui/use-toast';
-import { ArrowLeft, Book, FileText, Calendar, Clock, Download } from 'lucide-react';
+import { ArrowLeft, Book, Calendar, Clock, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { formatDistanceToNow } from 'date-fns';
 import DocumentSummary from '@/components/document/DocumentSummary';
 import DocumentAI from '@/components/document/DocumentAI';
 import DocumentChat from '@/components/document/DocumentChat';
-import { Document } from '@/utils/mockData';
+import DocumentIcon from '@/components/document/DocumentIcon';
+import { Document } from '@/store/documentStore';
 import { supabase } from '@/integrations/supabase/client';
 
 export default function DocumentView() {
@@ -70,10 +71,22 @@ export default function DocumentView() {
     if (!document) return;
     
     try {
-      if (document.filePath) {
-        window.open(document.filePath, '_blank');
+      if (document.file_path) {
+        const { data, error } = await supabase.storage
+          .from('documents')
+          .download(document.file_path);
+          
+        if (error) throw error;
+        
+        const url = URL.createObjectURL(data);
+        const a = window.document.createElement('a');
+        a.href = url;
+        a.download = `${document.title}`;
+        window.document.body.appendChild(a);
+        a.click();
+        window.document.body.removeChild(a);
+        URL.revokeObjectURL(url);
       } else if (document.content) {
-        // For text content, create a downloadable blob
         const blob = new Blob([document.content], { type: 'text/plain' });
         const url = URL.createObjectURL(blob);
         const a = window.document.createElement('a');
@@ -83,11 +96,6 @@ export default function DocumentView() {
         a.click();
         window.document.body.removeChild(a);
         URL.revokeObjectURL(url);
-        
-        toast({
-          title: "Download started",
-          description: "Your document is being downloaded.",
-        });
       } else {
         toast({
           title: "No content available",
@@ -95,6 +103,11 @@ export default function DocumentView() {
           variant: "destructive",
         });
       }
+      
+      toast({
+        title: "Download started",
+        description: "Your document is being downloaded.",
+      });
     } catch (error) {
       console.error("Download error:", error);
       toast({
@@ -144,16 +157,16 @@ export default function DocumentView() {
                 <h1 className="text-3xl font-bold">{document.title}</h1>
                 <div className="flex flex-wrap gap-x-4 gap-y-2 mt-2 text-sm text-muted-foreground">
                   <div className="flex items-center">
-                    <FileText className="mr-1 h-4 w-4" />
-                    {document.fileType || "Text Document"}
+                    <DocumentIcon fileType={document.file_type} className="mr-1 h-4 w-4" />
+                    {document.file_type || "Text Document"}
                   </div>
                   <div className="flex items-center">
                     <Calendar className="mr-1 h-4 w-4" />
-                    Created {getTimeAgo(document.createdAt)}
+                    Created {getTimeAgo(document.created_at)}
                   </div>
                   <div className="flex items-center">
                     <Clock className="mr-1 h-4 w-4" />
-                    Updated {getTimeAgo(document.updatedAt)}
+                    Updated {getTimeAgo(document.updated_at)}
                   </div>
                 </div>
               </div>

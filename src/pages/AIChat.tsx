@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Bot, Send, User, FileText, XCircle, Settings } from 'lucide-react';
+import { Bot, Send, User, FileText, XCircle, Settings, BookOpen } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import MainLayout from '@/components/layout/MainLayout';
 import { PageTransition } from '@/components/animations/PageTransition';
@@ -13,12 +13,22 @@ import { TypingIndicator } from '@/components/animations/TypingIndicator';
 import { useAuthStore } from '@/store/authStore';
 import { supabase } from '@/integrations/supabase/client';
 import { generateGeneralChatResponse } from '@/utils/openRouterUtils';
+import DocumentIcon from '@/components/document/DocumentIcon';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface Message {
   id: string;
   content: string;
-  role: 'user' | 'assistant';
+  role: 'user' | 'assistant' | 'system';
   timestamp: Date;
+}
+
+interface Document {
+  id: string;
+  title: string;
+  file_type: string;
+  content?: string;
+  created_at: string;
 }
 
 const AIChat = () => {
@@ -30,9 +40,16 @@ const AIChat = () => {
   }]);
   const [inputMessage, setInputMessage] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [userDocuments, setUserDocuments] = useState<Document[]>([]);
+  const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(null);
+  const [documentContent, setDocumentContent] = useState<string>('');
+  const [activeTab, setActiveTab] = useState('chat');
+  
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { user } = useAuthStore();
+  const navigate = useNavigate();
 
+  // Scroll to bottom of messages
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
@@ -41,6 +58,69 @@ const AIChat = () => {
     scrollToBottom();
   }, [messages]);
 
+  // Fetch user's documents
+  useEffect(() => {
+    if (user) {
+      fetchUserDocuments();
+    }
+  }, [user]);
+
+  const fetchUserDocuments = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('documents')
+        .select('id, title, file_type, created_at')
+        .eq('user_id', user?.id)
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      if (error) throw error;
+      
+      if (data) {
+        setUserDocuments(data);
+      }
+    } catch (error) {
+      console.error('Error fetching documents:', error);
+    }
+  };
+
+  // Handle document selection
+  const handleSelectDocument = async (documentId: string) => {
+    try {
+      setSelectedDocumentId(documentId);
+      
+      const { data, error } = await supabase
+        .from('documents')
+        .select('content, title')
+        .eq('id', documentId)
+        .single();
+      
+      if (error) throw error;
+      
+      if (data) {
+        setDocumentContent(data.content || '');
+        
+        // Add a system message about the selected document
+        const systemMessage: Message = {
+          id: `system-${Date.now()}`,
+          content: `📄 Now discussing: "${data.title}". You can ask me questions about this document.`,
+          role: 'system',
+          timestamp: new Date()
+        };
+        
+        setMessages(prev => [...prev, systemMessage]);
+      }
+    } catch (error) {
+      console.error('Error fetching document content:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load document content.",
+        variant: "destructive",
+      });
+    }
+  };
+
+  // Generate chat response
   const handleSendMessage = async () => {
     if (!inputMessage.trim()) return;
 
@@ -56,7 +136,25 @@ const AIChat = () => {
     setIsProcessing(true);
 
     try {
-      const response = await generateGeneralChatResponse(userMessage.content);
+      let response: string;
+      
+      // If a document is selected, use that context for the response
+      if (selectedDocumentId && documentContent) {
+        // Use document content as context
+        const prompt = `
+Document content:
+${documentContent.substring(0, 3000)}
+
+User question:
+${userMessage.content}
+
+Please answer the user's question based on the document content.
+`;
+        response = await generateGeneralChatResponse(prompt);
+      } else {
+        // General chat without document context
+        response = await generateGeneralChatResponse(userMessage.content);
+      }
       
       const aiMessage: Message = {
         id: `ai-${Date.now()}`,
@@ -121,14 +219,25 @@ const AIChat = () => {
 
       setMessages(prev => [...prev, systemMessage]);
 
-      // Read file content if it's a text file
+      // Read file content
+      let content = '';
       if (file.type === 'text/plain') {
-        const text = await file.text();
-        await supabase
-          .from('documents')
-          .update({ content: text })
-          .eq('id', docData.id);
+        content = await file.text();
+      } else if (file.type === 'application/pdf') {
+        content = "PDF content extracted (text extraction simulation)";
+      } else {
+        content = `Document of type ${file.type} uploaded. Content extraction in progress.`;
       }
+
+      // Update document with content
+      await supabase
+        .from('documents')
+        .update({ content: content })
+        .eq('id', docData.id);
+
+      // Refresh documents list and select the new document
+      fetchUserDocuments();
+      handleSelectDocument(docData.id);
 
       toast({
         title: 'Document uploaded successfully',
@@ -167,94 +276,194 @@ const AIChat = () => {
                   <FileText className="h-4 w-4 mr-2" />
                   Upload Document
                 </Button>
-                <Button variant="outline">
-                  <Settings className="h-4 w-4 mr-2" />
-                  Settings
+                <Button variant="outline" onClick={() => navigate('/documents')}>
+                  <BookOpen className="h-4 w-4 mr-2" />
+                  My Documents
                 </Button>
               </div>
             </div>
 
-            <Card className="flex-1 flex flex-col overflow-hidden bg-background/50 backdrop-blur-sm border border-border/50">
-              <div className="flex-1 overflow-y-auto p-4 space-y-6">
-                <AnimatePresence initial={false}>
-                  {messages.map((message) => (
-                    <motion.div
-                      key={message.id}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -20 }}
-                      className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                    >
-                      <div className={`flex items-start max-w-[80%] space-x-2 ${
-                        message.role === 'user' ? 'flex-row-reverse' : 'flex-row'
-                      }`}>
-                        <div className={`p-1.5 rounded-full ${
-                          message.role === 'user' ? 'bg-primary/20' : 'bg-muted'
-                        }`}>
-                          {message.role === 'user' ? (
-                            <User className="h-4 w-4" />
-                          ) : (
-                            <Bot className="h-4 w-4" />
-                          )}
-                        </div>
-                        <div className={`rounded-lg p-4 ${
-                          message.role === 'user' 
-                            ? 'bg-primary text-primary-foreground' 
-                            : 'bg-muted'
-                        }`}>
-                          <div className="prose prose-sm dark:prose-invert">
-                            {message.content}
-                          </div>
-                          <div className="mt-2 text-xs opacity-70">
-                            {message.timestamp.toLocaleTimeString()}
-                          </div>
-                        </div>
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col">
+              <div className="border-b mb-4">
+                <TabsList>
+                  <TabsTrigger value="chat">Chat</TabsTrigger>
+                  <TabsTrigger value="documents">Documents</TabsTrigger>
+                </TabsList>
+              </div>
+              
+              <TabsContent value="chat" className="flex-1 flex flex-col">
+                <Card className="flex-1 flex flex-col overflow-hidden bg-background/50 backdrop-blur-sm border border-border/50">
+                  {selectedDocumentId && (
+                    <div className="bg-muted/30 px-4 py-2 border-b border-border/30 flex items-center justify-between">
+                      <div className="flex items-center text-sm">
+                        <DocumentIcon 
+                          fileType={userDocuments.find(doc => doc.id === selectedDocumentId)?.file_type} 
+                          className="h-4 w-4 mr-2" 
+                        />
+                        <span>
+                          Discussing: {userDocuments.find(doc => doc.id === selectedDocumentId)?.title}
+                        </span>
                       </div>
-                    </motion.div>
-                  ))}
-                  {isProcessing && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="flex justify-start"
-                    >
-                      <div className="flex items-start space-x-2">
-                        <div className="p-1.5 rounded-full bg-muted">
-                          <Bot className="h-4 w-4" />
-                        </div>
-                        <div className="rounded-lg p-4 bg-muted">
-                          <TypingIndicator />
-                        </div>
-                      </div>
-                    </motion.div>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={() => {
+                          setSelectedDocumentId(null);
+                          setDocumentContent('');
+                        }}
+                      >
+                        <XCircle className="h-3 w-3 mr-1" />
+                        Clear
+                      </Button>
+                    </div>
                   )}
-                </AnimatePresence>
-                <div ref={messagesEndRef} />
-              </div>
+                  
+                  <div className="flex-1 overflow-y-auto p-4 space-y-6">
+                    <AnimatePresence initial={false}>
+                      {messages.map((message) => (
+                        <motion.div
+                          key={message.id}
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -20 }}
+                          className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                        >
+                          {message.role === 'system' ? (
+                            <div className="w-full bg-muted/30 border border-border/40 rounded-lg p-3 text-center text-sm">
+                              {message.content}
+                            </div>
+                          ) : (
+                            <div className={`flex items-start max-w-[80%] space-x-2 ${
+                              message.role === 'user' ? 'flex-row-reverse' : 'flex-row'
+                            }`}>
+                              <div className={`p-1.5 rounded-full ${
+                                message.role === 'user' ? 'bg-primary/20' : 'bg-muted'
+                              }`}>
+                                {message.role === 'user' ? (
+                                  <User className="h-4 w-4" />
+                                ) : (
+                                  <Bot className="h-4 w-4" />
+                                )}
+                              </div>
+                              <div className={`rounded-lg p-4 ${
+                                message.role === 'user' 
+                                  ? 'bg-primary text-primary-foreground' 
+                                  : 'bg-muted'
+                              }`}>
+                                <div className="prose prose-sm dark:prose-invert">
+                                  {message.content}
+                                </div>
+                                <div className="mt-2 text-xs opacity-70">
+                                  {message.timestamp.toLocaleTimeString()}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </motion.div>
+                      ))}
+                      {isProcessing && (
+                        <motion.div
+                          initial={{ opacity: 0, y: 20 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          className="flex justify-start"
+                        >
+                          <div className="flex items-start space-x-2">
+                            <div className="p-1.5 rounded-full bg-muted">
+                              <Bot className="h-4 w-4" />
+                            </div>
+                            <div className="rounded-lg p-4 bg-muted">
+                              <TypingIndicator />
+                            </div>
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                    <div ref={messagesEndRef} />
+                  </div>
 
-              <div className="border-t border-border/50 p-4 backdrop-blur-sm">
-                <div className="flex space-x-2">
-                  <Textarea
-                    value={inputMessage}
-                    onChange={(e) => setInputMessage(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    placeholder="Type your message..."
-                    className="min-h-[60px] resize-none bg-background/50"
-                    disabled={isProcessing}
-                  />
-                  <Button 
-                    onClick={handleSendMessage} 
-                    disabled={!inputMessage.trim() || isProcessing}
-                    className="px-4"
-                  >
-                    <Send className="h-4 w-4" />
-                  </Button>
-                </div>
-                <p className="text-xs text-muted-foreground mt-2">
-                  Press Enter to send, Shift + Enter for new line
-                </p>
-              </div>
-            </Card>
+                  <div className="border-t border-border/50 p-4 backdrop-blur-sm">
+                    <div className="flex space-x-2">
+                      <Textarea
+                        value={inputMessage}
+                        onChange={(e) => setInputMessage(e.target.value)}
+                        onKeyDown={handleKeyDown}
+                        placeholder="Type your message..."
+                        className="min-h-[60px] resize-none bg-background/50"
+                        disabled={isProcessing}
+                      />
+                      <Button 
+                        onClick={handleSendMessage} 
+                        disabled={!inputMessage.trim() || isProcessing}
+                        className="px-4"
+                      >
+                        <Send className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Press Enter to send, Shift + Enter for new line
+                    </p>
+                  </div>
+                </Card>
+              </TabsContent>
+              
+              <TabsContent value="documents" className="flex-1">
+                <Card className="h-full">
+                  <div className="p-4">
+                    <h3 className="text-lg font-medium mb-4">Your Documents</h3>
+                    
+                    {userDocuments.length === 0 ? (
+                      <div className="text-center py-10 text-muted-foreground">
+                        <FileText className="h-10 w-10 mx-auto mb-2 opacity-50" />
+                        <p>You have not uploaded any documents yet.</p>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="mt-4"
+                          onClick={() => document.getElementById('file-upload')?.click()}
+                        >
+                          Upload your first document
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="grid gap-3">
+                        {userDocuments.map(doc => (
+                          <div 
+                            key={doc.id}
+                            className={`flex items-center p-3 rounded-md cursor-pointer hover:bg-muted transition-colors ${
+                              selectedDocumentId === doc.id ? 'bg-primary/10 border border-primary/20' : 'border'
+                            }`}
+                            onClick={() => handleSelectDocument(doc.id)}
+                          >
+                            <DocumentIcon fileType={doc.file_type} className="mr-3" />
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium truncate">{doc.title}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {new Date(doc.created_at).toLocaleDateString()}
+                              </p>
+                            </div>
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (selectedDocumentId === doc.id) {
+                                  setSelectedDocumentId(null);
+                                  setDocumentContent('');
+                                } else {
+                                  handleSelectDocument(doc.id);
+                                }
+                              }}
+                            >
+                              {selectedDocumentId === doc.id ? 'Deselect' : 'Select'}
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </Card>
+              </TabsContent>
+            </Tabs>
           </div>
         </div>
       </PageTransition>

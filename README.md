@@ -22,14 +22,16 @@
 4. [Project Structure](#-project-structure)
 5. [Getting Started](#-getting-started)
 6. [User Types](#-user-types)
-7. [API & Integration](#-api--integration)
-8. [Deployment](#-deployment)
+7. [Security Features](#-security-features)
+8. [API & Integration](#-api--integration)
+9. [Deployment](#-deployment)
+10. [Future Roadmap](#-future-roadmap)
 
 ---
 
 ## 📖 Introduction
 
-MindGrove is an innovative AI-powered platform designed to enhance academic research and learning through intelligent document analysis, summarization, and knowledge extraction. It aims to transform the way researchers, students, and educators interact with academic content, making knowledge more accessible and easier to retain.
+MindGrove is an innovative AI-powered platform designed to enhance academic research and learning through intelligent document analysis, summarization, and knowledge extraction. It transforms the way researchers, students, and educators interact with academic content, making knowledge more accessible and easier to retain.
 
 **Mission**: To make academic knowledge more accessible, comprehensible, and memorable through the power of artificial intelligence.
 
@@ -40,18 +42,27 @@ MindGrove is an innovative AI-powered platform designed to enhance academic rese
 ### 🤖 AI-Powered Document Intelligence
 - **Smart Summarization**: Automatically extract key concepts, findings, and conclusions
 - **Personalized Flashcard Generation**: Convert long documents into bite-sized learning material
-- **Context-Aware AI Chat**: Ask questions about your documents and get precise answers
+- **Context-Aware AI Chat**: Ask questions about your uploaded documents and get precise answers
+- **Document Text Extraction**: Full support for PDFs, DOCX, and TXT files with text extraction
 
 ### 📄 Document Management
 - Upload and organize PDFs, Word documents, and research papers
 - Automatic metadata extraction (authors, publication dates, keywords)
 - Search across your entire document library with semantic search
+- Visual document type identification with custom icons
 
 ### 📚 Learning Enhancement
 - Interactive flashcards with spaced repetition
 - Knowledge tracking to monitor progress
 - Citation management for academic writing
 - Gamified learning with streaks and achievements
+
+### 🔒 Security & Account Management
+- Strong password enforcement (8+ chars, mixed character types)
+- Two-factor authentication support
+- 30-minute inactivity auto-logout protection
+- Profile customization with avatar and bio
+- Email notification preferences
 
 ### 🏆 Student Leaderboard
 - Top students ranked by research streaks
@@ -62,13 +73,21 @@ MindGrove is an innovative AI-powered platform designed to enhance academic rese
 - Clean, modern interface with light/dark mode
 - Mobile-optimized for learning on-the-go
 - Guided onboarding for new users
-- Companion app for learning on the go
+- Responsive design for all devices
+- Real-time upload progress indicators
 
 ### 🏫 Institutional Tools
 - Custom branding options for institutions
 - Analytics dashboard for tracking student engagement 
 - User management and reporting
 - Research collaboration portals
+
+### 👑 Admin Dashboard
+- Comprehensive user management system
+- Document approval and moderation
+- System health monitoring
+- Analytics and usage statistics
+- Access control and permissions
 
 ---
 
@@ -82,12 +101,14 @@ MindGrove is built with modern, robust technologies to ensure performance, scala
 - **Framer Motion** for animations
 - **Tanstack Query** for data fetching and state management
 - **Recharts** for data visualization
+- **Lucide React** for consistent iconography
 
 ### Backend & Services
 - **Supabase** for authentication, database, and storage
-- **OpenRouter API** for document understanding and generation
+- **OpenRouter API** for document understanding and AI chat capabilities
 - **PDF.js** for document rendering and text extraction
 - **Edge Functions** for serverless backend operations
+- **Row-Level Security** for data protection
 
 ---
 
@@ -167,6 +188,11 @@ npm run build
 yarn build
 ```
 
+### Admin Access
+For admin dashboard access, use these credentials:
+- Email: mindgroveai@gmail.com
+- Password: mindgroveai
+
 ---
 
 ## 👥 User Types
@@ -178,12 +204,32 @@ yarn build
 - Mobile companion app
 - Participation in leaderboards
 
+### Admin Users
+- Complete system management
+- User approval and moderation
+- Document oversight
+- Analytics and reporting
+- System health monitoring
+
 ### Institutional Users
 - All student features
 - Advanced analytics dashboard
 - Research collaboration portals
 - Custom branding options
 - Automated report generation
+
+---
+
+## 🔒 Security Features
+
+MindGrove implements several security best practices:
+
+- **Strong Password Policy**: Minimum 8 characters with mixed character types
+- **Session Management**: 30-minute inactivity timeout with auto-logout
+- **Two-Factor Authentication**: Optional additional security layer
+- **Row-Level Security**: Database-level security for data isolation
+- **Secure Authentication Flow**: Email verification with auto-login support
+- **Encrypted Storage**: Secure document and user data storage
 
 ---
 
@@ -198,6 +244,7 @@ MindGrove integrates with several powerful APIs:
 
 ### OpenRouter API
 - Used for document summarization, flashcard generation, and contextual chat
+- Context-aware queries about uploaded documents
 
 ### PDF Processing
 - PDF.js for client-side text extraction
@@ -212,6 +259,19 @@ MindGrove is deployed using:
 - Frontend: Vercel/Netlify for static site hosting
 - Backend: Supabase Cloud for database, auth, and storage
 - Edge Functions: Supabase Edge Functions for serverless backend logic
+
+---
+
+## 🔮 Future Roadmap
+
+- **Advanced Document Analysis**: Enhanced OCR for handwritten notes
+- **Collaborative Study Rooms**: Real-time document collaboration
+- **AI Tutoring**: Personalized learning paths with AI tutoring
+- **Mobile App**: Native mobile experience for iOS and Android
+- **Research Paper Generator**: AI-assisted academic writing tool
+- **Expanded Language Support**: Multi-language support for global reach
+- **Integration with LMS Systems**: Connect with Canvas, Blackboard, etc.
+- **Improved Accessibility**: Enhanced screen reader compatibility
 
 ---
 

@@ -1,6 +1,12 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { generateDocumentChatResponse, generateDocumentSummary as generateOpenRouterSummary, generateFlashcards as generateOpenRouterFlashcards } from '@/utils/openRouterUtils';
+import { 
+  generateDocumentSummary as generateOpenRouterSummary, 
+  generateDocumentChatResponse as generateOpenRouterChatResponse,
+  generateFlashcards as generateOpenRouterFlashcards,
+  generateQuiz as generateOpenRouterQuiz,
+  getOpenRouterApiKey
+} from '@/utils/openRouterUtils';
 
 export const generateSummary = async (documentId: string, text: string) => {
   try {
@@ -33,7 +39,6 @@ export const generateSummary = async (documentId: string, text: string) => {
           }
         } catch (dbError) {
           console.error('Database error when saving summary:', dbError);
-          // Continue even if saving to DB fails
         }
       }
       
@@ -45,7 +50,6 @@ export const generateSummary = async (documentId: string, text: string) => {
       console.error('API error for summary:', apiError);
       throw apiError;
     }
-    
   } catch (error) {
     console.error('Error generating summary:', error);
     return { 
@@ -95,7 +99,6 @@ export const generateFlashcards = async (documentId: string, text: string) => {
         }
       } catch (dbError) {
         console.error('Error saving flashcards to database:', dbError);
-        // Continue even if saving to DB fails
       }
       
       return {
@@ -129,7 +132,7 @@ export const chatWithDocument = async (documentId: string, documentText: string,
     }
     
     // Use direct call to OpenRouter for document chat
-    const response = await generateDocumentChatResponse(documentText, userMessage);
+    const response = await generateOpenRouterChatResponse(documentText, userMessage);
     
     return {
       success: true,
@@ -140,6 +143,41 @@ export const chatWithDocument = async (documentId: string, documentText: string,
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to generate a response'
+    };
+  }
+};
+
+// Generate quiz questions
+export const generateQuizQuestions = async (documentId: string, documentText: string, numQuestions = 5, difficulty = 'medium') => {
+  try {
+    console.log(`Generating quiz questions for document ${documentId}`);
+    
+    if (!documentText || documentText.trim().length < 10) {
+      return { 
+        success: false, 
+        error: "Document content is too short to generate quiz questions.",
+        questions: []
+      };
+    }
+
+    try {
+      // Use the OpenRouter utils directly
+      const questions = await generateOpenRouterQuiz(documentText, numQuestions, difficulty);
+      
+      return {
+        success: true,
+        questions
+      };
+    } catch (apiError) {
+      console.error('API error for quiz generation:', apiError);
+      throw apiError;
+    }
+  } catch (error) {
+    console.error('Error generating quiz questions:', error);
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Failed to generate quiz questions',
+      questions: []
     };
   }
 };

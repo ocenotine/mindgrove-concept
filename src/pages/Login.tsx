@@ -17,15 +17,20 @@ const Login = () => {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  if (isAuthenticated) {
-    // Redirect based on account type
-    if (user?.user_metadata?.account_type === 'institution') {
-      navigate('/institution/dashboard');
-    } else {
-      navigate('/dashboard');
+  useEffect(() => {
+    if (isAuthenticated && user) {
+      // Redirect based on account type
+      const accountType = user.user_metadata?.account_type || user.account_type;
+      
+      if (accountType === 'admin') {
+        navigate('/admin/dashboard');
+      } else if (accountType === 'institution') {
+        navigate('/institution/dashboard');
+      } else {
+        navigate('/dashboard');
+      }
     }
-    return null;
-  }
+  }, [isAuthenticated, user, navigate]);
 
   const handleBackToLanding = () => {
     navigate('/landing');

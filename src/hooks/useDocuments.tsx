@@ -1,9 +1,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
-import { useDocumentStore } from '@/store/documentStore';
-import { Document } from '@/utils/mockData';
+import { useDocumentStore, Document } from '@/store/documentStore';
 import { useAuthStore } from '@/store/authStore';
-import { adaptToMockDocument, adaptStoreDocumentsToMockDocuments } from '@/utils/documentAdapter';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/components/ui/use-toast';
 
@@ -15,28 +13,25 @@ export const useDocuments = () => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   
   const { 
-    documents: storeDocuments,
-    currentDocument: storeCurrentDocument,
-    fetchDocuments: storeFetchDocuments,
-    searchDocuments: searchStoreDocuments,
-    fetchDocumentById: storeFetchDocumentById,
-    addDocument: storeAddDocument
+    documents,
+    currentDocument,
+    fetchDocuments,
+    searchDocuments,
+    fetchDocumentById,
+    addDocument,
+    isLoading
   } = useDocumentStore();
-
-  // Adapt store documents to mock documents
-  const documents = adaptStoreDocumentsToMockDocuments(storeDocuments || []);
-  const currentDocument = storeCurrentDocument ? adaptToMockDocument(storeCurrentDocument) : null;
 
   // Add refreshDocuments function
   const refreshDocuments = useCallback(async () => {
     if (!user?.id) {
-      console.warn("Cannot refresh documents: No authenticated user");
+      console.log("Cannot refresh documents: No authenticated user");
       return;
     }
     
     setIsRefreshing(true);
     try {
-      await storeFetchDocuments();
+      await fetchDocuments();
       setLastRefresh(Date.now());
     } catch (error) {
       console.error("Error refreshing documents:", error);
@@ -48,31 +43,15 @@ export const useDocuments = () => {
     } finally {
       setIsRefreshing(false);
     }
-  }, [user?.id, storeFetchDocuments]);
-
-  const fetchDocumentById = useCallback(async (id: string) => {
-    try {
-      const document = await storeFetchDocumentById(id);
-      return document ? adaptToMockDocument(document) : null;
-    } catch (error) {
-      console.error("Error fetching document by ID:", error);
-      toast({
-        title: "Error fetching document",
-        description: "Failed to load the document. Please try again.",
-        variant: "destructive"
-      });
-      return null;
-    }
-  }, [storeFetchDocumentById]);
+  }, [user?.id, fetchDocuments]);
 
   const handleSearch = useCallback(async (query: string): Promise<Document[]> => {
     setIsSearching(true);
     
     try {
-      const storeResults = searchStoreDocuments(query);
-      const mockResults = adaptStoreDocumentsToMockDocuments(storeResults);
-      setSearchResults(mockResults);
-      return mockResults;
+      const results = searchDocuments(query);
+      setSearchResults(results);
+      return results;
     } catch (error) {
       console.error("Error searching documents:", error);
       toast({
@@ -84,17 +63,38 @@ export const useDocuments = () => {
     } finally {
       setIsSearching(false);
     }
-  }, [searchStoreDocuments]);
-
-  const addDocument = useCallback(async (document: any) => {
-    return storeAddDocument(document);
-  }, [storeAddDocument]);
+  }, [searchDocuments]);
+  
+  // Set up realtime subscription for document updates
+  useEffect(() => {
+    if (!user?.id) return;
+    
+    const channel = supabase
+      .channel('document-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*', 
+          schema: 'public',
+          table: 'documents',
+          filter: `user_id=eq.${user.id}`
+        },
+        () => {
+          refreshDocuments();
+        }
+      )
+      .subscribe();
+    
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user?.id, refreshDocuments]);
 
   useEffect(() => {
-    if (user?.id) {
+    if (user?.id && documents.length === 0 && !isLoading) {
       refreshDocuments();
     }
-  }, [user?.id, refreshDocuments]);
+  }, [user?.id, documents.length, isLoading, refreshDocuments]);
 
   return {
     documents,
@@ -103,6 +103,7 @@ export const useDocuments = () => {
     currentDocument,
     lastRefresh,
     isRefreshing,
+    isLoading,
     refreshDocuments,
     fetchDocumentById,
     addDocument,

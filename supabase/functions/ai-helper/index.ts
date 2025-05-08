@@ -3,7 +3,7 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import "https://deno.land/x/xhr@0.1.0/mod.ts"; // Required for fetch in Deno
 
 // Get the API key from environment variables or use the provided one
-const OPENROUTER_API_KEY = Deno.env.get('OPENROUTER_API_KEY') || "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";
+const OPENROUTER_API_KEY = Deno.env.get('OPENROUTER_API_KEY') || "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";
 const DEFAULT_MODEL = 'openai/gpt-3.5-turbo';
 
 // CORS headers

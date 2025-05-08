@@ -10,18 +10,10 @@ import ProfileAvatar from '@/components/profile/ProfileAvatar';
 import ProfileStats from '@/components/profile/ProfileStats';
 import { Settings, Lock, Bell, Key } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { getOpenRouterApiKey } from '@/utils/openRouterUtils';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 
 export default function ProfilePage() {
   const { user } = useAuthStore();
-  const [apiKey, setApiKey] = useState('');
   
-  useEffect(() => {
-    setApiKey(getOpenRouterApiKey());
-  }, []);
-
   // Function to format email for display
   const formatEmail = (email: string) => {
     if (!email) return '';
@@ -69,16 +61,6 @@ export default function ProfilePage() {
                     </CardHeader>
                     <CardContent className="space-y-4">
                       <ProfileSettings />
-                      <div className="space-y-2">
-                        <Label htmlFor="api-key">OpenRouter API Key</Label>
-                        <Input 
-                          id="api-key"
-                          value={apiKey}
-                          readOnly
-                          className="font-mono bg-muted"
-                        />
-                        <p className="text-xs text-muted-foreground">API key is used for AI features like document analysis and chat.</p>
-                      </div>
                     </CardContent>
                   </Card>
                 </TabsContent>

@@ -1,9 +1,16 @@
 
 import { supabase } from '@/integrations/supabase/client';
 
-// Function to retrieve the API key from local storage or use the default one
+// Function to retrieve the API key - always returns the default one
 export const getOpenRouterApiKey = (): string => {
-  return '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';
+  // Always use the provided API key
+  return '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';
+};
+
+// Set the OpenRouter API key - kept for backwards compatibility
+export const setOpenRouterApiKey = (key: string): void => {
+  // This function is maintained for compatibility but doesn't actually store the key
+  console.log('Using default OpenRouter API key');
 };
 
 // Play a notification sound
@@ -16,40 +23,58 @@ export const playNotificationSound = async (): Promise<void> => {
   }
 };
 
-// Function to generate a response for general chat
-export const generateGeneralChatResponse = async (message: string): Promise<string> => {
+// Common function to call OpenRouter API with different prompts
+const callOpenRouter = async (
+  messages: Array<{role: string, content: string}>,
+  model: string = 'openai/gpt-3.5-turbo',
+  maxTokens: number = 1000,
+  temperature: number = 0.3
+): Promise<any> => {
   const apiKey = getOpenRouterApiKey();
   
   try {
-    console.log("Generating general chat response");
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
+        'Authorization': `Bearer ${apiKey}`,
+        'HTTP-Referer': 'https://mindgrove.app',
+        'X-Title': 'MindGrove AI'
       },
       body: JSON.stringify({
-        model: 'openai/gpt-3.5-turbo',
-        messages: [
-          {
-            role: 'system',
-            content: 'You are a helpful AI assistant for students. You provide concise, accurate, and helpful responses.'
-          },
-          {
-            role: 'user',
-            content: message
-          }
-        ],
-        max_tokens: 500
+        model,
+        messages,
+        temperature,
+        max_tokens: maxTokens
       })
     });
 
-    const data = await response.json();
-    
     if (!response.ok) {
-      console.error('OpenRouter API error:', data);
-      throw new Error(data.error?.message || 'Failed to generate response');
+      const errorText = await response.text();
+      throw new Error(`OpenRouter API returned status: ${response.status} - ${errorText}`);
     }
+    
+    return await response.json();
+  } catch (error) {
+    console.error('Error calling OpenRouter API:', error);
+    throw error;
+  }
+};
+
+// Function to generate a response for general chat
+export const generateGeneralChatResponse = async (message: string): Promise<string> => {
+  try {
+    console.log("Generating general chat response");
+    const data = await callOpenRouter([
+      {
+        role: 'system',
+        content: 'You are a helpful AI assistant for students. You provide concise, accurate, and helpful responses.'
+      },
+      {
+        role: 'user',
+        content: message
+      }
+    ]);
     
     return data.choices[0].message.content;
   } catch (error) {
@@ -60,8 +85,6 @@ export const generateGeneralChatResponse = async (message: string): Promise<stri
 
 // Function to generate a response for document chat
 export const generateDocumentChatResponse = async (documentText: string, userMessage: string): Promise<string> => {
-  const apiKey = getOpenRouterApiKey();
-  
   // Truncate document text to prevent token limits
   const truncatedText = documentText.length > 5000 
     ? documentText.substring(0, 5000) + '...' 
@@ -69,34 +92,16 @@ export const generateDocumentChatResponse = async (documentText: string, userMes
   
   try {
     console.log("Generating document chat response");
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
+    const data = await callOpenRouter([
+      {
+        role: 'system',
+        content: `You are a document assistant. Use the following document content to answer the user's questions: ${truncatedText}`
       },
-      body: JSON.stringify({
-        model: 'openai/gpt-3.5-turbo',
-        messages: [
-          {
-            role: 'system',
-            content: `You are a document assistant. Use the following document content to answer the user's questions: ${truncatedText}`
-          },
-          {
-            role: 'user',
-            content: userMessage
-          }
-        ],
-        max_tokens: 500
-      })
-    });
-
-    const data = await response.json();
-    
-    if (!response.ok) {
-      console.error('OpenRouter API error:', data);
-      throw new Error(data.error?.message || 'Failed to generate response');
-    }
+      {
+        role: 'user',
+        content: userMessage
+      }
+    ]);
     
     return data.choices[0].message.content;
   } catch (error) {
@@ -107,8 +112,6 @@ export const generateDocumentChatResponse = async (documentText: string, userMes
 
 // Function to generate detailed document summary
 export const generateDocumentSummary = async (documentText: string): Promise<string> => {
-  const apiKey = getOpenRouterApiKey();
-  
   // Process document text to handle larger documents
   const chunkSize = 12000; // Characters per chunk
   let summary = "";
@@ -117,34 +120,16 @@ export const generateDocumentSummary = async (documentText: string): Promise<str
     console.log("Generating document summary");
     // If the text is small enough for a single request
     if (documentText.length <= chunkSize) {
-      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`
+      const data = await callOpenRouter([
+        {
+          role: 'system',
+          content: 'You are a document summarization assistant specialized in creating detailed, comprehensive summaries. Analyze the document thoroughly and extract key concepts, main arguments, important details, methodologies, findings, and conclusions. Structure your summary with clear sections and bullet points where appropriate for better readability.'
         },
-        body: JSON.stringify({
-          model: 'openai/gpt-3.5-turbo',
-          messages: [
-            {
-              role: 'system',
-              content: 'You are a document summarization assistant specialized in creating detailed, comprehensive summaries. Analyze the document thoroughly and extract key concepts, main arguments, important details, methodologies, findings, and conclusions. Structure your summary with clear sections and bullet points where appropriate for better readability.'
-            },
-            {
-              role: 'user',
-              content: `Please create a detailed and comprehensive summary of the following document, covering all major points and key information: ${documentText}`
-            }
-          ],
-          max_tokens: 1000
-        })
-      });
-
-      const data = await response.json();
-      
-      if (!response.ok) {
-        console.error('OpenRouter API error:', data);
-        throw new Error(data.error?.message || 'Failed to generate summary');
-      }
+        {
+          role: 'user',
+          content: `Please create a detailed and comprehensive summary of the following document, covering all major points and key information: ${documentText}`
+        }
+      ], 'openai/gpt-3.5-turbo', 1000, 0.2);
       
       summary = data.choices[0].message.content;
     } 
@@ -159,34 +144,16 @@ export const generateDocumentSummary = async (documentText: string): Promise<str
       
       const chunkSummaries = [];
       for (let i = 0; i < chunks.length; i++) {
-        const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey}`
+        const data = await callOpenRouter([
+          {
+            role: 'system',
+            content: `You are summarizing part ${i+1} of ${chunks.length} of a document. Create a detailed summary of this section.`
           },
-          body: JSON.stringify({
-            model: 'openai/gpt-3.5-turbo',
-            messages: [
-              {
-                role: 'system',
-                content: `You are summarizing part ${i+1} of ${chunks.length} of a document. Create a detailed summary of this section.`
-              },
-              {
-                role: 'user',
-                content: `Please summarize this part of the document: ${chunks[i]}`
-              }
-            ],
-            max_tokens: 500
-          })
-        });
-        
-        const data = await response.json();
-        
-        if (!response.ok) {
-          console.error('OpenRouter API error:', data);
-          throw new Error(data.error?.message || `Failed to summarize part ${i+1}`);
-        }
+          {
+            role: 'user',
+            content: `Please summarize this part of the document: ${chunks[i]}`
+          }
+        ], 'openai/gpt-3.5-turbo', 500, 0.2);
         
         chunkSummaries.push(data.choices[0].message.content);
       }
@@ -194,34 +161,16 @@ export const generateDocumentSummary = async (documentText: string): Promise<str
       // Second pass: Combine the summaries into a cohesive whole
       const combinedContent = chunkSummaries.join("\n\n--- Next Section ---\n\n");
       
-      const finalResponse = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`
+      const finalData = await callOpenRouter([
+        {
+          role: 'system',
+          content: 'You are a document summarization assistant. Create a single cohesive and detailed summary from these section summaries. Structure your summary with clear sections and bullet points where appropriate for better readability.'
         },
-        body: JSON.stringify({
-          model: 'openai/gpt-3.5-turbo',
-          messages: [
-            {
-              role: 'system',
-              content: 'You are a document summarization assistant. Create a single cohesive and detailed summary from these section summaries. Structure your summary with clear sections and bullet points where appropriate for better readability.'
-            },
-            {
-              role: 'user',
-              content: `Using these section summaries, create a comprehensive and detailed summary of the entire document:\n\n${combinedContent}`
-            }
-          ],
-          max_tokens: 1000
-        })
-      });
-      
-      const finalData = await finalResponse.json();
-      
-      if (!finalResponse.ok) {
-        console.error('OpenRouter API error:', finalData);
-        throw new Error(finalData.error?.message || 'Failed to generate final summary');
-      }
+        {
+          role: 'user',
+          content: `Using these section summaries, create a comprehensive and detailed summary of the entire document:\n\n${combinedContent}`
+        }
+      ], 'openai/gpt-3.5-turbo', 1000, 0.2);
       
       summary = finalData.choices[0].message.content;
     }
@@ -235,8 +184,6 @@ export const generateDocumentSummary = async (documentText: string): Promise<str
 
 // Function to generate flashcards
 export const generateFlashcards = async (documentText: string): Promise<Array<{question: string, answer: string}>> => {
-  const apiKey = getOpenRouterApiKey();
-  
   // Handle larger documents by focusing on the most important parts
   const maxLength = 10000; // Maximum characters to process
   const processedText = documentText.length > maxLength 
@@ -245,34 +192,16 @@ export const generateFlashcards = async (documentText: string): Promise<Array<{q
   
   try {
     console.log("Generating flashcards");
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
+    const data = await callOpenRouter([
+      {
+        role: 'system',
+        content: 'You are a flashcard generation assistant specialized in creating educational study cards. Generate 5-10 high-quality flashcards that cover the most important concepts from the document. Each flashcard should have a clear question on one side and a comprehensive answer on the other.'
       },
-      body: JSON.stringify({
-        model: 'openai/gpt-3.5-turbo',
-        messages: [
-          {
-            role: 'system',
-            content: 'You are a flashcard generation assistant specialized in creating educational study cards. Generate 5-10 high-quality flashcards that cover the most important concepts from the document. Each flashcard should have a clear question on one side and a comprehensive answer on the other.'
-          },
-          {
-            role: 'user',
-            content: `Generate 5-10 flashcards (question and answer pairs) from this document: ${processedText}. Format your response as a valid JSON array with "question" and "answer" properties for each flashcard. The response should be valid JSON that can be parsed.`
-          }
-        ],
-        max_tokens: 1000
-      })
-    });
-
-    const data = await response.json();
-    
-    if (!response.ok) {
-      console.error('OpenRouter API error:', data);
-      throw new Error(data.error?.message || 'Failed to generate flashcards');
-    }
+      {
+        role: 'user',
+        content: `Generate 5-10 flashcards (question and answer pairs) from this document: ${processedText}. Format your response as a valid JSON array with "question" and "answer" properties for each flashcard. The response should be valid JSON that can be parsed.`
+      }
+    ], 'openai/gpt-3.5-turbo', 1000, 0.3);
     
     // Try to parse the response as JSON or extract JSON from text
     const content = data.choices[0].message.content;
@@ -285,16 +214,28 @@ export const generateFlashcards = async (documentText: string): Promise<Array<{q
         flashcards = JSON.parse(jsonMatch[0]);
       } else {
         // If no JSON array is found, parse the entire response
-        flashcards = JSON.parse(content);
-      }
-      
-      if (!Array.isArray(flashcards)) {
-        if (flashcards?.flashcards && Array.isArray(flashcards.flashcards)) {
-          flashcards = flashcards.flashcards;
-        } else if (flashcards?.cards && Array.isArray(flashcards.cards)) {
-          flashcards = flashcards.cards;
-        } else {
-          throw new Error("Response is not an array of flashcards");
+        try {
+          const parsedData = JSON.parse(content);
+          
+          // Check if parsed data is directly an array or needs extraction from a property
+          if (Array.isArray(parsedData)) {
+            flashcards = parsedData;
+          } else if (parsedData && typeof parsedData === 'object') {
+            // Try to extract from known properties
+            if (Array.isArray(parsedData.flashcards)) {
+              flashcards = parsedData.flashcards;
+            } else if (Array.isArray(parsedData.cards)) {
+              flashcards = parsedData.cards;
+            } else {
+              // If we can't find an array, throw an error
+              throw new Error("Response is not an array of flashcards");
+            }
+          } else {
+            throw new Error("Response is not a valid JSON object or array");
+          }
+        } catch (innerError) {
+          console.error("Inner parsing error:", innerError);
+          throw new Error("Failed to parse response data");
         }
       }
     } catch (parseError) {
@@ -321,8 +262,6 @@ export const generateFlashcards = async (documentText: string): Promise<Array<{q
 
 // Function to generate quiz questions
 export const generateQuiz = async (documentText: string, numQuestions: number = 5, difficulty: string = 'medium'): Promise<Array<{question: string, options: string[], answer: string, explanation: string}>> => {
-  const apiKey = getOpenRouterApiKey();
-  
   // Handle larger documents by focusing on the most important parts
   const maxLength = 10000; // Maximum characters to process
   const processedText = documentText.length > maxLength 
@@ -331,34 +270,16 @@ export const generateQuiz = async (documentText: string, numQuestions: number = 
   
   try {
     console.log("Generating quiz questions");
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
+    const data = await callOpenRouter([
+      {
+        role: 'system',
+        content: `You are a quiz generation assistant specialized in creating educational multiple-choice questions. Generate ${numQuestions} ${difficulty}-difficulty quiz questions that cover important concepts from the document. Each question should have 4 options with one correct answer and an explanation of why it's correct.`
       },
-      body: JSON.stringify({
-        model: 'openai/gpt-3.5-turbo',
-        messages: [
-          {
-            role: 'system',
-            content: `You are a quiz generation assistant specialized in creating educational multiple-choice questions. Generate ${numQuestions} ${difficulty}-difficulty quiz questions that cover important concepts from the document. Each question should have 4 options with one correct answer and an explanation of why it's correct.`
-          },
-          {
-            role: 'user',
-            content: `Generate ${numQuestions} multiple-choice quiz questions from this document: ${processedText}. Format your response as a valid JSON array with "question", "options" (array of 4 choices), "answer" (the correct option text), and "explanation" properties for each question. The response should be valid JSON that can be parsed.`
-          }
-        ],
-        max_tokens: 1200
-      })
-    });
-
-    const data = await response.json();
-    
-    if (!response.ok) {
-      console.error('OpenRouter API error:', data);
-      throw new Error(data.error?.message || 'Failed to generate quiz');
-    }
+      {
+        role: 'user',
+        content: `Generate ${numQuestions} multiple-choice quiz questions from this document: ${processedText}. Format your response as a valid JSON array with "question", "options" (array of 4 choices), "answer" (the correct option text), and "explanation" properties for each question. The response should be valid JSON that can be parsed.`
+      }
+    ], 'openai/gpt-3.5-turbo', 1200, 0.3);
     
     // Try to parse the response as JSON or extract JSON from text
     const content = data.choices[0].message.content;
@@ -371,14 +292,26 @@ export const generateQuiz = async (documentText: string, numQuestions: number = 
         quiz = JSON.parse(jsonMatch[0]);
       } else {
         // If no JSON array is found, parse the entire response
-        quiz = JSON.parse(content);
-      }
-      
-      if (!Array.isArray(quiz)) {
-        if (quiz?.questions && Array.isArray(quiz.questions)) {
-          quiz = quiz.questions;
-        } else {
-          throw new Error("Response is not an array of quiz questions");
+        try {
+          const parsedData = JSON.parse(content);
+          
+          // Check if parsed data is directly an array or needs extraction from a property
+          if (Array.isArray(parsedData)) {
+            quiz = parsedData;
+          } else if (parsedData && typeof parsedData === 'object' && parsedData !== null) {
+            // Try to extract from known properties
+            if (Array.isArray(parsedData.questions)) {
+              quiz = parsedData.questions;
+            } else {
+              // If we can't find an array, throw an error
+              throw new Error("Response is not an array of quiz questions");
+            }
+          } else {
+            throw new Error("Response is not a valid JSON object or array");
+          }
+        } catch (innerError) {
+          console.error("Inner parsing error:", innerError);
+          throw new Error("Failed to parse response data");
         }
       }
     } catch (parseError) {

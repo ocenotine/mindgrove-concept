@@ -10,11 +10,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useAuthStore } from '@/store/authStore';
 import { supabase } from '@/integrations/supabase/client';
-import { Check, AlertCircle, CreditCard, Gift, Calendar, Users, Lock } from 'lucide-react';
-import { toast } from '@/components/ui/use-toast';
+import { Check, AlertCircle, CreditCard, Gift, Calendar, Users, Lock, Loader2 } from 'lucide-react';
+import { useToast } from '@/components/ui/use-toast';
 
 const InstitutionSubscription = () => {
   const { user } = useAuthStore();
+  const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
   const [isPremium, setIsPremium] = useState(false);
   const [subscriptionData, setSubscriptionData] = useState<any>(null);
@@ -29,7 +30,7 @@ const InstitutionSubscription = () => {
       try {
         setIsLoading(true);
         // Get institution ID
-        const instId = user.user_metadata?.institution_id || user.institution_id;
+        const instId = user?.user_metadata?.institution_id || user?.institution_id;
         
         if (!instId) {
           toast({
@@ -63,19 +64,24 @@ const InstitutionSubscription = () => {
             .limit(1)
             .single();
           
-          if (!subscriptionError) {
+          if (!subscriptionError && subscriptionData) {
             setSubscriptionData(subscriptionData);
           }
         }
       } catch (error) {
         console.error('Error loading subscription data:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load subscription data",
+          variant: "destructive"
+        });
       } finally {
         setIsLoading(false);
       }
     };
     
     loadSubscriptionData();
-  }, [user]);
+  }, [user, toast]);
 
   const handleRedeemCode = async () => {
     if (!redeemCode || !institutionId) return;
@@ -90,6 +96,7 @@ const InstitutionSubscription = () => {
           description: 'Please check your code and try again.',
           variant: 'destructive',
         });
+        setIsRedeeming(false);
         return;
       }
       
@@ -122,17 +129,23 @@ const InstitutionSubscription = () => {
         
       if (subscriptionError) throw subscriptionError;
       
+      // Update local state to reflect changes
       setIsPremium(true);
+      setSubscriptionData({
+        plan_type: 'premium',
+        status: 'active',
+        starts_at: new Date().toISOString(),
+        expires_at: expiryDate.toISOString(),
+      });
+      
       toast({
         title: 'Redemption Successful',
         description: 'Your account has been upgraded to Premium!',
         variant: 'default',
       });
       
-      // Reload page after short delay
-      setTimeout(() => {
-        window.location.reload();
-      }, 2000);
+      // Clear redemption code
+      setRedeemCode('');
       
     } catch (error) {
       console.error('Error redeeming code:', error);
@@ -150,7 +163,7 @@ const InstitutionSubscription = () => {
     return (
       <InstitutionLayout>
         <div className="flex justify-center items-center h-full py-16">
-          <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full"></div>
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
         </div>
       </InstitutionLayout>
     );
@@ -321,7 +334,14 @@ const InstitutionSubscription = () => {
                       onClick={handleRedeemCode} 
                       disabled={!redeemCode || isRedeeming || isPremium}
                     >
-                      {isRedeeming ? 'Redeeming...' : 'Redeem'}
+                      {isRedeeming ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Redeeming...
+                        </>
+                      ) : (
+                        'Redeem'
+                      )}
                     </Button>
                   </div>
                 </div>
@@ -368,7 +388,7 @@ const InstitutionSubscription = () => {
                           </li>
                           <li className="flex justify-between">
                             <span className="text-muted-foreground">Payment Method:</span>
-                            <span>Promotional Code</span>
+                            <span>{subscriptionData?.selar_co_order_id?.startsWith('REDEEM-') ? 'Promotional Code' : 'Selar.co'}</span>
                           </li>
                         </ul>
                       </div>

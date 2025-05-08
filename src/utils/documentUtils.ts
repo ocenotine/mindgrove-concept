@@ -16,3 +16,26 @@ export const getDocumentThumbnail = (fileType?: string): string => {
   const normalizedType = fileType.toUpperCase();
   return fileTypeIcons[normalizedType as keyof typeof fileTypeIcons] || fileTypeIcons.default;
 };
+
+// Add downloadDocument function
+export const downloadDocument = (document: any) => {
+  // Get document content
+  const content = document.content || '';
+  
+  // Create blob with document content
+  const blob = new Blob([content], { type: 'text/plain' });
+  
+  // Create download link
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${document.title || 'document'}.txt`;
+  
+  // Trigger download
+  document.body.appendChild(a);
+  a.click();
+  
+  // Clean up
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+};

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import InstitutionLayout from '@/components/layout/InstitutionLayout';
 import { PageTransition } from '@/components/animations/PageTransition';
@@ -12,6 +13,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/store/authStore';
 import { Loader2, Save } from 'lucide-react';
 import { InstitutionData } from '@/types/institution';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 // Define the institution branding type
 interface InstitutionBranding {
@@ -28,6 +30,8 @@ const InstitutionSettings = () => {
   const { toast } = useToast();
   const [institutionData, setInstitutionData] = useState<InstitutionData | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [showReloadAlert, setShowReloadAlert] = useState(false);
   
   // Form state
   const [name, setName] = useState('');
@@ -47,6 +51,7 @@ const InstitutionSettings = () => {
       if (!user) return;
       
       try {
+        setIsLoading(true);
         const institutionId = user?.user_metadata?.institution_id || user?.institution_id;
         
         if (!institutionId) {
@@ -99,6 +104,8 @@ const InstitutionSettings = () => {
           description: "Failed to load institution settings",
           variant: "destructive"
         });
+      } finally {
+        setIsLoading(false);
       }
     };
     
@@ -140,6 +147,9 @@ const InstitutionSettings = () => {
         title: "Settings saved",
         description: "Your institution settings have been updated",
       });
+      
+      // Ask user to reload for changes to take effect
+      setShowReloadAlert(true);
     } catch (error) {
       console.error("Error saving institution settings:", error);
       toast({
@@ -161,6 +171,18 @@ const InstitutionSettings = () => {
       }
     }));
   };
+
+  if (isLoading) {
+    return (
+      <InstitutionLayout>
+        <PageTransition>
+          <div className="flex justify-center items-center h-full min-h-[50vh]">
+            <Loader2 className="h-8 w-8 text-primary animate-spin" />
+          </div>
+        </PageTransition>
+      </InstitutionLayout>
+    );
+  }
 
   return (
     <InstitutionLayout>
@@ -360,6 +382,23 @@ const InstitutionSettings = () => {
               </Card>
             </TabsContent>
           </Tabs>
+          
+          <AlertDialog open={showReloadAlert} onOpenChange={setShowReloadAlert}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Settings updated</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Your changes have been saved. For some changes to take effect, you may need to reload the application.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Later</AlertDialogCancel>
+                <AlertDialogAction onClick={() => window.location.reload()}>
+                  Reload Now
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </PageTransition>
     </InstitutionLayout>

@@ -2,6 +2,54 @@
 import { create } from 'zustand';
 import { supabase } from '@/integrations/supabase/client';
 import { User, Session } from '@supabase/supabase-js';
+import { toast } from '@/hooks/use-toast';
+
+// Add a constant for session timeout (30 minutes in milliseconds)
+const SESSION_TIMEOUT = 30 * 60 * 1000; // 30 minutes
+
+// Password strength validation function
+export const validatePassword = (password: string): { isValid: boolean; message: string } => {
+  if (password.length < 8) {
+    return { isValid: false, message: 'Password must be at least 8 characters' };
+  }
+  
+  // Check for at least one number
+  if (!/\d/.test(password)) {
+    return { isValid: false, message: 'Password must include at least one number' };
+  }
+  
+  // Check for at least one letter
+  if (!/[a-zA-Z]/.test(password)) {
+    return { isValid: false, message: 'Password must include at least one letter' };
+  }
+  
+  // Check for at least one special character
+  if (!/[!@#$%^&*(),.?":{}|<>]/.test(password)) {
+    return { isValid: false, message: 'Password must include at least one special character' };
+  }
+  
+  return { isValid: true, message: 'Password meets strength requirements' };
+};
+
+// Helper function to clean up auth state
+export const cleanupAuthState = () => {
+  // Remove standard auth tokens
+  localStorage.removeItem('supabase.auth.token');
+  
+  // Remove all Supabase auth keys from localStorage
+  Object.keys(localStorage).forEach((key) => {
+    if (key.startsWith('supabase.auth.') || key.includes('sb-')) {
+      localStorage.removeItem(key);
+    }
+  });
+  
+  // Remove from sessionStorage if in use
+  Object.keys(sessionStorage || {}).forEach((key) => {
+    if (key.startsWith('supabase.auth.') || key.includes('sb-')) {
+      sessionStorage.removeItem(key);
+    }
+  });
+};
 
 // Export the UserWithMetadata interface
 export interface UserWithMetadata extends User {
@@ -35,6 +83,7 @@ interface AuthState {
   session: Session | null;
   isAuthenticated: boolean;
   loading: boolean;
+  lastActivity: number;
   login: (email: string, password: string) => Promise<void>;
   signup: (email: string, password: string, name: string, options?: any) => Promise<void>;
   loginWithGoogle: () => Promise<void>;
@@ -44,6 +93,12 @@ interface AuthState {
   setLoading: (loading: boolean) => void;
   updateProfile: (data: Partial<UserWithMetadata>) => Promise<void>;
   initialize: () => Promise<void>;
+  updateLastActivity: () => void;
+  checkSessionTimeout: () => void;
+  requestPasswordReset: (email: string) => Promise<void>;
+  resetPassword: (password: string) => Promise<void>;
+  enableTwoFactorAuth: () => Promise<string>;
+  verifyTwoFactorAuth: (token: string) => Promise<boolean>;
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
@@ -51,6 +106,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   session: null,
   isAuthenticated: false,
   loading: true,
+  lastActivity: Date.now(),
   
   setUser: (user) => {
     set({ user, isAuthenticated: !!user });
@@ -72,7 +128,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ 
       session, 
       user,
-      isAuthenticated: !!session?.user
+      isAuthenticated: !!session?.user,
+      lastActivity: Date.now() // Reset last activity timestamp when session changes
     });
   },
   
@@ -81,6 +138,16 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
   
   login: async (email, password) => {
+    // Clean up existing auth state
+    cleanupAuthState();
+    
+    // Try to sign out globally first
+    try {
+      await supabase.auth.signOut({ scope: 'global' });
+    } catch (err) {
+      // Continue even if this fails
+    }
+    
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password
@@ -104,11 +171,21 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     set({ 
       user,
       session: data.session,
-      isAuthenticated: true 
+      isAuthenticated: true,
+      lastActivity: Date.now() // Set last activity to current time on login
     });
   },
   
   signup: async (email, password, name, options = {}) => {
+    // Validate password strength
+    const validation = validatePassword(password);
+    if (!validation.isValid) {
+      throw new Error(validation.message);
+    }
+    
+    // Clean up existing auth state
+    cleanupAuthState();
+    
     const userData = {
       name,
       account_type: options.accountType || 'student'
@@ -125,7 +202,8 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       email,
       password,
       options: {
-        data: userData
+        data: userData,
+        emailRedirectTo: `${window.location.origin}/#/auth/callback?autoLogin=true`
       }
     });
     
@@ -147,16 +225,20 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       set({ 
         user,
         session: data.session,
-        isAuthenticated: !!data.session
+        isAuthenticated: !!data.session,
+        lastActivity: Date.now() // Set last activity to current time on signup
       });
     }
   },
   
   loginWithGoogle: async () => {
+    // Clean up existing auth state
+    cleanupAuthState();
+    
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}/#/auth/callback`
+        redirectTo: `${window.location.origin}/#/auth/callback?autoLogin=true`
       }
     });
     
@@ -174,9 +256,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         isAuthenticated: false 
       });
       
+      // Clean up all auth state
+      cleanupAuthState();
+      
       // Then tell Supabase to sign out
       const { error } = await supabase.auth.signOut({ 
-        scope: 'local' // Use 'global' to sign out from all devices
+        scope: 'global' // Sign out from all devices
       });
       
       if (error) {
@@ -184,8 +269,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         throw error;
       }
       
-      // Clear any local auth data
-      localStorage.removeItem('supabase.auth.token');
+      // Notify user
+      toast({
+        title: "Logged out",
+        description: "You have been logged out successfully."
+      });
+      
+      // Force page reload to ensure clean state
+      window.location.href = '/#/login';
       
       // Return successful
       return Promise.resolve();
@@ -207,7 +298,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     // Update local user data
     const currentUser = get().user;
     if (currentUser) {
-      set({ user: { ...currentUser, ...data } });
+      set({ 
+        user: { ...currentUser, ...data },
+        lastActivity: Date.now() // Update last activity on profile update
+      });
     }
   },
   
@@ -234,6 +328,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       setSession(session);
       setUser(user);
       
+      // Set initial last activity
+      set({ lastActivity: Date.now() });
+      
       return Promise.resolve();
     } catch (error) {
       console.error("Auth initialization error:", error);
@@ -241,17 +338,113 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     } finally {
       setLoading(false);
     }
+  },
+  
+  // Method to update the last activity timestamp
+  updateLastActivity: () => {
+    set({ lastActivity: Date.now() });
+  },
+  
+  // Method to check if session has timed out
+  checkSessionTimeout: () => {
+    const { lastActivity, isAuthenticated, logout } = get();
+    const currentTime = Date.now();
+    
+    if (isAuthenticated && currentTime - lastActivity > SESSION_TIMEOUT) {
+      // Session has timed out, log the user out
+      logout().then(() => {
+        toast({
+          title: "Session expired",
+          description: "You have been logged out due to inactivity",
+          variant: "default"
+        });
+        
+        // Redirect to login page
+        window.location.href = '/#/login';
+      });
+    }
+  },
+  
+  // Password reset methods
+  requestPasswordReset: async (email: string) => {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/#/reset-password`,
+    });
+    
+    if (error) {
+      throw error;
+    }
+    
+    toast({
+      title: "Password reset email sent",
+      description: "Check your inbox for a link to reset your password"
+    });
+  },
+  
+  resetPassword: async (password: string) => {
+    // Validate password strength
+    const validation = validatePassword(password);
+    if (!validation.isValid) {
+      throw new Error(validation.message);
+    }
+    
+    const { error } = await supabase.auth.updateUser({ password });
+    
+    if (error) {
+      throw error;
+    }
+    
+    toast({
+      title: "Password updated",
+      description: "Your password has been updated successfully"
+    });
+  },
+  
+  // Two-factor authentication methods (placeholder - would need actual implementation)
+  enableTwoFactorAuth: async () => {
+    // This would typically generate a QR code or secret for an authenticator app
+    toast({
+      title: "2FA Feature",
+      description: "Two-factor authentication would be implemented with Supabase Auth",
+      variant: "default"
+    });
+    return "EXAMPLE_SECRET_KEY";
+  },
+  
+  verifyTwoFactorAuth: async (token: string) => {
+    // This would verify the token against the user's secret
+    toast({
+      title: "2FA Verification",
+      description: "Token verification would be implemented with Supabase Auth",
+      variant: "default"
+    });
+    return token.length === 6;
   }
 }));
 
-// Set up auth listener
+// Set up auth listener and activity tracker
 export const initializeAuth = async () => {
-  const { setUser, setSession, setLoading } = useAuthStore.getState();
+  const { setUser, setSession, setLoading, updateLastActivity, checkSessionTimeout } = useAuthStore.getState();
   
   try {
     // First set up the auth state change listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
+      (event, session) => {
+        // If the event is PASSWORD_RECOVERY, redirect to reset password page
+        if (event === 'PASSWORD_RECOVERY') {
+          window.location.href = '/#/reset-password';
+          return;
+        }
+        
+        // Handle automatic login after verification
+        if (event === 'USER_UPDATED' && session) {
+          // User's email was verified
+          toast({
+            title: "Email verified",
+            description: "Your email has been verified. You are now logged in.",
+          });
+        }
+        
         // Process user metadata from session
         const user = session?.user ? {
           ...session.user,
@@ -267,6 +460,17 @@ export const initializeAuth = async () => {
         setSession(session);
         setUser(user);
         setLoading(false);
+        
+        // Update activity timestamp
+        updateLastActivity();
+        
+        // Defer data fetching on sign-in to prevent potential deadlocks
+        if (event === 'SIGNED_IN' && user) {
+          setTimeout(() => {
+            // Additional data fetching can be done here
+            console.log('User signed in:', user.id);
+          }, 0);
+        }
       }
     );
     
@@ -289,8 +493,22 @@ export const initializeAuth = async () => {
     setUser(user);
     setLoading(false);
     
+    // Set up activity listeners to track user activity
+    const activityEvents = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart'];
+    
+    activityEvents.forEach(event => {
+      window.addEventListener(event, updateLastActivity);
+    });
+    
+    // Set up session timeout check interval
+    const timeoutCheckInterval = setInterval(checkSessionTimeout, 60000); // Check every minute
+    
     return () => {
       subscription.unsubscribe();
+      activityEvents.forEach(event => {
+        window.removeEventListener(event, updateLastActivity);
+      });
+      clearInterval(timeoutCheckInterval);
     };
   } catch (error) {
     console.error("Auth initialization error:", error);

@@ -1,19 +1,37 @@
 
 import React from 'react';
-import { Document } from '@/utils/mockData';
+import { Document } from '@/store/documentStore';
 import DocumentCard from '@/components/document/DocumentCard';
 import { motion } from 'framer-motion';
+import { Upload, Plus } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Link } from 'react-router-dom';
 
 interface DocumentListProps {
   documents: Document[];
 }
 
 const DocumentList = ({ documents }: DocumentListProps) => {
-  if (documents.length === 0) {
+  if (!documents || documents.length === 0) {
     return (
-      <div className="text-center py-12">
-        <h3 className="text-lg font-medium text-muted-foreground">No documents found</h3>
-        <p className="text-sm text-muted-foreground">Upload a document or create a new one</p>
+      <div className="text-center py-12 bg-muted/20 rounded-lg border border-dashed border-muted-foreground/30">
+        <Upload className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+        <h3 className="text-lg font-medium text-muted-foreground mb-2">No documents found</h3>
+        <p className="text-sm text-muted-foreground mb-6">Upload a document or create a new one to get started</p>
+        <div className="flex justify-center gap-4">
+          <Link to="/document/upload">
+            <Button variant="default">
+              <Upload className="h-4 w-4 mr-2" />
+              Upload Document
+            </Button>
+          </Link>
+          <Link to="/documents/new">
+            <Button variant="outline">
+              <Plus className="h-4 w-4 mr-2" />
+              Create Document
+            </Button>
+          </Link>
+        </div>
       </div>
     );
   }

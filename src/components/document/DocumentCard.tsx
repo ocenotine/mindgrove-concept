@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import Card, { CardHeader, CardTitle, CardContent, CardFooter } from '@/components/common/Card';
@@ -18,14 +18,27 @@ interface DocumentCardProps {
 const DocumentCard = ({ document, className }: DocumentCardProps) => {
   const [isBookmarked, setIsBookmarked] = useState(false);
   const { user } = useAuthStore();
+  const [canAccess, setCanAccess] = useState(true);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const navigate = useNavigate();
+  
+  useEffect(() => {
+    // Check if the user has access to this document
+    if (user && document.user_id && document.user_id !== user.id) {
+      setCanAccess(false);
+    } else {
+      setCanAccess(true);
+    }
+  }, [user, document.user_id]);
   
   // Format the date to show how long ago it was last accessed
   const getLastAccessedTime = () => {
     try {
-      if (!document.lastAccessed) return 'recently';
-      return formatDistanceToNow(new Date(document.lastAccessed), { addSuffix: true });
+      const dateToUse = document.lastAccessed || document.updatedAt || document.createdAt;
+      if (dateToUse) {
+        return formatDistanceToNow(new Date(dateToUse), { addSuffix: true });
+      }
+      return 'recently';
     } catch (error) {
       return 'recently';
     }
@@ -43,20 +56,22 @@ const DocumentCard = ({ document, className }: DocumentCardProps) => {
     if (isMenuOpen) {
       e.preventDefault();
     } else {
-      e.preventDefault();
-      // Use navigate directly instead of Link to ensure proper navigation
       navigate(`/document/${document.id}`);
     }
   };
 
+  if (!canAccess) {
+    return null; // Don't display documents the user can't access
+  }
+
   return (
-    <div onClick={handleCardClick} className="cursor-pointer">
+    <Link to={`/document/${document.id}`} onClick={handleCardClick}>
       <motion.div
         whileHover={{ y: -5 }}
         transition={{ duration: 0.2 }}
       >
         <Card 
-          className={`h-full transition-all duration-300 hover:shadow-md ${className || ''}`}
+          className={`h-full transition-all duration-300 hover:shadow-md ${className}`}
           isHoverable
           isInteractive
         >
@@ -103,7 +118,7 @@ const DocumentCard = ({ document, className }: DocumentCardProps) => {
           </CardFooter>
         </Card>
       </motion.div>
-    </div>
+    </Link>
   );
 };
 

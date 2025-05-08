@@ -6,16 +6,17 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Book, CheckCircle, Loader, AlertCircle } from 'lucide-react';
-import { toast } from '@/components/ui/use-toast';
+import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/store/authStore';
-import { generateQuiz } from '@/utils/openRouterUtils';
+import { generateQuizQuestions } from '@/utils/nlpUtils';
 import { useNavigate } from 'react-router-dom';
+import { v4 as uuidv4 } from 'uuid';
 
 interface Document {
   id: string;
   title: string;
-  content: string;
+  content: string | null;
 }
 
 interface QuizQuestion {
@@ -25,7 +26,11 @@ interface QuizQuestion {
   explanation: string;
 }
 
-const QuizGenerator: React.FC = () => {
+interface QuizGeneratorProps {
+  onQuizGenerated?: () => void;
+}
+
+const QuizGenerator: React.FC<QuizGeneratorProps> = ({ onQuizGenerated }) => {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -87,24 +92,35 @@ const QuizGenerator: React.FC = () => {
         throw new Error("Selected document not found");
       }
       
-      // Generate quiz using OpenRouter API
-      const quizQuestions: QuizQuestion[] = await generateQuiz(
+      if (!selectedDocument.content) {
+        throw new Error("Document has no content");
+      }
+      
+      console.log("Generating quiz for document:", selectedDocument.title);
+      console.log("Document content length:", selectedDocument.content.length);
+      
+      // Generate quiz using OpenRouter API via nlpUtils
+      const result = await generateQuizQuestions(
+        selectedDocument.id,
         selectedDocument.content,
         numQuestions,
         difficulty
       );
       
-      if (!quizQuestions || quizQuestions.length === 0) {
-        throw new Error("Failed to generate quiz questions");
+      if (!result.success || !result.questions || result.questions.length === 0) {
+        throw new Error(result.error || "Failed to generate quiz questions");
       }
       
+      console.log("Generated quiz questions:", result.questions.length);
+      
       // Save the quiz to localStorage (would be to a database in production)
-      const quizId = `quiz_${Date.now()}`;
+      const quizId = uuidv4();
       const newQuiz = {
         id: quizId,
         documentId: selectedDocumentId,
+        documentTitle: selectedDocument.title,
         name: quizName,
-        questions: quizQuestions,
+        questions: result.questions,
         difficulty: difficulty,
         created_at: new Date().toISOString(),
         lastTaken: 'Never'
@@ -119,11 +135,15 @@ const QuizGenerator: React.FC = () => {
       
       toast({
         title: "Quiz generated successfully",
-        description: `Your quiz "${quizName}" has been created with ${quizQuestions.length} questions.`,
+        description: `Your quiz "${quizName}" has been created with ${result.questions.length} questions.`,
       });
       
+      // Call the callback function to notify parent component
+      if (onQuizGenerated) {
+        onQuizGenerated();
+      }
+      
       // Navigate to the saved quizzes tab
-      navigate('/quiz');
       setTimeout(() => {
         document.querySelector('[value="saved"]')?.dispatchEvent(new Event('click'));
       }, 500);

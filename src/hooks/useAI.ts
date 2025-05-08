@@ -1,8 +1,8 @@
 
 import { useState } from 'react';
-import { toast } from '@/components/ui/use-toast';
+import { useToast } from '@/components/ui/use-toast';
 import { useDocumentStore, Flashcard } from '@/store/documentStore';
-import { generateDocumentSummary, generateFlashcards, playNotificationSound, getOpenRouterApiKey } from '@/utils/openRouterUtils';
+import { generateSummary, generateFlashcards as generateDocFlashcards, generateQuizQuestions } from '@/utils/nlpUtils';
 import { supabase } from '@/integrations/supabase/client';
 
 interface UseAIProps {
@@ -14,23 +14,9 @@ export function useAI({ onSuccess, onError }: UseAIProps = {}) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const { setDocumentSummary, saveFlashcards } = useDocumentStore();
+  const { toast } = useToast();
 
   const summarizeDocument = async (documentText: string, documentId: string) => {
-    // Check if OpenRouter API key is set
-    const apiKey = getOpenRouterApiKey();
-    if (!apiKey) {
-      const error = new Error("OpenRouter API key not set. Please set your API key in settings.");
-      toast({
-        title: 'API Key Required',
-        description: error.message,
-        variant: 'destructive',
-      });
-      
-      if (onError) onError(error);
-      setError(error);
-      return "Please set your OpenRouter API key in settings to generate summaries.";
-    }
-    
     setIsLoading(true);
     setError(null);
     
@@ -42,26 +28,22 @@ export function useAI({ onSuccess, onError }: UseAIProps = {}) {
         throw new Error("Document content is too short to summarize");
       }
       
-      // Get summary using OpenRouter API
-      const summary = await generateDocumentSummary(documentText);
+      // Use the nlpUtils function to generate summary
+      const result = await generateSummary(documentId, documentText);
+      
+      if (!result.success) {
+        throw new Error(result.error || "Failed to generate summary");
+      }
+      
+      const summary = result.summary;
       
       // Save summary to document store
       await setDocumentSummary(documentId, summary);
       
-      // Also save directly to the database
-      try {
-        const { error } = await supabase
-          .from('documents')
-          .update({ summary })
-          .eq('id', documentId);
-          
-        if (error) throw error;
-      } catch (dbError) {
-        console.error("Error saving summary to database:", dbError);
-        // Continue even if saving to database fails
-      }
-      
       console.log("Received summary:", summary);
+      
+      // Also save to database if institutional account
+      await saveSummaryToDatabase(documentId, summary);
       
       if (onSuccess) onSuccess(summary);
       
@@ -69,9 +51,6 @@ export function useAI({ onSuccess, onError }: UseAIProps = {}) {
         title: 'Summary generated',
         description: 'Document summary created successfully',
       });
-      
-      // Play notification sound
-      await playNotificationSound();
       
       return summary;
     } catch (err) {
@@ -94,27 +73,18 @@ export function useAI({ onSuccess, onError }: UseAIProps = {}) {
     }
   };
   
-  const generateDocumentFlashcards = async (documentText: string, documentId: string): Promise<Flashcard[]> => {
-    // Check if OpenRouter API key is set
-    const apiKey = getOpenRouterApiKey();
-    if (!apiKey) {
-      const error = new Error("OpenRouter API key not set. Please set your API key in settings.");
-      toast({
-        title: 'API Key Required',
-        description: error.message,
-        variant: 'destructive',
-      });
-      
-      if (onError) onError(error);
-      setError(error);
-      return [
-        {
-          question: "Why can't I generate flashcards?",
-          answer: "You need to set your OpenRouter API key in settings first."
-        }
-      ];
+  const saveSummaryToDatabase = async (documentId: string, summary: string) => {
+    try {
+      await supabase
+        .from('documents')
+        .update({ summary })
+        .eq('id', documentId);
+    } catch (error) {
+      console.error("Error saving summary to database:", error);
     }
-    
+  };
+  
+  const generateFlashcards = async (documentText: string, documentId: string): Promise<Flashcard[]> => {
     setIsLoading(true);
     setError(null);
     
@@ -126,30 +96,22 @@ export function useAI({ onSuccess, onError }: UseAIProps = {}) {
         throw new Error("Document content is too short to generate flashcards");
       }
       
-      // Generate flashcards using OpenRouter API
-      const flashcards = await generateFlashcards(documentText);
+      // Use the nlpUtils function to generate flashcards
+      const result = await generateDocFlashcards(documentId, documentText);
+      
+      if (!result.success) {
+        throw new Error(result.error || "Failed to generate flashcards");
+      }
+      
+      const flashcards = result.flashcards;
       
       // Save flashcards to document store
       await saveFlashcards(documentId, flashcards);
       
-      // Also save directly to the database
-      try {
-        for (const flashcard of flashcards) {
-          await supabase
-            .from('flashcards')
-            .insert({
-              document_id: documentId,
-              front_content: flashcard.question,
-              back_content: flashcard.answer,
-              user_id: (await supabase.auth.getUser()).data.user?.id
-            });
-        }
-      } catch (dbError) {
-        console.error("Error saving flashcards to database:", dbError);
-        // Continue even if saving to database fails
-      }
-      
       console.log("Received flashcards:", flashcards);
+      
+      // Also save to database
+      await saveFlashcardsToDatabase(documentId, flashcards);
       
       if (onSuccess) onSuccess(flashcards);
       
@@ -157,9 +119,6 @@ export function useAI({ onSuccess, onError }: UseAIProps = {}) {
         title: 'Flashcards generated',
         description: `${flashcards.length} flashcards created from your document`,
       });
-      
-      // Play notification sound
-      await playNotificationSound();
       
       return flashcards;
     } catch (err) {
@@ -191,10 +150,94 @@ export function useAI({ onSuccess, onError }: UseAIProps = {}) {
     }
   };
   
+  const saveFlashcardsToDatabase = async (documentId: string, flashcards: Flashcard[]) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (user) {
+        for (const card of flashcards) {
+          await supabase
+            .from('flashcards')
+            .insert({
+              user_id: user.id,
+              document_id: documentId,
+              front_content: card.question,
+              back_content: card.answer
+            });
+        }
+      }
+    } catch (error) {
+      console.error("Error saving flashcards to database:", error);
+    }
+  };
+  
+  const generateQuiz = async (documentText: string, documentId: string, numQuestions = 5, difficulty = 'medium') => {
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      console.log("Sending quiz generation request with content length:", documentText.length);
+      
+      // If the document text is empty, provide a fallback
+      if (!documentText || documentText.trim().length < 10) {
+        throw new Error("Document content is too short to generate quiz questions");
+      }
+      
+      // Use the nlpUtils function to generate quiz questions
+      const result = await generateQuizQuestions(documentId, documentText, numQuestions, difficulty);
+      
+      if (!result.success) {
+        throw new Error(result.error || "Failed to generate quiz questions");
+      }
+      
+      const questions = result.questions;
+      
+      console.log("Received quiz questions:", questions);
+      
+      if (onSuccess) onSuccess(questions);
+      
+      toast({
+        title: 'Quiz generated',
+        description: `${questions.length} quiz questions created from your document`,
+      });
+      
+      return questions;
+    } catch (err) {
+      const error = err instanceof Error ? err : new Error('Unknown error occurred');
+      console.error("Quiz generation error:", error);
+      setError(error);
+      
+      toast({
+        title: 'Quiz generation failed',
+        description: error.message,
+        variant: 'destructive',
+      });
+      
+      if (onError) onError(error);
+      
+      // Return fallback questions
+      return [
+        {
+          question: "What is the main topic of this document?",
+          options: [
+            "Research methods",
+            "Academic writing",
+            "Data analysis",
+            "Literature review"
+          ],
+          answer: 0
+        }
+      ];
+    } finally {
+      setIsLoading(false);
+    }
+  };
+  
   return {
     isLoading,
     error,
     summarizeDocument,
-    generateFlashcards: generateDocumentFlashcards
+    generateFlashcards,
+    generateQuiz
   };
 }
