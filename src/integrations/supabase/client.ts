@@ -51,6 +51,8 @@ export type StoredQuiz = {
 // Helper function to create a profile if it doesn't exist
 export const ensureUserProfile = async (userId: string, email: string, accountType: string = 'student') => {
   try {
+    console.log("Ensuring profile exists for:", userId, email, accountType);
+    
     // Check if profile exists
     const { data, error } = await supabase
       .from('profiles')
@@ -58,7 +60,12 @@ export const ensureUserProfile = async (userId: string, email: string, accountTy
       .eq('id', userId)
       .single();
     
-    if (error && error.code === 'PGRST116') {
+    if (error && error.code !== 'PGRST116') {
+      console.error("Error checking profile:", error);
+      return;
+    }
+    
+    if (!data || error?.code === 'PGRST116') {
       // Profile doesn't exist, create it
       console.log("Creating new profile for user:", userId, email, accountType);
       const { error: insertError } = await supabase
@@ -74,15 +81,27 @@ export const ensureUserProfile = async (userId: string, email: string, accountTy
       } else {
         console.log("Profile created successfully");
       }
-    } else if (error) {
-      console.error("Error checking profile:", error);
     } else {
       console.log("Profile exists:", data);
+      
+      // If account type is admin but not set in profile, update it
+      if (accountType === 'admin' && data.account_type !== 'admin') {
+        const { error: updateError } = await supabase
+          .from('profiles')
+          .update({ account_type: 'admin' })
+          .eq('id', userId);
+        
+        if (updateError) {
+          console.error("Error updating admin account type:", updateError);
+        } else {
+          console.log("Updated account_type to admin");
+        }
+      }
     }
     
     // Special handling for admin user
     if (email === 'admin@mindgrove.com') {
-      console.log("Updating account_type to admin for:", email);
+      console.log("Detected admin email, ensuring admin privileges");
       const { error: updateError } = await supabase
         .from('profiles')
         .update({ account_type: 'admin' })
@@ -96,5 +115,28 @@ export const ensureUserProfile = async (userId: string, email: string, accountTy
     }
   } catch (err) {
     console.error("Error in ensureUserProfile:", err);
+  }
+};
+
+// Helper function to get a user's profile data
+export const getUserProfile = async (userId: string) => {
+  if (!userId) return null;
+  
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .single();
+      
+    if (error) {
+      console.error("Error fetching profile:", error);
+      return null;
+    }
+    
+    return data;
+  } catch (err) {
+    console.error("Error in getUserProfile:", err);
+    return null;
   }
 };

@@ -7,7 +7,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 import { PageTransition } from '@/components/animations/PageTransition';
 import { toast } from '@/hooks/use-toast';
 import { Lock, Mail, LogIn } from 'lucide-react';
-import { supabase, ensureUserProfile } from '@/integrations/supabase/client';
+import { supabase, ensureUserProfile, getUserProfile } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/store/authStore';
 
 const AdminLogin: React.FC = () => {
@@ -24,17 +24,13 @@ const AdminLogin: React.FC = () => {
       const { data: { session } } = await supabase.auth.getSession();
       
       if (session?.user) {
-        // Get profile to check if admin
+        console.log("Found existing session, checking if admin", session.user.email);
         try {
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('account_type')
-            .eq('id', session.user.id)
-            .single();
-          
-          console.log("Checking admin status, profile:", profile);
+          const profile = await getUserProfile(session.user.id);
+          console.log("Profile for existing session:", profile);
           
           if (profile?.account_type === 'admin') {
+            console.log("Existing admin session found, redirecting to dashboard");
             navigate('/admin/dashboard');
           }
         } catch (err) {
@@ -54,67 +50,68 @@ const AdminLogin: React.FC = () => {
     try {
       console.log("Attempting admin login with:", email);
       
-      // Clean up auth state first
+      // Always clean up auth state first and attempt signout
       cleanupAuthState();
-      
-      // Try global sign out
       try {
-        await supabase.auth.signOut({ scope: 'global' });
+        await supabase.auth.signOut();
       } catch (err) {
-        // Continue even if this fails
+        // Ignore errors from signout attempt
       }
       
-      // First, try to log in with Supabase
-      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-        email: email,
-        password: password
-      });
-      
-      if (authError) {
-        console.error("Auth error:", authError);
-        throw authError;
-      }
-      
-      if (!authData.user) {
-        console.error("No user returned from auth");
-        throw new Error('Login failed - no user returned');
-      }
-      
-      console.log("Auth successful, checking if admin...");
-      
-      // Ensure profile exists
-      await ensureUserProfile(authData.user.id, email, 'admin');
-      
-      // Check if the user is an admin
-      const { data: profileData, error: profileError } = await supabase
-        .from('profiles')
-        .select('account_type')
-        .eq('id', authData.user.id)
-        .single();
-      
-      console.log("Profile data:", profileData, "Error:", profileError);
-      
-      // Special case for admin@mindgrove.com
       if (email === 'admin@mindgrove.com') {
-        console.log("Admin login detected, setting admin session");
+        console.log("Admin login detected");
         
-        // Update the profile to be admin
-        const { error: updateError } = await supabase
-          .from('profiles')
-          .update({ account_type: 'admin' })
-          .eq('id', authData.user.id);
+        // First, try to log in with Supabase
+        const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+          email: email,
+          password: password
+        });
         
-        if (updateError) {
-          console.error("Admin update error:", updateError);
-        } else {
-          console.log("Admin profile updated successfully");
+        if (authError) {
+          console.error("Admin login auth error:", authError);
+          throw authError;
         }
         
-        // Set session in auth store
+        if (!authData.user) {
+          console.error("No user returned from auth");
+          throw new Error('Login failed - no user returned');
+        }
+        
+        console.log("Admin auth successful, updating profile");
+        
+        // Ensure profile exists with admin privileges
+        await ensureUserProfile(authData.user.id, email, 'admin');
+        
+        // Get the updated profile
+        const profile = await getUserProfile(authData.user.id);
+        console.log("Admin profile after login:", profile);
+        
+        if (!profile || profile.account_type !== 'admin') {
+          console.error("Profile missing or not admin type:", profile);
+          // Force update the profile once more
+          const { error: updateError } = await supabase
+            .from('profiles')
+            .upsert({ 
+              id: authData.user.id, 
+              email: email,
+              account_type: 'admin',
+              updated_at: new Date().toISOString()
+            });
+          
+          if (updateError) {
+            console.error("Error updating admin profile:", updateError);
+          }
+        }
+        
+        // Set session in auth store with admin privileges
         setSession(authData.session);
         setUser({
           ...authData.user,
-          account_type: 'admin'
+          account_type: 'admin',
+          user_metadata: {
+            ...authData.user.user_metadata,
+            account_type: 'admin'
+          }
         });
         
         // Set admin session
@@ -130,32 +127,9 @@ const AdminLogin: React.FC = () => {
         return;
       }
       
-      if (profileData?.account_type !== 'admin') {
-        // Log out the user if they're not an admin
-        await supabase.auth.signOut();
-        throw new Error('Access denied. Your account does not have administrator privileges.');
-      }
+      // Non-admin email provided
+      throw new Error('Access denied. Only the admin account can access the admin dashboard.');
       
-      // Log successful admin login
-      console.log('Admin login successful:', authData.user.email);
-      
-      // Set session in auth store
-      setSession(authData.session);
-      setUser({
-        ...authData.user,
-        account_type: 'admin'
-      });
-      
-      // Set admin session
-      localStorage.setItem('adminLoggedIn', 'true');
-      localStorage.setItem('adminLoginTime', Date.now().toString());
-      
-      toast({
-        title: "Admin login successful",
-        description: "Welcome to the MindGrove admin dashboard",
-      });
-      
-      navigate('/admin/dashboard');
     } catch (error) {
       console.error('Login error:', error);
       

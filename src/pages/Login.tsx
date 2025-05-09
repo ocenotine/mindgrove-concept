@@ -8,6 +8,7 @@ import { toast } from '@/hooks/use-toast';
 import { PageTransition } from '@/components/animations/PageTransition';
 import { Mail, Lock, LogIn, Github, ArrowLeft } from 'lucide-react';
 import ParallaxScroll from '@/components/animations/ParallaxScroll';
+import { supabase, ensureUserProfile } from '@/integrations/supabase/client';
 
 const Login = () => {
   const navigate = useNavigate();
@@ -47,13 +48,41 @@ const Login = () => {
       cleanupAuthState();
       
       console.log("Attempting login with:", email);
-      await login(email, password);
       
-      toast({
-        title: "Login successful",
-        description: "Welcome back to MindGrove!",
-        variant: "default"
+      // Special handling for admin@mindgrove.com
+      if (email === 'admin@mindgrove.com') {
+        console.log("Admin login detected, redirecting to admin login page");
+        navigate('/admin/login');
+        return;
+      }
+      
+      // Normal login process
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password
       });
+      
+      if (error) {
+        throw error;
+      }
+      
+      if (data.user) {
+        // Ensure user profile exists
+        await ensureUserProfile(
+          data.user.id,
+          data.user.email || '',
+          data.user.user_metadata?.account_type || 'student'
+        );
+        
+        // Update auth store
+        await login(email, password);
+        
+        toast({
+          title: "Login successful",
+          description: "Welcome back to MindGrove!",
+          variant: "default"
+        });
+      }
       
       // Redirect will happen via the isAuthenticated check above on the next render
     } catch (error) {
