@@ -3,7 +3,6 @@ import {
   BrowserRouter as Router,
   Routes,
   Route,
-  useNavigate,
 } from 'react-router-dom';
 import { ThemeProvider } from "./components/theme-provider";
 import { ErrorBoundary } from 'react-error-boundary';
@@ -18,15 +17,21 @@ import Signup from '@/pages/Signup';
 import Dashboard from '@/pages/Dashboard';
 import DocumentsPage from '@/pages/DocumentsPage';
 import LectureDigestPage from '@/pages/LectureDigestPage';
+import LoadingScreen from './components/animations/LoadingScreen';
 
 function ErrorFallback({ error, resetErrorBoundary }) {
   return (
-    <div role="alert">
-      <p>Something went wrong:</p>
-      <pre>{error.message}</pre>
-      <button onClick={resetErrorBoundary}>Try again</button>
+    <div role="alert" className="p-4 m-4 border border-destructive rounded bg-destructive/10 text-destructive">
+      <p className="font-medium mb-2">Something went wrong:</p>
+      <pre className="text-sm p-2 bg-background/50 rounded overflow-auto max-h-[300px]">{error.message}</pre>
+      <button 
+        onClick={resetErrorBoundary}
+        className="mt-4 px-4 py-2 bg-primary text-primary-foreground rounded hover:bg-primary/90"
+      >
+        Try again
+      </button>
     </div>
-  )
+  );
 }
 
 function App() {
@@ -35,7 +40,7 @@ function App() {
   
   // Show loading indicator while checking auth status
   if (isLoading) {
-    return <div>Loading...</div>;
+    return <LoadingScreen />;
   }
   
   return (
@@ -65,10 +70,7 @@ function App() {
               <Route path="/auth-callback" element={<AuthCallback />} />
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/documents" element={<DocumentsPage />} />
-              
-              {/* Add the new Lecture Digest route */}
               <Route path="/lecture-digest" element={<LectureDigestPage />} />
-              
             </Routes>
           </Router>
         </ErrorBoundary>
