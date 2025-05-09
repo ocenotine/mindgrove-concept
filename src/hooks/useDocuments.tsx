@@ -22,7 +22,7 @@ export const useDocuments = () => {
     isLoading
   } = useDocumentStore();
 
-  // Add refreshDocuments function
+  // Add refreshDocuments function with improved error handling
   const refreshDocuments = useCallback(async () => {
     if (!user?.id) {
       console.log("Cannot refresh documents: No authenticated user");
@@ -31,7 +31,9 @@ export const useDocuments = () => {
     
     setIsRefreshing(true);
     try {
+      console.log("Refreshing documents for user:", user.id);
       await fetchDocuments();
+      console.log("Documents refreshed successfully:", Date.now());
       setLastRefresh(Date.now());
     } catch (error) {
       console.error("Error refreshing documents:", error);
@@ -65,9 +67,14 @@ export const useDocuments = () => {
     }
   }, [searchDocuments]);
   
-  // Set up realtime subscription for document updates
+  // Set up realtime subscription for document updates with improved logging
   useEffect(() => {
-    if (!user?.id) return;
+    if (!user?.id) {
+      console.log("No user ID available for document subscription");
+      return;
+    }
+    
+    console.log("Setting up realtime subscription for documents for user:", user.id);
     
     const channel = supabase
       .channel('document-changes')
@@ -79,19 +86,22 @@ export const useDocuments = () => {
           table: 'documents',
           filter: `user_id=eq.${user.id}`
         },
-        () => {
-          console.log("Document change detected, refreshing documents");
+        (payload) => {
+          console.log("Document change detected:", payload.eventType, payload);
           refreshDocuments();
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log("Document subscription status:", status);
+      });
     
     return () => {
+      console.log("Cleaning up document subscription");
       supabase.removeChannel(channel);
     };
   }, [user?.id, refreshDocuments]);
 
-  // Initial fetch of documents
+  // Initial fetch of documents with improved logging
   useEffect(() => {
     if (user?.id && documents.length === 0 && !isLoading) {
       console.log("Initial document fetch for user:", user.id);

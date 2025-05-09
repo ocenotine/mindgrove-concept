@@ -8,7 +8,7 @@ import { PageTransition } from '@/components/animations/PageTransition';
 import { toast } from '@/hooks/use-toast';
 import { Lock, Mail, LogIn } from 'lucide-react';
 import { supabase, ensureUserProfile, getUserProfile, cleanupAuthState } from '@/integrations/supabase/client';
-import { useAuthStore } from '@/store/authStore';
+import { useAuthStore, UserWithMetadata } from '@/store/authStore';
 
 const AdminLogin: React.FC = () => {
   const navigate = useNavigate();
@@ -118,7 +118,7 @@ const AdminLogin: React.FC = () => {
       }
       
       // Set session in auth store with admin privileges
-      const userWithAdminMeta = {
+      const userWithAdminMeta: UserWithMetadata = {
         ...authData.user,
         account_type: 'admin',
         user_metadata: {

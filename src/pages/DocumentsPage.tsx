@@ -18,10 +18,24 @@ export default function DocumentsPage() {
   const { documents, searchResults, isSearching, handleSearch, refreshDocuments, isRefreshing, isLoading } = useDocuments();
 
   useEffect(() => {
-    // Refresh documents when page loads
-    console.log("DocumentsPage mounted, refreshing documents");
+    // Refresh documents when page loads with timeout to ensure auth is ready
+    console.log("DocumentsPage mounted");
+    
     if (user?.id) {
+      console.log("User available, refreshing documents immediately");
       refreshDocuments();
+    } else {
+      console.log("No user available yet, waiting 500ms before refresh attempt");
+      const timeoutId = setTimeout(() => {
+        if (user?.id) {
+          console.log("User available after timeout, refreshing documents");
+          refreshDocuments();
+        } else {
+          console.log("Still no user available after timeout");
+        }
+      }, 500);
+      
+      return () => clearTimeout(timeoutId);
     }
   }, [refreshDocuments, user?.id]);
 
@@ -33,6 +47,29 @@ export default function DocumentsPage() {
       description: "Your documents are being refreshed from the database."
     });
   }, [refreshDocuments]);
+
+  // Display content based on loading state
+  const renderContent = () => {
+    if (isLoading || isRefreshing) {
+      return (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {[1, 2, 3].map((i) => (
+            <DocumentCardSkeleton key={i} />
+          ))}
+        </div>
+      );
+    }
+
+    if (documents.length === 0) {
+      return (
+        <p className="text-center text-muted-foreground mt-8 p-8 border border-dashed rounded-lg">
+          No documents found. Upload a new document to get started.
+        </p>
+      );
+    }
+
+    return <DocumentList documents={documents} />;
+  };
 
   return (
     <MainLayout>
@@ -80,22 +117,7 @@ export default function DocumentsPage() {
               Your Documents
             </h2>
             
-            {isLoading || isRefreshing ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {[1, 2, 3].map((i) => (
-                  <DocumentCardSkeleton key={i} />
-                ))}
-              </div>
-            ) : (
-              <>
-                <DocumentList documents={documents} />
-                {documents.length === 0 && !isLoading && (
-                  <p className="text-center text-muted-foreground mt-8">
-                    No documents found. Upload a new document to get started.
-                  </p>
-                )}
-              </>
-            )}
+            {renderContent()}
           </div>
         </div>
       </PageTransition>
