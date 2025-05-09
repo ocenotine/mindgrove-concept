@@ -3,14 +3,14 @@ import { useEffect, useState } from 'react';
 import { useAuthStore } from '@/store/authStore';
 
 export const useAuth = () => {
-  const { user, session, isInitialized } = useAuthStore();
-  const [isLoading, setIsLoading] = useState(!isInitialized);
+  const { user, session, loading } = useAuthStore();
+  const [isLoading, setIsLoading] = useState(loading);
 
   useEffect(() => {
-    if (isInitialized) {
+    if (!loading) {
       setIsLoading(false);
     }
-  }, [isInitialized]);
+  }, [loading]);
 
   return {
     user,

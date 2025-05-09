@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Play, Download, Flag, Clock, FileText, Lightbulb, AlertCircle } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
@@ -19,11 +18,16 @@ interface ProcessingState {
   error?: string;
 }
 
+interface Timestamp {
+  time: number;
+  text: string;
+}
+
 interface VideoDigest {
   transcript: string;
   summary: string;
   keyConcepts: string[];
-  timestamps: { time: number; text: string }[];
+  timestamps: Timestamp[];
 }
 
 export default function VideoDigestProcessor({ 
@@ -57,11 +61,24 @@ export default function VideoDigestProcessor({
         }
         
         if (data) {
+          // Parse timestamps to ensure they match the expected format
+          let parsedTimestamps: Timestamp[] = [];
+          
+          if (data.timestamps) {
+            // Handle different potential formats of timestamps data
+            if (Array.isArray(data.timestamps)) {
+              parsedTimestamps = data.timestamps.map((item: any) => ({
+                time: typeof item.time === 'number' ? item.time : 0,
+                text: typeof item.text === 'string' ? item.text : ''
+              }));
+            }
+          }
+          
           setDigestData({
             transcript: data.transcript || '',
             summary: data.summary || '',
-            keyConcepts: data.key_concepts || [],
-            timestamps: data.timestamps || []
+            keyConcepts: Array.isArray(data.key_concepts) ? data.key_concepts : [],
+            timestamps: parsedTimestamps
           });
           
           setProcessing({
