@@ -1,122 +1,80 @@
+import {
+  BrowserRouter as Router,
+  Routes,
+  Route,
+  Link,
+  useNavigate,
+} from 'react-router-dom';
+import { ThemeProvider } from "@/components/theme-provider"
+import { ErrorBoundary } from 'react-error-boundary';
+import { useEffect, useState } from 'react';
+import { useToast } from "@/components/ui/use-toast"
+import { Toaster } from "@/components/ui/toaster"
+import { useAuth } from '@/hooks/useAuth';
+import { AuthCallback } from '@/pages/AuthCallback';
+import LandingPage from '@/pages/LandingPage';
+import Login from '@/pages/Login';
+import Signup from '@/pages/Signup';
+import Dashboard from '@/pages/Dashboard';
+import DocumentsPage from '@/pages/DocumentsPage';
+import LectureDigestPage from '@/pages/LectureDigestPage';
 
-import React, { Suspense, useEffect } from 'react';
-import './App.css';
-import { Route, Routes, useLocation, useNavigate } from 'react-router-dom';
-import Index from './pages/Index';
-import LandingPage from './pages/LandingPage';
-import Login from './pages/Login';
-import Signup from './pages/Signup';
-import Dashboard from './pages/Dashboard';
-import ProfilePage from './pages/ProfilePage';
-import EditProfile from './pages/EditProfile';
-import NotFound from './pages/NotFound';
-import DocumentsPage from './pages/DocumentsPage';
-import DocumentView from './pages/DocumentView';
-import DocumentUploadPage from './pages/DocumentUploadPage';
-import AIChat from './pages/AIChat';
-import FlashcardsPage from './pages/FlashcardsPage';
-import PrivacyPolicy from './pages/PrivacyPolicy';
-import TermsOfService from './pages/TermsOfService';
-import LoadingScreen from './components/animations/LoadingScreen';
-import InstitutionDashboard from './pages/InstitutionDashboard';
-import InstitutionSettings from './pages/InstitutionSettings';
-import InstitutionSubscription from './pages/InstitutionSubscription';
-import InstitutionUsers from './pages/InstitutionUsers';
-import InstitutionAIChat from './pages/InstitutionAIChat';
-import AuthCallback from './pages/AuthCallback';
-import ProgressPage from './pages/ProgressPage';
-import QuizPage from './pages/QuizPage';
-import AdminLogin from './pages/AdminLogin';
-import AdminDashboard from './pages/AdminDashboard';
-import QuizPractice from './pages/QuizPractice';
-import QuizEdit from './pages/QuizEdit';
-
-// Add BackToTop component
-import BackToTop from './components/ui/BackToTop';
-import { useAuthStore } from '@/store/authStore';
+function ErrorFallback({ error, resetErrorBoundary }) {
+  return (
+    <div role="alert">
+      <p>Something went wrong:</p>
+      <pre>{error.message}</pre>
+      <button onClick={resetErrorBoundary}>Try again</button>
+    </div>
+  )
+}
 
 function App() {
-  const location = useLocation();
-  const navigate = useNavigate();
-  const { user, isAuthenticated, initialize } = useAuthStore();
+  const { isLoading } = useAuth();
+  const { toast } = useToast();
   
-  // Initialize auth on app start
-  useEffect(() => {
-    initialize();
-  }, [initialize]);
-  
-  // Ensure index route redirects correctly
-  useEffect(() => {
-    if (location.pathname === '/' && !location.hash.includes('#/')) {
-      navigate('/landing', { replace: true });
-    }
-  }, [location, navigate]);
-  
-  // Handle redirection based on user account type
-  useEffect(() => {
-    if (isAuthenticated && user) {
-      const accountType = user.user_metadata?.account_type || user.account_type;
-      console.log("App.tsx: User authenticated with account type:", accountType);
-      const currentPath = location.pathname;
-
-      // Redirect to appropriate dashboard based on account type
-      if (accountType === 'admin' && 
-          (currentPath === '/dashboard' || 
-          currentPath === '/institution/dashboard')) {
-        navigate('/admin/dashboard', { replace: true });
-      } else if (accountType === 'institution' && 
-                currentPath === '/dashboard') {
-        navigate('/institution/dashboard', { replace: true });
-      }
-    }
-  }, [isAuthenticated, user, location.pathname, navigate]);
+  // Show loading indicator while checking auth status
+  if (isLoading) {
+    return <div>Loading...</div>;
+  }
   
   return (
-    <Suspense fallback={<div className="h-screen w-screen flex items-center justify-center"><LoadingScreen /></div>}>
-      <Routes>
-        <Route path="/" element={<Index />} />
-        <Route path="/landing" element={<LandingPage />} />
-        <Route path="/login" element={<Login />} />
-        <Route path="/signup" element={<Signup />} />
-        <Route path="/auth/callback" element={<AuthCallback />} />
-        
-        {/* Student Routes */}
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/documents" element={<DocumentsPage />} />
-        <Route path="/document/:id" element={<DocumentView />} />
-        <Route path="/documents/view/:id" element={<DocumentView />} />
-        <Route path="/documents/upload" element={<DocumentUploadPage />} />
-        <Route path="/ai-chat" element={<AIChat />} />
-        <Route path="/flashcards" element={<FlashcardsPage />} />
-        <Route path="/progress" element={<ProgressPage />} />
-        <Route path="/quiz" element={<QuizPage />} />
-        <Route path="/quiz/practice/:id" element={<QuizPractice />} />
-        <Route path="/quiz/edit/:id" element={<QuizEdit />} />
-        
-        {/* Institution Routes */}
-        <Route path="/institution/dashboard" element={<InstitutionDashboard />} />
-        <Route path="/institution/settings" element={<InstitutionSettings />} />
-        <Route path="/institution/subscription" element={<InstitutionSubscription />} />
-        <Route path="/institution/users" element={<InstitutionUsers />} />
-        <Route path="/institution/ai-chat" element={<InstitutionAIChat />} />
-        
-        {/* Admin Routes */}
-        <Route path="/admin/login" element={<AdminLogin />} />
-        <Route path="/admin/dashboard" element={<AdminDashboard />} />
-        
-        {/* Common Routes */}
-        <Route path="/profile" element={<ProfilePage />} />
-        <Route path="/profile/edit" element={<EditProfile />} />
-        <Route path="/privacy" element={<PrivacyPolicy />} />
-        <Route path="/terms" element={<TermsOfService />} />
-        
-        {/* 404 Route - MUST be last */}
-        <Route path="*" element={<NotFound />} />
-      </Routes>
-      
-      {/* Global BackToTop component */}
-      <BackToTop />
-    </Suspense>
+    <div className="min-h-screen bg-background flex flex-col">
+      <ThemeProvider
+        attribute="class"
+        defaultTheme="system"
+        enableSystem
+        disableTransitionOnChange
+      >
+        <ErrorBoundary
+          FallbackComponent={ErrorFallback}
+          onError={(error, info) => {
+            console.error("Caught an error: ", error, info);
+            toast({
+              title: "Error",
+              description: error.message,
+              variant: "destructive",
+            });
+          }}
+        >
+          <Router>
+            <Routes>
+              <Route path="/" element={<LandingPage />} />
+              <Route path="/login" element={<Login />} />
+              <Route path="/signup" element={<Signup />} />
+              <Route path="/auth-callback" element={<AuthCallback />} />
+              <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/documents" element={<DocumentsPage />} />
+              
+              {/* Add the new Lecture Digest route */}
+              <Route path="/lecture-digest" element={<LectureDigestPage />} />
+              
+            </Routes>
+          </Router>
+        </ErrorBoundary>
+        <Toaster />
+      </ThemeProvider>
+    </div>
   );
 }
 
