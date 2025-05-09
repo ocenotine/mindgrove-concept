@@ -1,4 +1,3 @@
-
 import { create } from 'zustand';
 import { supabase } from '@/integrations/supabase/client';
 import { createJSONStorage, persist } from 'zustand/middleware';
@@ -70,14 +69,20 @@ export const useDocumentStore = create<DocumentState>()(
             return [];
           }
 
+          console.log("Fetching documents for user:", user.id);
+
           const { data, error } = await supabase
             .from('documents')
             .select('*')
             .eq('user_id', user.id)
             .order('updated_at', { ascending: false });
 
-          if (error) throw error;
+          if (error) {
+            console.error("Error in fetchDocuments:", error);
+            throw error;
+          }
 
+          console.log("Documents fetched:", data?.length || 0);
           set({ documents: data || [], isLoading: false });
           return data || [];
         } catch (error: any) {

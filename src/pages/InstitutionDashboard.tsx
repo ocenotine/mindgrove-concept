@@ -40,18 +40,23 @@ const InstitutionDashboard: React.FC = () => {
       
       try {
         setIsLoading(true);
+        console.log("Fetching institution data for user:", user);
         
         const institutionId = user.institution_id || user.user_metadata?.institution_id;
+        console.log("Institution ID:", institutionId);
         
         // If we have an institution ID, fetch the institution details
         if (institutionId) {
-          const { data: institutionData } = await supabase
+          const { data: institutionData, error } = await supabase
             .from('institutions')
             .select('name')
             .eq('id', institutionId)
             .single();
             
-          if (institutionData) {
+          if (error) {
+            console.error("Error fetching institution:", error);
+          } else if (institutionData) {
+            console.log("Institution data:", institutionData);
             setInstitutionName(institutionData.name);
           }
         }
@@ -62,7 +67,9 @@ const InstitutionDashboard: React.FC = () => {
           .select('id')
           .eq('institution_id', institutionId);
           
-        if (usersError) throw usersError;
+        if (usersError) {
+          console.error("Error fetching users:", usersError);
+        }
         
         // Count documents created by users in this institution
         const { data: documentsData, error: documentsError } = await supabase
@@ -71,15 +78,21 @@ const InstitutionDashboard: React.FC = () => {
           .order('created_at', { ascending: false })
           .limit(10);
           
-        if (documentsError) throw documentsError;
+        if (documentsError) {
+          console.error("Error fetching documents:", documentsError);
+        }
         
         // Process document data to include user information
-        const recentDocs = await Promise.all(documentsData.map(async (doc) => {
-          const { data: userData } = await supabase
+        const recentDocs = await Promise.all((documentsData || []).map(async (doc) => {
+          const { data: userData, error: userError } = await supabase
             .from('profiles')
             .select('email')
             .eq('id', doc.user_id)
             .single();
+            
+          if (userError) {
+            console.error("Error fetching user for document:", userError);
+          }
             
           return {
             id: doc.id,
@@ -96,14 +109,23 @@ const InstitutionDashboard: React.FC = () => {
           .eq('account_type', 'student')
           .eq('institution_id', institutionId);
           
-        if (studentsError) throw studentsError;
+        if (studentsError) {
+          console.error("Error fetching students:", studentsError);
+        }
         
         setStats({
           totalUsers: usersData?.length || 0,
           totalStudents: studentsData?.length || 0,
-          activeCourses: Math.floor(Math.random() * 5) + 1, // Still mock data for courses
+          activeCourses: Math.floor(Math.random() * 5) + 1, // Still mock data for courses until we implement course tracking
           totalDocuments: documentsData?.length || 0,
           recentDocuments: recentDocs
+        });
+        
+        console.log("Dashboard stats:", {
+          users: usersData?.length || 0,
+          students: studentsData?.length || 0,
+          documents: documentsData?.length || 0,
+          recentDocs: recentDocs.length
         });
       } catch (error) {
         console.error("Error fetching institution data:", error);

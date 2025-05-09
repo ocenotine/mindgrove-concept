@@ -11,16 +11,22 @@ import DocumentCardSkeleton from '@/components/document/DocumentCardSkeleton';
 import { Button } from '@/components/ui/button';
 import { Plus, Upload, RefreshCcw } from 'lucide-react';
 import { toast } from '@/components/ui/use-toast';
+import { useAuthStore } from '@/store/authStore';
 
 export default function DocumentsPage() {
+  const { user } = useAuthStore();
   const { documents, searchResults, isSearching, handleSearch, refreshDocuments, isRefreshing, isLoading } = useDocuments();
 
   useEffect(() => {
     // Refresh documents when page loads
-    refreshDocuments();
-  }, [refreshDocuments]);
+    console.log("DocumentsPage mounted, refreshing documents");
+    if (user?.id) {
+      refreshDocuments();
+    }
+  }, [refreshDocuments, user?.id]);
 
   const handleRefresh = useCallback(() => {
+    console.log("Manual refresh triggered");
     refreshDocuments();
     toast({
       title: "Refreshing documents",
@@ -81,7 +87,14 @@ export default function DocumentsPage() {
                 ))}
               </div>
             ) : (
-              <DocumentList documents={documents} />
+              <>
+                <DocumentList documents={documents} />
+                {documents.length === 0 && !isLoading && (
+                  <p className="text-center text-muted-foreground mt-8">
+                    No documents found. Upload a new document to get started.
+                  </p>
+                )}
+              </>
             )}
           </div>
         </div>

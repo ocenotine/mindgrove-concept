@@ -80,6 +80,7 @@ export const useDocuments = () => {
           filter: `user_id=eq.${user.id}`
         },
         () => {
+          console.log("Document change detected, refreshing documents");
           refreshDocuments();
         }
       )
@@ -90,8 +91,10 @@ export const useDocuments = () => {
     };
   }, [user?.id, refreshDocuments]);
 
+  // Initial fetch of documents
   useEffect(() => {
     if (user?.id && documents.length === 0 && !isLoading) {
+      console.log("Initial document fetch for user:", user.id);
       refreshDocuments();
     }
   }, [user?.id, documents.length, isLoading, refreshDocuments]);

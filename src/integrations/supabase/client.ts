@@ -48,6 +48,27 @@ export type StoredQuiz = {
   updated_at?: string;
 };
 
+// Helper function to clean up auth state to prevent login issues
+export const cleanupAuthState = () => {
+  // Remove standard auth tokens
+  localStorage.removeItem('supabase.auth.token');
+  
+  // Remove all Supabase auth keys from localStorage
+  Object.keys(localStorage).forEach((key) => {
+    if (key.startsWith('supabase.auth.') || key.includes('sb-')) {
+      console.log("Removing auth key:", key);
+      localStorage.removeItem(key);
+    }
+  });
+  
+  // Remove from sessionStorage if in use
+  Object.keys(sessionStorage || {}).forEach((key) => {
+    if (key.startsWith('supabase.auth.') || key.includes('sb-')) {
+      sessionStorage.removeItem(key);
+    }
+  });
+};
+
 // Helper function to create a profile if it doesn't exist
 export const ensureUserProfile = async (userId: string, email: string, accountType: string = 'student') => {
   try {
