@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from 'react';
-import { Play, Download, Flag, Clock, FileText, Lightbulb } from 'lucide-react';
+import { Play, Download, Flag, Clock, FileText, Lightbulb, AlertCircle } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
@@ -42,6 +42,7 @@ export default function VideoDigestProcessor({
   useEffect(() => {
     const checkExistingDigest = async () => {
       try {
+        // Use typed query for video_digests table
         const { data, error } = await supabase
           .from('video_digests')
           .select('*')
@@ -265,7 +266,6 @@ export default function VideoDigestProcessor({
                   className="p-2 rounded-md bg-muted/50 hover:bg-muted cursor-pointer"
                   onClick={() => {
                     // Handle clicking to jump to this position in the video
-                    // This would require integration with a video player component
                     console.log(`Jump to ${item.time} seconds`);
                   }}
                 >

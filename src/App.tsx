@@ -1,17 +1,17 @@
+
 import {
   BrowserRouter as Router,
   Routes,
   Route,
-  Link,
   useNavigate,
 } from 'react-router-dom';
-import { ThemeProvider } from "@/components/theme-provider"
+import { ThemeProvider } from "./components/theme-provider";
 import { ErrorBoundary } from 'react-error-boundary';
 import { useEffect, useState } from 'react';
-import { useToast } from "@/components/ui/use-toast"
-import { Toaster } from "@/components/ui/toaster"
-import { useAuth } from '@/hooks/useAuth';
-import { AuthCallback } from '@/pages/AuthCallback';
+import { useToast } from "./components/ui/use-toast";
+import { Toaster } from "./components/ui/toaster";
+import { useAuth } from './hooks/useAuth';
+import AuthCallback from './pages/AuthCallback';
 import LandingPage from '@/pages/LandingPage';
 import Login from '@/pages/Login';
 import Signup from '@/pages/Signup';

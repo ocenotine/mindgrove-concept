@@ -1,10 +1,10 @@
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Upload, FileVideo, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import { toast } from '@/components/ui/use-toast';
+import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/store/authStore';
 
@@ -17,6 +17,7 @@ export default function VideoUploader({ onUploadSuccess }: VideoUploaderProps) {
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const { toast } = useToast();
   
   const onDrop = useCallback((acceptedFiles: File[]) => {
     const file = acceptedFiles[0];
@@ -40,7 +41,7 @@ export default function VideoUploader({ onUploadSuccess }: VideoUploaderProps) {
         variant: "destructive"
       });
     }
-  }, []);
+  }, [toast]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -68,10 +69,6 @@ export default function VideoUploader({ onUploadSuccess }: VideoUploaderProps) {
         .upload(filePath, selectedFile, {
           cacheControl: '3600',
           upsert: false,
-          onUploadProgress: (progress) => {
-            const percent = (progress.loaded / progress.total) * 100;
-            setUploadProgress(Math.round(percent));
-          }
         });
       
       if (error) {
@@ -120,6 +117,26 @@ export default function VideoUploader({ onUploadSuccess }: VideoUploaderProps) {
       setUploading(false);
     }
   };
+  
+  // Manual progress update
+  const updateProgress = (percent: number) => {
+    setUploadProgress(percent);
+  };
+  
+  // Simulate upload progress (since Supabase JS v2 doesn't support onUploadProgress)
+  // In a real implementation, we would use a more accurate method
+  useEffect(() => {
+    if (!uploading || uploadProgress >= 100) return;
+    
+    const interval = setInterval(() => {
+      setUploadProgress(prev => {
+        const increment = Math.random() * 10;
+        return Math.min(prev + increment, 95); // Cap at 95% until complete
+      });
+    }, 500);
+    
+    return () => clearInterval(interval);
+  }, [uploading, uploadProgress]);
   
   return (
     <div className="space-y-4">
@@ -171,7 +188,7 @@ export default function VideoUploader({ onUploadSuccess }: VideoUploaderProps) {
         <div className="space-y-2">
           <div className="flex justify-between text-sm">
             <span>Uploading...</span>
-            <span>{uploadProgress}%</span>
+            <span>{uploadProgress.toFixed(0)}%</span>
           </div>
           <Progress value={uploadProgress} />
         </div>

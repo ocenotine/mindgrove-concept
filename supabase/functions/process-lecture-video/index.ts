@@ -1,7 +1,30 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.0";
+
+interface VideoDigest {
+  video_id: string;
+  transcript?: string;
+  summary?: string;
+  key_concepts?: string[];
+  timestamps?: Array<{ time: number; text: string }>;
+}
+
+interface LectureVideo {
+  id: string;
+  user_id: string;
+  file_path: string;
+  file_name: string;
+  file_size?: number;
+  file_type?: string;
+  duration_seconds?: number;
+  status: string;
+  error_message?: string;
+  processed_at?: string;
+  has_digest?: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
 
 // Environment variables
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';

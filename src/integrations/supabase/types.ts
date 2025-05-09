@@ -260,6 +260,54 @@ export type Database = {
         }
         Relationships: []
       }
+      lecture_videos: {
+        Row: {
+          created_at: string | null
+          duration_seconds: number | null
+          error_message: string | null
+          file_name: string
+          file_path: string
+          file_size: number | null
+          file_type: string | null
+          has_digest: boolean | null
+          id: string
+          processed_at: string | null
+          status: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          duration_seconds?: number | null
+          error_message?: string | null
+          file_name: string
+          file_path: string
+          file_size?: number | null
+          file_type?: string | null
+          has_digest?: boolean | null
+          id?: string
+          processed_at?: string | null
+          status?: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          duration_seconds?: number | null
+          error_message?: string | null
+          file_name?: string
+          file_path?: string
+          file_size?: number | null
+          file_type?: string | null
+          has_digest?: boolean | null
+          id?: string
+          processed_at?: string | null
+          status?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           account_type: string | null
@@ -594,6 +642,44 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      video_digests: {
+        Row: {
+          created_at: string | null
+          id: string
+          key_concepts: string[] | null
+          summary: string | null
+          timestamps: Json | null
+          transcript: string | null
+          video_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          key_concepts?: string[] | null
+          summary?: string | null
+          timestamps?: Json | null
+          transcript?: string | null
+          video_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          key_concepts?: string[] | null
+          summary?: string | null
+          timestamps?: Json | null
+          transcript?: string | null
+          video_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "video_digests_video_id_fkey"
+            columns: ["video_id"]
+            isOneToOne: false
+            referencedRelation: "lecture_videos"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
