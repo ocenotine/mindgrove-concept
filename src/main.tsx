@@ -1,9 +1,11 @@
 
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import { BrowserRouter } from 'react-router-dom';
+import { ThemeProvider } from '@/components/theme/theme-provider';
+import { Toaster } from '@/components/ui/toaster';
 import App from './App';
 import './index.css';
-import './App.css';
 import { setOpenRouterApiKey } from './utils/openRouterUtils';
 
 // Initialize the API key if not yet set
@@ -16,6 +18,11 @@ if (!localStorage.getItem('openRouterApiKey') && hardcodedApiKey) {
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <App />
+    <BrowserRouter>
+      <ThemeProvider defaultTheme="dark" storageKey="ui-theme">
+        <App />
+        <Toaster />
+      </ThemeProvider>
+    </BrowserRouter>
   </React.StrictMode>,
 );

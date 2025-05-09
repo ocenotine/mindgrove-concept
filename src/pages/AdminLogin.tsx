@@ -1,14 +1,14 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import { PageTransition } from '@/components/animations/PageTransition';
-import { useToast } from '@/components/ui/use-toast';
+import { toast } from '@/hooks/use-toast';
 import { Lock, Mail, LogIn } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuthStore } from '@/store/authStore';
-import type { UserWithMetadata } from '@/store/authStore';
+import { supabase, ensureUserProfile, getUserProfile, cleanupAuthState } from '@/integrations/supabase/client';
+import { useAuthStore, UserWithMetadata } from '@/store/authStore';
 
 const AdminLogin: React.FC = () => {
   const navigate = useNavigate();
@@ -16,8 +16,7 @@ const AdminLogin: React.FC = () => {
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
-  const { setSession, setUser } = useAuthStore();
-  const { toast } = useToast();
+  const { setSession, setUser, cleanupAuthState: storeCleanup } = useAuthStore();
 
   useEffect(() => {
     // Check if already logged in as admin
@@ -27,14 +26,7 @@ const AdminLogin: React.FC = () => {
       if (session?.user) {
         console.log("Found existing session, checking if admin", session.user.email);
         try {
-          const { data: profile, error } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', session.user.id)
-            .single();
-            
-          if (error) throw error;
-          
+          const profile = await getUserProfile(session.user.id);
           console.log("Profile for existing session:", profile);
           
           if (profile?.account_type === 'admin') {
@@ -58,14 +50,17 @@ const AdminLogin: React.FC = () => {
     try {
       console.log("Attempting admin login with:", email);
       
-      // First, try to sign out of any existing session
+      // Always clean up auth state first and attempt signout
+      cleanupAuthState();
+      storeCleanup();
+      
       try {
         await supabase.auth.signOut({ scope: 'global' });
       } catch (err) {
         console.log("Signout error (can be ignored):", err);
       }
       
-      // Sign in with Supabase
+      // First, try to log in with Supabase
       console.log("Signing in with email:", email);
       const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
         email: email,
@@ -84,20 +79,16 @@ const AdminLogin: React.FC = () => {
       
       console.log("Admin auth successful, user:", authData.user);
       
-      // Check if profile exists
-      const { data: existingProfile, error: profileError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', authData.user.id)
-        .maybeSingle();
-        
-      if (profileError && profileError.code !== 'PGRST116') {
-        console.error("Error checking profile:", profileError);
-      }
+      // Ensure profile exists with admin privileges
+      await ensureUserProfile(authData.user.id, email, 'admin');
       
-      // Create or update profile
-      if (!existingProfile) {
-        console.log("Creating new admin profile");
+      // Get the updated profile
+      const profile = await getUserProfile(authData.user.id);
+      console.log("Admin profile after login:", profile);
+      
+      if (!profile) {
+        console.error("Profile not found after login");
+        // Create profile since it doesn't exist
         const { error: insertError } = await supabase
           .from('profiles')
           .insert({
@@ -110,8 +101,9 @@ const AdminLogin: React.FC = () => {
         if (insertError) {
           console.error("Error creating admin profile:", insertError);
         }
-      } else if (existingProfile.account_type !== 'admin') {
-        console.log("Updating profile to admin type");
+      } else if (profile.account_type !== 'admin') {
+        console.error("Profile exists but not admin type:", profile);
+        // Update the profile to admin type
         const { error: updateError } = await supabase
           .from('profiles')
           .update({ 
@@ -128,8 +120,9 @@ const AdminLogin: React.FC = () => {
       // Set session in auth store with admin privileges
       const userWithAdminMeta: UserWithMetadata = {
         ...authData.user,
+        account_type: 'admin',
         user_metadata: {
-          ...(authData.user.user_metadata || {}),
+          ...authData.user.user_metadata,
           account_type: 'admin'
         }
       };
@@ -146,8 +139,8 @@ const AdminLogin: React.FC = () => {
         description: "Welcome to the MindGrove admin dashboard",
       });
       
-      // Navigate to dashboard
-      navigate('/admin/dashboard');
+      // Force page reload for a clean state
+      window.location.href = '/admin/dashboard';
     } catch (error) {
       console.error('Login error:', error);
       
@@ -157,7 +150,6 @@ const AdminLogin: React.FC = () => {
         description: error instanceof Error ? error.message : "Invalid admin credentials",
         variant: "destructive"
       });
-    } finally {
       setIsLoading(false);
     }
   };
