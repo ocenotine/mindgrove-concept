@@ -7,8 +7,8 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 import { PageTransition } from '@/components/animations/PageTransition';
 import { toast } from '@/hooks/use-toast';
 import { Lock, Mail, LogIn } from 'lucide-react';
-import { supabase, ensureUserProfile, getUserProfile, cleanupAuthState } from '@/integrations/supabase/client';
-import { useAuthStore, UserWithMetadata } from '@/store/authStore';
+import { supabase, getUserProfile, cleanupAuthState } from '@/integrations/supabase/client';
+import { useAuthStore } from '@/store/authStore';
 
 const AdminLogin: React.FC = () => {
   const navigate = useNavigate();
@@ -21,21 +21,26 @@ const AdminLogin: React.FC = () => {
   useEffect(() => {
     // Check if already logged in as admin
     const checkAdminStatus = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (session?.user) {
-        console.log("Found existing session, checking if admin", session.user.email);
-        try {
-          const profile = await getUserProfile(session.user.id);
-          console.log("Profile for existing session:", profile);
-          
-          if (profile?.account_type === 'admin') {
-            console.log("Existing admin session found, redirecting to dashboard");
-            navigate('/admin/dashboard');
+      try {
+        const { data } = await supabase.auth.getSession();
+        const session = data?.session;
+        
+        if (session?.user) {
+          console.log("Found existing session, checking if admin", session.user.email);
+          try {
+            const profile = await getUserProfile(session.user.id);
+            console.log("Profile for existing session:", profile);
+            
+            if (profile?.account_type === 'admin') {
+              console.log("Existing admin session found, redirecting to dashboard");
+              navigate('/admin/dashboard');
+            }
+          } catch (err) {
+            console.error("Error checking admin status:", err);
           }
-        } catch (err) {
-          console.error("Error checking admin status:", err);
         }
+      } catch (err) {
+        console.error("Error checking session:", err);
       }
     };
     
@@ -72,37 +77,19 @@ const AdminLogin: React.FC = () => {
         throw authError;
       }
       
-      if (!authData.user) {
+      if (!authData?.user) {
         console.error("No user returned from auth");
         throw new Error('Login failed - no user returned');
       }
       
       console.log("Admin auth successful, user:", authData.user);
       
-      // Ensure profile exists with admin privileges
-      await ensureUserProfile(authData.user.id, email, 'admin');
-      
-      // Get the updated profile
+      // Get the profile to verify admin status
       const profile = await getUserProfile(authData.user.id);
       console.log("Admin profile after login:", profile);
       
-      if (!profile) {
-        console.error("Profile not found after login");
-        // Create profile since it doesn't exist
-        const { error: insertError } = await supabase
-          .from('profiles')
-          .insert({
-            id: authData.user.id,
-            email: email,
-            account_type: 'admin',
-            name: 'Admin User'
-          });
-        
-        if (insertError) {
-          console.error("Error creating admin profile:", insertError);
-        }
-      } else if (profile.account_type !== 'admin') {
-        console.error("Profile exists but not admin type:", profile);
+      // Update user metadata with admin role if necessary
+      if (!profile?.account_type || profile.account_type !== 'admin') {
         // Update the profile to admin type
         const { error: updateError } = await supabase
           .from('profiles')
@@ -114,11 +101,14 @@ const AdminLogin: React.FC = () => {
         
         if (updateError) {
           console.error("Error updating admin profile:", updateError);
+          // Continue anyway, we'll set it in the session
+        } else {
+          console.log("Updated account_type to admin");
         }
       }
       
       // Set session in auth store with admin privileges
-      const userWithAdminMeta: UserWithMetadata = {
+      const userWithAdminMeta = {
         ...authData.user,
         account_type: 'admin',
         user_metadata: {
@@ -139,8 +129,8 @@ const AdminLogin: React.FC = () => {
         description: "Welcome to the MindGrove admin dashboard",
       });
       
-      // Force page reload for a clean state
-      window.location.href = '/admin/dashboard';
+      // Navigate to admin dashboard
+      navigate('/admin/dashboard');
     } catch (error) {
       console.error('Login error:', error);
       

@@ -9,12 +9,13 @@ import { toast } from '@/hooks/use-toast';
 export default function AuthCallback() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { session, setSession, setUser } = useAuthStore();
+  const { setSession, setUser } = useAuthStore();
   const [message, setMessage] = useState('Processing authentication...');
 
   useEffect(() => {
     const handleAuthCallback = async () => {
       try {
+        console.log("AuthCallback: Processing auth callback");
         // Get the URL parameters
         const params = new URLSearchParams(location.search);
         const hash = location.hash || window.location.hash;
@@ -34,6 +35,7 @@ export default function AuthCallback() {
           return;
         }
         
+        console.log("AuthCallback: Getting session");
         // Get the current session
         const { data, error } = await supabase.auth.getSession();
         
@@ -43,17 +45,22 @@ export default function AuthCallback() {
         
         if (data?.session) {
           // We have a session, process it
+          console.log("AuthCallback: Session found", data.session.user?.email);
           setSession(data.session);
           setUser(data.session.user);
           
           // Create profile if needed
           if (data.session.user) {
             console.log("Creating profile if needed for:", data.session.user.email);
-            await ensureUserProfile(
-              data.session.user.id, 
-              data.session.user.email || '', 
-              data.session.user.email === 'admin@mindgrove.com' ? 'admin' : 'student'
-            );
+            try {
+              await ensureUserProfile(
+                data.session.user.id, 
+                data.session.user.email || '', 
+                data.session.user.email === 'admin@mindgrove.com' ? 'admin' : 'student'
+              );
+            } catch (profileErr) {
+              console.error("Error ensuring user profile:", profileErr);
+            }
           }
           
           // If this was an email confirmation/verification
