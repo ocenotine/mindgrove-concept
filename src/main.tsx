@@ -9,7 +9,9 @@ import './index.css';
 import { initializeAuth } from './store/authStore';
 
 // Initialize auth with activity tracking
-initializeAuth().catch(error => {
+initializeAuth().then(() => {
+  console.log("Auth initialization complete");
+}).catch(error => {
   console.error("Failed to initialize auth:", error);
 });
 

@@ -86,7 +86,7 @@ export const ensureUserProfile = async (userId: string, email: string, accountTy
       .eq('id', userId)
       .maybeSingle(); // Using maybeSingle instead of single to avoid errors
     
-    if (error && error.code !== 'PGRST116') {
+    if (error) {
       console.error("Error checking profile:", error);
       return;
     }
@@ -162,7 +162,7 @@ export const getUserProfile = async (userId: string) => {
       .from('profiles')
       .select('*')
       .eq('id', userId)
-      .maybeSingle(); // Using maybeSingle instead of single to avoid errors
+      .maybeSingle();
       
     if (error) {
       console.error("Error fetching profile:", error);

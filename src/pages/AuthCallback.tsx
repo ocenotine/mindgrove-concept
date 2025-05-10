@@ -98,7 +98,7 @@ export default function AuthCallback() {
                   .from('profiles')
                   .select('account_type')
                   .eq('id', data.session?.user?.id)
-                  .single();
+                  .maybeSingle();
                 
                 console.log("Profile data:", profileData);
                 
@@ -128,7 +128,7 @@ export default function AuthCallback() {
                 .from('profiles')
                 .select('account_type')
                 .eq('id', data.session?.user?.id)
-                .single();
+                .maybeSingle();
               
               console.log("Profile data for routing:", profileData);
               

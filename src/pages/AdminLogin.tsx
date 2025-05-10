@@ -7,7 +7,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter }
 import { PageTransition } from '@/components/animations/PageTransition';
 import { toast } from '@/hooks/use-toast';
 import { Lock, Mail, LogIn } from 'lucide-react';
-import { supabase, getUserProfile, cleanupAuthState } from '@/integrations/supabase/client';
+import { supabase, getUserProfile, cleanupAuthState, ensureUserProfile } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/store/authStore';
 
 const AdminLogin: React.FC = () => {
@@ -83,6 +83,14 @@ const AdminLogin: React.FC = () => {
       }
       
       console.log("Admin auth successful, user:", authData.user);
+      
+      // Ensure user profile exists (critical step that was missing before)
+      try {
+        await ensureUserProfile(authData.user.id, authData.user.email || "", "admin");
+      } catch (profileErr) {
+        console.error("Error ensuring profile exists:", profileErr);
+        // Continue anyway as the login was successful
+      }
       
       // Get the profile to verify admin status
       const profile = await getUserProfile(authData.user.id);
