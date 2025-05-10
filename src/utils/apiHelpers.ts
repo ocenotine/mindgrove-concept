@@ -14,7 +14,11 @@ export const getOpenRouterApiKey = (): string | null => {
  * Set the OpenRouter API key in localStorage
  */
 export const setOpenRouterApiKey = (key: string): void => {
-  localStorage.setItem('openRouterApiKey', key);
+  if (!key || key.trim() === '') {
+    clearOpenRouterApiKey();
+    return;
+  }
+  localStorage.setItem('openRouterApiKey', key.trim());
 };
 
 /**
@@ -30,4 +34,12 @@ export const hasOpenRouterApiKey = (): boolean => {
  */
 export const clearOpenRouterApiKey = (): void => {
   localStorage.removeItem('openRouterApiKey');
+};
+
+/**
+ * Validate API key format
+ */
+export const validateApiKey = (key: string): boolean => {
+  // Basic validation - can be enhanced based on specific API key formats
+  return key && key.trim().length > 8;
 };

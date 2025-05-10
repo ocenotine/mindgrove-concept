@@ -108,17 +108,19 @@ const AdminLogin: React.FC = () => {
       }
       
       // Set session in auth store with admin privileges
-      const userWithAdminMeta = {
+      const adminUser = {
         ...authData.user,
-        account_type: 'admin',
+        name: authData.user.user_metadata?.name || 'Admin User',
+        account_type: 'admin' as const,
+        avatarUrl: authData.user.user_metadata?.avatar_url,
         user_metadata: {
           ...authData.user.user_metadata,
-          account_type: 'admin'
+          account_type: 'admin' as const
         }
       };
       
       setSession(authData.session);
-      setUser(userWithAdminMeta);
+      setUser(adminUser);
       
       // Set admin session
       localStorage.setItem('adminLoggedIn', 'true');

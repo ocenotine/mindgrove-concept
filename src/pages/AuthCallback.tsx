@@ -47,16 +47,35 @@ export default function AuthCallback() {
           // We have a session, process it
           console.log("AuthCallback: Session found", data.session.user?.email);
           setSession(data.session);
-          setUser(data.session.user);
           
-          // Create profile if needed
+          // Process user info
           if (data.session.user) {
+            // Check if email is admin
+            const isAdmin = data.session.user.email === 'admin@mindgrove.com';
+            const accountType = isAdmin ? 'admin' : 
+                              (data.session.user.user_metadata?.account_type || 'student');
+            
+            // Set user with proper typing
+            const processedUser = {
+              ...data.session.user,
+              name: data.session.user.user_metadata?.name || data.session.user.user_metadata?.full_name || '',
+              account_type: accountType,
+              avatarUrl: data.session.user.user_metadata?.avatar_url,
+              user_metadata: {
+                ...data.session.user.user_metadata,
+                account_type: accountType
+              }
+            };
+            
+            setUser(processedUser);
+            
+            // Create profile if needed
             console.log("Creating profile if needed for:", data.session.user.email);
             try {
               await ensureUserProfile(
                 data.session.user.id, 
                 data.session.user.email || '', 
-                data.session.user.email === 'admin@mindgrove.com' ? 'admin' : 'student'
+                isAdmin ? 'admin' : (data.session.user.user_metadata?.account_type || 'student')
               );
             } catch (profileErr) {
               console.error("Error ensuring user profile:", profileErr);

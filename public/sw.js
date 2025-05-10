@@ -1,10 +1,10 @@
 
-const CACHE_NAME = 'mindgrove-v1';
+const CACHE_NAME = 'mindgrove-v2'; // Increased version number
 const urlsToCache = [
   '/',
   '/index.html',
   '/manifest.json',
-  '//mindgrove.png',
+  '/mindgrove.png',
   '/document-icons/doc-icon.svg',
   '/document-icons/pdf-icon.svg',
   '/document-icons/ppt-icon.svg',
@@ -16,6 +16,9 @@ const urlsToCache = [
 
 // Install event - cache static assets
 self.addEventListener('install', (event) => {
+  // Force waiting service worker to activate immediately
+  self.skipWaiting();
+  
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then((cache) => {
@@ -27,6 +30,9 @@ self.addEventListener('install', (event) => {
 
 // Activate event - clean up old caches
 self.addEventListener('activate', (event) => {
+  // Tell the active service worker to take control of the page immediately
+  self.clients.claim();
+  
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
@@ -78,16 +84,20 @@ self.addEventListener('fetch', (event) => {
 
 // Handle push notifications
 self.addEventListener('push', (event) => {
-  const data = event.data.json();
-  const options = {
-    body: data.body,
-    icon: '//mindgrove.png',
-    badge: '//mindgrove.png'
-  };
-  
-  event.waitUntil(
-    self.registration.showNotification(data.title, options)
-  );
+  try {
+    const data = event.data.json();
+    const options = {
+      body: data.body,
+      icon: '/mindgrove.png',
+      badge: '/mindgrove.png'
+    };
+    
+    event.waitUntil(
+      self.registration.showNotification(data.title, options)
+    );
+  } catch (err) {
+    console.error('Error processing push notification:', err);
+  }
 });
 
 // Handle notification clicks

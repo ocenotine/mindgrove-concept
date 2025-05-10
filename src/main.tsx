@@ -9,7 +9,9 @@ import './index.css';
 import { initializeAuth } from './store/authStore';
 
 // Initialize auth with activity tracking
-initializeAuth();
+initializeAuth().catch(error => {
+  console.error("Failed to initialize auth:", error);
+});
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

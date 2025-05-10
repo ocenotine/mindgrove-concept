@@ -74,19 +74,24 @@ export const ensureUserProfile = async (userId: string, email: string, accountTy
   try {
     console.log("Ensuring profile exists for:", userId, email, accountType);
     
+    if (!userId) {
+      console.error("No user ID provided");
+      return;
+    }
+    
     // Check if profile exists
     const { data, error } = await supabase
       .from('profiles')
       .select('*')
       .eq('id', userId)
-      .single();
+      .maybeSingle(); // Using maybeSingle instead of single to avoid errors
     
     if (error && error.code !== 'PGRST116') {
       console.error("Error checking profile:", error);
       return;
     }
     
-    if (!data || error?.code === 'PGRST116') {
+    if (!data) {
       // Profile doesn't exist, create it
       console.log("Creating new profile for user:", userId, email, accountType);
       const { error: insertError } = await supabase
@@ -94,7 +99,10 @@ export const ensureUserProfile = async (userId: string, email: string, accountTy
         .insert({
           id: userId,
           email: email,
-          account_type: accountType
+          account_type: accountType,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          last_active: new Date().toISOString()
         });
       
       if (insertError) {
@@ -109,7 +117,10 @@ export const ensureUserProfile = async (userId: string, email: string, accountTy
       if (accountType === 'admin' && data.account_type !== 'admin') {
         const { error: updateError } = await supabase
           .from('profiles')
-          .update({ account_type: 'admin' })
+          .update({ 
+            account_type: 'admin',
+            updated_at: new Date().toISOString()
+          })
           .eq('id', userId);
         
         if (updateError) {
@@ -125,7 +136,10 @@ export const ensureUserProfile = async (userId: string, email: string, accountTy
       console.log("Detected admin email, ensuring admin privileges");
       const { error: updateError } = await supabase
         .from('profiles')
-        .update({ account_type: 'admin' })
+        .update({ 
+          account_type: 'admin',
+          updated_at: new Date().toISOString()
+        })
         .eq('id', userId);
       
       if (updateError) {
@@ -148,7 +162,7 @@ export const getUserProfile = async (userId: string) => {
       .from('profiles')
       .select('*')
       .eq('id', userId)
-      .single();
+      .maybeSingle(); // Using maybeSingle instead of single to avoid errors
       
     if (error) {
       console.error("Error fetching profile:", error);
