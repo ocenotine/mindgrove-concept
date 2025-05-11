@@ -147,8 +147,8 @@ const AdminLogin: React.FC = () => {
         description: "Welcome to the admin panel!",
       });
       
-      // Redirect to admin dashboard
-      navigate('/admin/dashboard');
+      // Use direct page reload to avoid auth state conflicts
+      window.location.href = '/admin/dashboard';
       
     } catch (err) {
       console.error("Error during admin login:", err);

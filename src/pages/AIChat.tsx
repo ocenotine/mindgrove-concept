@@ -1,7 +1,7 @@
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Bot, Send, User, FileText, XCircle, Settings, BookOpen, Plus, Trash2, Edit, MessageSquare } from 'lucide-react';
+import { Bot, Send, User, FileText, XCircle, Settings, BookOpen, Plus, Trash2, Edit, MessageSquare, Copy, StopCircle, Download } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import MainLayout from '@/components/layout/MainLayout';
 import { PageTransition } from '@/components/animations/PageTransition';
@@ -20,6 +20,21 @@ import { Input } from '@/components/ui/input';
 import { useChatStore, ChatSession, Message } from '@/store/chatStore';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import Typewriter from '@/components/chat/Typewriter';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import * as pdfjs from 'pdfjs-dist';
+import Prism from 'prismjs';
+import 'prismjs/components/prism-javascript';
+import 'prismjs/components/prism-typescript';
+import 'prismjs/components/prism-jsx';
+import 'prismjs/components/prism-tsx';
+import 'prismjs/components/prism-python';
+import 'prismjs/components/prism-java';
+import 'prismjs/components/prism-rust';
+import 'prismjs/themes/prism-tomorrow.css';
+
+// Initialize pdfjs worker
+pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
 
 interface Document {
   id: string;
@@ -33,6 +48,7 @@ const AIChat = () => {
   // States for current UI
   const [inputMessage, setInputMessage] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isStreaming, setIsStreaming] = useState(false);
   const [userDocuments, setUserDocuments] = useState<Document[]>([]);
   const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(null);
   const [documentContent, setDocumentContent] = useState<string>('');
@@ -41,6 +57,7 @@ const AIChat = () => {
   const [renameDialogOpen, setRenameDialogOpen] = useState(false);
   const [renameSessionId, setRenameSessionId] = useState<string | null>(null);
   const [newSessionTitle, setNewSessionTitle] = useState('');
+  const [typingComplete, setTypingComplete] = useState<Record<string, boolean>>({});
   
   // References for auto-scroll
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -66,11 +83,70 @@ const AIChat = () => {
   // Derived values
   const messages = getMessages();
   const currentSession = sessions.find(s => s.id === currentSessionId);
+  
+  // Function to format code blocks in messages
+  const formatCodeBlocks = useCallback((content: string) => {
+    // Regular expression to find code blocks with language specification
+    const codeBlockRegex = /```(\w+)?\s*([\s\S]*?)```/g;
+    
+    // Replace code blocks with formatted HTML
+    const formattedContent = content.replace(codeBlockRegex, (match, language, code) => {
+      const lang = language || 'javascript';
+      
+      try {
+        // Try to highlight with the specified language
+        const grammar = Prism.languages[lang] || Prism.languages.javascript;
+        const highlightedCode = Prism.highlight(code, grammar, lang);
+        
+        return `<div class="code-block">
+                  <div class="code-header">
+                    <span class="code-language">${lang}</span>
+                    <button class="copy-button" data-code="${encodeURIComponent(code)}">
+                      <span class="copy-icon">📋</span>
+                    </button>
+                  </div>
+                  <pre class="language-${lang}"><code>${highlightedCode}</code></pre>
+                </div>`;
+      } catch (e) {
+        // Fallback if language not supported
+        return `<div class="code-block">
+                  <div class="code-header">
+                    <span class="code-language">code</span>
+                    <button class="copy-button" data-code="${encodeURIComponent(code)}">
+                      <span class="copy-icon">📋</span>
+                    </button>
+                  </div>
+                  <pre><code>${code}</code></pre>
+                </div>`;
+      }
+    });
+    
+    return formattedContent;
+  }, []);
 
   // Scroll to bottom on message updates
   useEffect(() => {
     scrollToBottom();
-  }, [messages]);
+  }, [messages, typingComplete]);
+  
+  // Initialize code copy buttons after rendering
+  useEffect(() => {
+    const copyButtons = document.querySelectorAll('.copy-button');
+    copyButtons.forEach(button => {
+      if (button instanceof HTMLElement) {
+        button.onclick = () => {
+          const code = button.getAttribute('data-code');
+          if (code) {
+            navigator.clipboard.writeText(decodeURIComponent(code));
+            toast({
+              title: "Copied to clipboard",
+              description: "Code snippet copied successfully"
+            });
+          }
+        };
+      }
+    });
+  }, [typingComplete, messages]);
   
   // Initialize a session if none exists
   useEffect(() => {
@@ -110,6 +186,29 @@ const AIChat = () => {
     }
   };
 
+  // Extract text from PDF
+  const extractPdfText = async (file: File): Promise<string> => {
+    return new Promise(async (resolve, reject) => {
+      try {
+        const fileArrayBuffer = await file.arrayBuffer();
+        const pdf = await pdfjs.getDocument({ data: fileArrayBuffer }).promise;
+        let fullText = '';
+        
+        for (let i = 1; i <= pdf.numPages; i++) {
+          const page = await pdf.getPage(i);
+          const textContent = await page.getTextContent();
+          const pageText = textContent.items.map((item: any) => item.str).join(' ');
+          fullText += pageText + '\n\n';
+        }
+        
+        resolve(fullText);
+      } catch (error) {
+        console.error('Error extracting PDF text:', error);
+        reject('Failed to extract text from PDF. It might be encrypted or scanned.');
+      }
+    });
+  };
+
   // Handle document selection
   const handleSelectDocument = async (documentId: string) => {
     try {
@@ -131,6 +230,13 @@ const AIChat = () => {
         
         // Update chat store with document context
         setDocumentContext(documentId, data.title);
+        
+        // Add system message indicating document selection
+        addMessage({
+          content: `📄 Now discussing document: "${data.title}". You can ask me questions about this document.`,
+          role: 'system',
+          timestamp: new Date()
+        });
       }
     } catch (error) {
       console.error('Error fetching document content:', error);
@@ -144,11 +250,12 @@ const AIChat = () => {
 
   // Generate chat response
   const handleSendMessage = async () => {
-    if (!inputMessage.trim()) return;
+    if (!inputMessage.trim() || isProcessing) return;
 
     const userMessageContent = inputMessage.trim();
     setInputMessage('');
     setIsProcessing(true);
+    setIsStreaming(true);
 
     // Add user message to the current chat session
     addMessage({
@@ -158,32 +265,50 @@ const AIChat = () => {
     });
 
     try {
-      let response: string;
+      let responseId = `assistant-${Date.now()}`;
+      let promptContext = '';
       
       // If a document is selected, use that context for the response
       if (selectedDocumentId && documentContent) {
         // Use document content as context
-        const prompt = `
+        promptContext = `
 Document content:
 ${documentContent.substring(0, 3000)}
 
 User question:
 ${userMessageContent}
 
-Please answer the user's question based on the document content.
+Please answer the user's question based on the document content. If asked to generate code, format it with proper syntax highlighting using triple backticks and language specification (e.g. \`\`\`javascript).
 `;
-        response = await generateGeneralChatResponse(prompt);
       } else {
         // General chat without document context
-        response = await generateGeneralChatResponse(userMessageContent);
+        promptContext = `${userMessageContent}
+If asked to generate code, format it with proper syntax highlighting using triple backticks and language specification (e.g. \`\`\`javascript).
+`;
       }
       
-      // Add AI response to the current chat session
+      // Add an initial empty message that will be updated during streaming
       addMessage({
-        content: response,
+        id: responseId,
+        content: '',
         role: 'assistant',
         timestamp: new Date()
       });
+      
+      // Generate response
+      const response = await generateGeneralChatResponse(promptContext);
+      
+      // Update the message with the full response
+      const updatedMessages = messages.map(msg => 
+        msg.id === responseId ? { ...msg, content: response } : msg
+      );
+      
+      // Set the typing complete for this message
+      setTypingComplete(prev => ({
+        ...prev,
+        [responseId]: true
+      }));
+      
     } catch (error) {
       console.error('Error:', error);
       toast({
@@ -200,6 +325,26 @@ Please answer the user's question based on the document content.
       });
     } finally {
       setIsProcessing(false);
+      setIsStreaming(false);
+    }
+  };
+
+  const handleTypewriterComplete = (messageId: string) => {
+    setTypingComplete(prev => ({
+      ...prev,
+      [messageId]: true
+    }));
+  };
+
+  const handleStopGenerating = () => {
+    setIsStreaming(false);
+    // Mark current message as complete
+    const lastMessage = messages[messages.length - 1];
+    if (lastMessage && lastMessage.role === 'assistant') {
+      setTypingComplete(prev => ({
+        ...prev,
+        [lastMessage.id]: true
+      }));
     }
   };
 
@@ -222,14 +367,39 @@ Please answer the user's question based on the document content.
     }
 
     try {
-      // Create document record directly without storage bucket
+      let content = 'Processing...';
+      
+      // Extract text from PDF files
+      if (file.type === 'application/pdf') {
+        try {
+          toast({
+            title: 'Processing PDF',
+            description: 'Extracting text from your document...'
+          });
+          
+          content = await extractPdfText(file);
+          
+          if (!content || content.trim().length < 10) {
+            content = "This PDF appears to be scanned or encrypted. Limited text extraction was possible.";
+          }
+        } catch (err) {
+          console.error('PDF extraction error:', err);
+          content = "Failed to extract text from this PDF. It might be scanned or encrypted.";
+        }
+      } else if (file.type === 'text/plain') {
+        content = await file.text();
+      } else {
+        content = `Document of type ${file.type} uploaded. Content extraction in progress.`;
+      }
+
+      // Create document record
       const { data: docData, error: docError } = await supabase
         .from('documents')
         .insert({
           title: file.name,
           file_type: file.type,
           user_id: user.id,
-          content: 'Processing...' // This will be updated with actual content
+          content: content
         })
         .select()
         .single();
@@ -242,22 +412,6 @@ Please answer the user's question based on the document content.
         role: 'system',
         timestamp: new Date()
       });
-
-      // Read file content
-      let content = '';
-      if (file.type === 'text/plain') {
-        content = await file.text();
-      } else if (file.type === 'application/pdf') {
-        content = "PDF content extracted (text extraction simulation)";
-      } else {
-        content = `Document of type ${file.type} uploaded. Content extraction in progress.`;
-      }
-
-      // Update document with content
-      await supabase
-        .from('documents')
-        .update({ content: content })
-        .eq('id', docData.id);
 
       // Refresh documents list and select the new document
       fetchUserDocuments();
@@ -322,6 +476,35 @@ Please answer the user's question based on the document content.
       setNewSessionTitle('');
     }
   };
+
+  const handleDownloadDocumentContent = () => {
+    if (!documentContent) {
+      toast({
+        title: "No document selected",
+        description: "Please select a document to download its content."
+      });
+      return;
+    }
+    
+    const documentTitle = userDocuments.find(doc => doc.id === selectedDocumentId)?.title || "document";
+    const filename = `${documentTitle}-content.txt`;
+    
+    const blob = new Blob([documentContent], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    toast({
+      title: "Download started",
+      description: `Downloading ${filename}`
+    });
+  };
   
   const formatTimestamp = (dateStr: Date) => {
     const date = new Date(dateStr);
@@ -342,6 +525,24 @@ Please answer the user's question based on the document content.
 
   const toggleChatSidebar = () => {
     setIsChatSidebarOpen(!isChatSidebarOpen);
+  };
+
+  // User avatar URL from auth store
+  const userAvatarUrl = user?.user_metadata?.avatar_url || user?.avatarUrl;
+  
+  // Get user initials for avatar fallback
+  const getUserInitials = (): string => {
+    if (!user) return "U";
+    
+    const name = user.user_metadata?.name || 
+                user.user_metadata?.full_name || 
+                user.email || "";
+    
+    return name.split(' ')
+      .map(part => part[0])
+      .join('')
+      .toUpperCase()
+      .substring(0, 2);
   };
 
   return (
@@ -383,6 +584,192 @@ Please answer the user's question based on the document content.
               
               <TabsContent value="chat" className="flex-1 flex flex-col">
                 <div className="flex flex-1 gap-4">
+                  {/* Main chat area */}
+                  <Card className="flex-1 flex flex-col overflow-hidden bg-background/50 backdrop-blur-sm border border-border/50">
+                    <div className="flex items-center justify-between border-b border-border/30 p-2">
+                      <div className="flex items-center gap-2">
+                        {selectedDocumentId && (
+                          <div className="flex items-center">
+                            <DocumentIcon 
+                              fileType={userDocuments.find(doc => doc.id === selectedDocumentId)?.file_type} 
+                              className="h-4 w-4 mr-1" 
+                            />
+                            <span className="text-sm">
+                              {userDocuments.find(doc => doc.id === selectedDocumentId)?.title}
+                            </span>
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              className="h-7 w-7 p-0 ml-1"
+                              onClick={() => {
+                                setSelectedDocumentId(null);
+                                setDocumentContent('');
+                                clearDocumentContext();
+                              }}
+                            >
+                              <XCircle className="h-3 w-3" />
+                            </Button>
+                            {documentContent && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 p-0 ml-1 text-xs"
+                                onClick={handleDownloadDocumentContent}
+                                title="Download document text"
+                              >
+                                <Download className="h-3 w-3 mr-1" />
+                                <span className="sr-only md:not-sr-only md:inline-block">Download Text</span>
+                              </Button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                      
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={startNewChat}
+                          title="New Chat"
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                        
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={toggleChatSidebar}
+                          title={isChatSidebarOpen ? "Hide History" : "Show History"}
+                        >
+                          <MessageSquare className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                    
+                    <div className="flex-1 overflow-y-auto p-4 space-y-6">
+                      <AnimatePresence initial={false}>
+                        {messages.map((message) => (
+                          <motion.div
+                            key={message.id}
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -20 }}
+                            className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                          >
+                            {message.role === 'system' ? (
+                              <div className="w-full bg-muted/30 border border-border/40 rounded-lg p-3 text-center text-sm">
+                                {message.content}
+                              </div>
+                            ) : (
+                              <div className={`flex items-start max-w-[80%] space-x-2 ${
+                                message.role === 'user' ? 'flex-row-reverse space-x-reverse' : 'flex-row'
+                              }`}>
+                                <div className="flex-shrink-0">
+                                  {message.role === 'user' ? (
+                                    <Avatar className="h-8 w-8 border">
+                                      <AvatarImage src={userAvatarUrl || undefined} alt="User" />
+                                      <AvatarFallback>{getUserInitials()}</AvatarFallback>
+                                    </Avatar>
+                                  ) : (
+                                    <Avatar className="h-8 w-8 bg-primary/10">
+                                      <AvatarFallback className="text-primary">AI</AvatarFallback>
+                                    </Avatar>
+                                  )}
+                                </div>
+                                <div className={`rounded-lg p-4 ${
+                                  message.role === 'user' 
+                                    ? 'bg-primary text-primary-foreground' 
+                                    : 'bg-muted'
+                                }`}>
+                                  <div className="prose prose-sm dark:prose-invert">
+                                    {message.role === 'assistant' ? (
+                                      // For AI messages, use the typewriter effect
+                                      typingComplete[message.id] || !isStreaming ? (
+                                        // If typing is complete or not streaming, show the full message with code blocks
+                                        <div dangerouslySetInnerHTML={{ 
+                                          __html: formatCodeBlocks(message.content)
+                                        }} />
+                                      ) : (
+                                        // If typing is in progress, show typewriter effect
+                                        <Typewriter
+                                          text={message.content}
+                                          delay={20}
+                                          onComplete={() => handleTypewriterComplete(message.id)}
+                                          isActive={isStreaming}
+                                        />
+                                      )
+                                    ) : (
+                                      // For user messages, display normally
+                                      message.content
+                                    )}
+                                  </div>
+                                  <div className="mt-2 text-xs opacity-70 flex justify-between items-center">
+                                    <span>{formatMessageTime(message.timestamp)}</span>
+                                    {message.role === 'assistant' && !typingComplete[message.id] && isStreaming && (
+                                      <Button 
+                                        variant="ghost" 
+                                        size="sm" 
+                                        onClick={handleStopGenerating}
+                                        className="h-6 px-2 text-xs"
+                                      >
+                                        <StopCircle className="h-3 w-3 mr-1" />
+                                        Stop
+                                      </Button>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </motion.div>
+                        ))}
+                        {isProcessing && !messages.some(m => m.role === 'assistant' && !typingComplete[m.id]) && (
+                          <motion.div
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="flex justify-start"
+                          >
+                            <div className="flex items-start space-x-2">
+                              <Avatar className="h-8 w-8 bg-primary/10">
+                                <AvatarFallback className="text-primary">AI</AvatarFallback>
+                              </Avatar>
+                              <div className="rounded-lg p-4 bg-muted">
+                                <TypingIndicator />
+                              </div>
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                      <div ref={messagesEndRef} />
+                    </div>
+
+                    <div className="border-t border-border/50 p-4 backdrop-blur-sm">
+                      <div className="flex space-x-2">
+                        <Textarea
+                          value={inputMessage}
+                          onChange={(e) => setInputMessage(e.target.value)}
+                          onKeyDown={handleKeyDown}
+                          placeholder="Type your message..."
+                          className="min-h-[60px] resize-none bg-background/50"
+                          disabled={isProcessing}
+                        />
+                        <Button 
+                          onClick={handleSendMessage} 
+                          disabled={!inputMessage.trim() || isProcessing}
+                          className="px-4"
+                        >
+                          <Send className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        {selectedDocumentId ? 
+                          "Document context enabled - ask questions about the selected document" : 
+                          "Press Enter to send, Shift + Enter for new line"}
+                      </p>
+                    </div>
+                  </Card>
+                  
                   {/* Chat sidebar - right side */}
                   <AnimatePresence>
                     {isChatSidebarOpen && (
@@ -441,145 +828,6 @@ Please answer the user's question based on the document content.
                       </motion.div>
                     )}
                   </AnimatePresence>
-                  
-                  {/* Main chat area */}
-                  <Card className="flex-1 flex flex-col overflow-hidden bg-background/50 backdrop-blur-sm border border-border/50">
-                    <div className="flex items-center justify-between border-b border-border/30 p-2">
-                      <div className="flex items-center gap-2">
-                        {selectedDocumentId && (
-                          <div className="flex items-center">
-                            <DocumentIcon 
-                              fileType={userDocuments.find(doc => doc.id === selectedDocumentId)?.file_type} 
-                              className="h-4 w-4 mr-1" 
-                            />
-                            <span className="text-sm">
-                              {userDocuments.find(doc => doc.id === selectedDocumentId)?.title}
-                            </span>
-                            <Button 
-                              variant="ghost" 
-                              size="sm"
-                              className="h-7 w-7 p-0 ml-1"
-                              onClick={() => {
-                                setSelectedDocumentId(null);
-                                setDocumentContent('');
-                                clearDocumentContext();
-                              }}
-                            >
-                              <XCircle className="h-3 w-3" />
-                            </Button>
-                          </div>
-                        )}
-                      </div>
-                      
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={startNewChat}
-                          title="New Chat"
-                        >
-                          <Plus className="h-4 w-4" />
-                        </Button>
-                        
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={toggleChatSidebar}
-                          title={isChatSidebarOpen ? "Hide History" : "Show History"}
-                        >
-                          <MessageSquare className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </div>
-                    
-                    <div className="flex-1 overflow-y-auto p-4 space-y-6">
-                      <AnimatePresence initial={false}>
-                        {messages.map((message) => (
-                          <motion.div
-                            key={message.id}
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -20 }}
-                            className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                          >
-                            {message.role === 'system' ? (
-                              <div className="w-full bg-muted/30 border border-border/40 rounded-lg p-3 text-center text-sm">
-                                {message.content}
-                              </div>
-                            ) : (
-                              <div className={`flex items-start max-w-[80%] space-x-2 ${
-                                message.role === 'user' ? 'flex-row-reverse' : 'flex-row'
-                              }`}>
-                                <div className={`p-1.5 rounded-full ${
-                                  message.role === 'user' ? 'bg-primary/20' : 'bg-muted'
-                                }`}>
-                                  {message.role === 'user' ? (
-                                    <User className="h-4 w-4" />
-                                  ) : (
-                                    <Bot className="h-4 w-4" />
-                                  )}
-                                </div>
-                                <div className={`rounded-lg p-4 ${
-                                  message.role === 'user' 
-                                    ? 'bg-primary text-primary-foreground' 
-                                    : 'bg-muted'
-                                }`}>
-                                  <div className="prose prose-sm dark:prose-invert">
-                                    {message.content}
-                                  </div>
-                                  <div className="mt-2 text-xs opacity-70">
-                                    {formatMessageTime(message.timestamp)}
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-                          </motion.div>
-                        ))}
-                        {isProcessing && (
-                          <motion.div
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            className="flex justify-start"
-                          >
-                            <div className="flex items-start space-x-2">
-                              <div className="p-1.5 rounded-full bg-muted">
-                                <Bot className="h-4 w-4" />
-                              </div>
-                              <div className="rounded-lg p-4 bg-muted">
-                                <TypingIndicator />
-                              </div>
-                            </div>
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                      <div ref={messagesEndRef} />
-                    </div>
-
-                    <div className="border-t border-border/50 p-4 backdrop-blur-sm">
-                      <div className="flex space-x-2">
-                        <Textarea
-                          value={inputMessage}
-                          onChange={(e) => setInputMessage(e.target.value)}
-                          onKeyDown={handleKeyDown}
-                          placeholder="Type your message..."
-                          className="min-h-[60px] resize-none bg-background/50"
-                          disabled={isProcessing}
-                        />
-                        <Button 
-                          onClick={handleSendMessage} 
-                          disabled={!inputMessage.trim() || isProcessing}
-                          className="px-4"
-                        >
-                          <Send className="h-4 w-4" />
-                        </Button>
-                      </div>
-                      <p className="text-xs text-muted-foreground mt-2">
-                        Press Enter to send, Shift + Enter for new line
-                      </p>
-                    </div>
-                  </Card>
                 </div>
               </TabsContent>
               
