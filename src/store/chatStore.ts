@@ -24,7 +24,7 @@ interface ChatState {
   currentSessionId: string | null;
   
   // Actions
-  createNewSession: () => void;
+  createNewSession: () => string;
   setCurrentSession: (sessionId: string) => void;
   addMessage: (message: Omit<Message, 'id'>, sessionId?: string) => void;
   deleteSession: (sessionId: string) => void;

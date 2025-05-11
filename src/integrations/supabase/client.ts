@@ -11,9 +11,9 @@ const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiO
 
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: {
-    storage: localStorage,
     persistSession: true,
-    autoRefreshToken: true
+    autoRefreshToken: true,
+    storage: typeof window !== 'undefined' ? localStorage : undefined,
   }
 });
 
@@ -50,6 +50,8 @@ export type StoredQuiz = {
 
 // Helper function to clean up auth state to prevent login issues
 export const cleanupAuthState = () => {
+  if (typeof window === 'undefined') return;
+  
   // Remove standard auth tokens
   localStorage.removeItem('supabase.auth.token');
   
@@ -62,11 +64,13 @@ export const cleanupAuthState = () => {
   });
   
   // Remove from sessionStorage if in use
-  Object.keys(sessionStorage || {}).forEach((key) => {
-    if (key.startsWith('supabase.auth.') || key.includes('sb-')) {
-      sessionStorage.removeItem(key);
-    }
-  });
+  if (typeof sessionStorage !== 'undefined') {
+    Object.keys(sessionStorage).forEach((key) => {
+      if (key.startsWith('supabase.auth.') || key.includes('sb-')) {
+        sessionStorage.removeItem(key);
+      }
+    });
+  }
 };
 
 // Helper function to create a profile if it doesn't exist
@@ -175,4 +179,3 @@ export const getUserProfile = async (userId: string) => {
     return null;
   }
 };
-

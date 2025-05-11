@@ -81,6 +81,7 @@ const AdminLogin: React.FC = () => {
           });
         }
         
+        setLoading(false);
         return;
       }
       
@@ -97,12 +98,13 @@ const AdminLogin: React.FC = () => {
           variant: "destructive",
         });
         await supabase.auth.signOut();
+        setLoading(false);
         return;
       }
       
       console.log("Admin auth successful, user:", authData.user);
       
-      // Ensure user profile exists (critical step that was missing before)
+      // Ensure user profile exists (critical step)
       try {
         await ensureUserProfile(authData.user.id, authData.user.email || "", "admin");
       } catch (profileErr) {
@@ -155,6 +157,7 @@ const AdminLogin: React.FC = () => {
         description: err instanceof Error ? err.message : "An unknown error occurred",
         variant: "destructive",
       });
+      setLoading(false);
     } finally {
       setLoading(false);
     }
