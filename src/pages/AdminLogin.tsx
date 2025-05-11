@@ -134,7 +134,7 @@ const AdminLogin: React.FC = () => {
       setUser({
         ...authData.user,
         account_type: 'admin',
-        name: authData.user.user_metadata?.full_name || authData.user.email || 'Admin',
+        name: authData.user.user_metadata?.name || authData.user.email || 'Admin',
         avatarUrl: authData.user.user_metadata?.avatar_url,
         user_metadata: {
           ...authData.user.user_metadata,

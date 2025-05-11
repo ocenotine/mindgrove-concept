@@ -1,13 +1,13 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Bot, Send, User, FileText, XCircle, Settings, BookOpen, Plus, Trash2, Edit, MessageSquare, Copy, StopCircle, Download } from 'lucide-react';
+import { Bot, Send, FileText, XCircle, Settings, BookOpen, Plus, Trash2, Edit, MessageSquare, Copy, StopCircle, Download } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import MainLayout from '@/components/layout/MainLayout';
 import { PageTransition } from '@/components/animations/PageTransition';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from '@/components/ui/use-toast';
 import { TypingIndicator } from '@/components/animations/TypingIndicator';
 import { useAuthStore } from '@/store/authStore';
@@ -15,7 +15,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { generateGeneralChatResponse } from '@/utils/openRouterUtils';
 import DocumentIcon from '@/components/document/DocumentIcon';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Separator } from '@/components/ui/separator';
 import { Input } from '@/components/ui/input';
 import { useChatStore, ChatSession, Message } from '@/store/chatStore';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -289,7 +288,6 @@ If asked to generate code, format it with proper syntax highlighting using tripl
       
       // Add an initial empty message that will be updated during streaming
       addMessage({
-        id: responseId,
         content: '',
         role: 'assistant',
         timestamp: new Date()
@@ -528,14 +526,13 @@ If asked to generate code, format it with proper syntax highlighting using tripl
   };
 
   // User avatar URL from auth store
-  const userAvatarUrl = user?.user_metadata?.avatar_url || user?.avatarUrl;
+  const userAvatarUrl = user?.avatarUrl || '';
   
   // Get user initials for avatar fallback
   const getUserInitials = (): string => {
     if (!user) return "U";
     
     const name = user.user_metadata?.name || 
-                user.user_metadata?.full_name || 
                 user.email || "";
     
     return name.split(' ')
@@ -669,7 +666,7 @@ If asked to generate code, format it with proper syntax highlighting using tripl
                                 <div className="flex-shrink-0">
                                   {message.role === 'user' ? (
                                     <Avatar className="h-8 w-8 border">
-                                      <AvatarImage src={userAvatarUrl || undefined} alt="User" />
+                                      <AvatarImage src={userAvatarUrl} alt="User" />
                                       <AvatarFallback>{getUserInitials()}</AvatarFallback>
                                     </Avatar>
                                   ) : (

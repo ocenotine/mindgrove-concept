@@ -91,7 +91,7 @@ export const useChatStore = create<ChatState>()(
             
             if (sessionIndex !== -1) {
               const updatedSession = { ...sessions[sessionIndex] };
-              const newMessage = { id: uuidv4(), ...message };
+              const newMessage = { ...message, id: uuidv4() };
               updatedSession.messages = [...updatedSession.messages, newMessage];
               
               // If this is the first user message, update the title
@@ -115,7 +115,7 @@ export const useChatStore = create<ChatState>()(
           
           if (sessionIndex !== -1) {
             const updatedSession = { ...sessions[sessionIndex] };
-            const newMessage = { id: message.id || uuidv4(), ...message };
+            const newMessage = { ...message, id: uuidv4() };
             updatedSession.messages = [...updatedSession.messages, newMessage];
             
             // If this is the first user message, update the title
