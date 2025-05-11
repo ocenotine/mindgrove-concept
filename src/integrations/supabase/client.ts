@@ -5,6 +5,39 @@ import { createClient } from '@supabase/supabase-js';
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 
+// Define types for wellbeing data
+export interface WellbeingData {
+  id: string;
+  user_id: string;
+  date: string;
+  focus: number;
+  stress: number;
+  notes?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// Define types for quiz data
+export interface QuizQuestion {
+  id: string;
+  question: string;
+  options: string[];
+  correctAnswer: string;
+  explanation?: string;
+}
+
+export interface StoredQuiz {
+  id: string;
+  user_id: string;
+  document_id: string | null;
+  name: string;
+  questions: QuizQuestion[];
+  difficulty: string;
+  last_taken: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 // Check if we're in a browser environment with localStorage available
 const hasLocalStorage = typeof window !== 'undefined' && window.localStorage;
 

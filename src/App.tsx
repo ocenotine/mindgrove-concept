@@ -8,6 +8,7 @@ import BackToTop from './components/ui/BackToTop';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
 // Import all pages
+import Home from './pages/Home';
 import Index from './pages/Index';
 import LandingPage from './pages/LandingPage';
 import Login from './pages/Login';
@@ -98,7 +99,8 @@ const ProfilePages = () => (
 const StaticPages = () => (
   <ErrorBoundary>
     <Routes>
-      <Route path="/" element={<Index />} />
+      <Route path="/" element={<Home />} />
+      <Route path="/index" element={<Index />} />
       <Route path="/landing" element={<LandingPage />} />
       <Route path="/privacy" element={<PrivacyPolicy />} />
       <Route path="/terms" element={<TermsOfService />} />
@@ -125,13 +127,6 @@ function App() {
     
     initAuth();
   }, [initialize]);
-  
-  // Ensure index route redirects correctly
-  useEffect(() => {
-    if (location.pathname === '/' && !location.hash.includes('#/')) {
-      navigate('/landing', { replace: true });
-    }
-  }, [location, navigate]);
   
   // Handle redirection based on user account type
   useEffect(() => {
@@ -164,9 +159,12 @@ function App() {
     <ErrorBoundary>
       <Suspense fallback={<div className="h-screen w-screen flex items-center justify-center"><LoadingScreen /></div>}>
         <Routes>
+          {/* Root route now goes to the Home component */}
+          <Route path="/" element={<Home />} />
+          
           {/* Group routes by sections for better error isolation */}
-          <Route path="/*" element={<StaticPages />} />
-          <Route path="/auth/*" element={<AuthPages />} />
+          <Route path="/index" element={<Index />} />
+          <Route path="/landing" element={<LandingPage />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
           <Route path="/admin/login" element={<AdminLogin />} />
