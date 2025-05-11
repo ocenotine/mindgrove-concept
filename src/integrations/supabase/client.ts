@@ -88,7 +88,7 @@ export const ensureUserProfile = async (userId: string, email: string, accountTy
     
     if (error) {
       console.error("Error checking profile:", error);
-      return;
+      // Continue anyway as we'll try to create it
     }
     
     if (!data) {
@@ -175,3 +175,4 @@ export const getUserProfile = async (userId: string) => {
     return null;
   }
 };
+

@@ -1,13 +1,13 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Bot, Send, User, FileText, XCircle, Settings, BookOpen } from 'lucide-react';
+import { Bot, Send, User, FileText, XCircle, Settings, BookOpen, Plus, Trash2, Edit, MessageSquare } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import MainLayout from '@/components/layout/MainLayout';
 import { PageTransition } from '@/components/animations/PageTransition';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Card } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from '@/components/ui/use-toast';
 import { TypingIndicator } from '@/components/animations/TypingIndicator';
 import { useAuthStore } from '@/store/authStore';
@@ -15,13 +15,11 @@ import { supabase } from '@/integrations/supabase/client';
 import { generateGeneralChatResponse } from '@/utils/openRouterUtils';
 import DocumentIcon from '@/components/document/DocumentIcon';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-
-interface Message {
-  id: string;
-  content: string;
-  role: 'user' | 'assistant' | 'system';
-  timestamp: Date;
-}
+import { Separator } from '@/components/ui/separator';
+import { Input } from '@/components/ui/input';
+import { useChatStore, ChatSession, Message } from '@/store/chatStore';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface Document {
   id: string;
@@ -32,31 +30,54 @@ interface Document {
 }
 
 const AIChat = () => {
-  const [messages, setMessages] = useState<Message[]>([{
-    id: 'welcome',
-    content: "👋 Hello! I'm your MindGrove AI assistant. How can I help you today?",
-    role: 'assistant',
-    timestamp: new Date()
-  }]);
+  // States for current UI
   const [inputMessage, setInputMessage] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [userDocuments, setUserDocuments] = useState<Document[]>([]);
   const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(null);
   const [documentContent, setDocumentContent] = useState<string>('');
   const [activeTab, setActiveTab] = useState('chat');
+  const [isChatSidebarOpen, setIsChatSidebarOpen] = useState(true);
+  const [renameDialogOpen, setRenameDialogOpen] = useState(false);
+  const [renameSessionId, setRenameSessionId] = useState<string | null>(null);
+  const [newSessionTitle, setNewSessionTitle] = useState('');
   
+  // References for auto-scroll
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  
+  // Use auth store
   const { user } = useAuthStore();
   const navigate = useNavigate();
+  
+  // Chat store hooks
+  const { 
+    sessions,
+    currentSessionId,
+    createNewSession,
+    setCurrentSession,
+    addMessage,
+    deleteSession,
+    updateSessionTitle,
+    setDocumentContext,
+    clearDocumentContext,
+    getMessages
+  } = useChatStore();
+  
+  // Derived values
+  const messages = getMessages();
+  const currentSession = sessions.find(s => s.id === currentSessionId);
 
-  // Scroll to bottom of messages
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
+  // Scroll to bottom on message updates
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+  
+  // Initialize a session if none exists
+  useEffect(() => {
+    if (sessions.length === 0) {
+      createNewSession();
+    }
+  }, [sessions.length, createNewSession]);
 
   // Fetch user's documents
   useEffect(() => {
@@ -64,6 +85,11 @@ const AIChat = () => {
       fetchUserDocuments();
     }
   }, [user]);
+
+  // Scroll to bottom helper function
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
 
   const fetchUserDocuments = async () => {
     try {
@@ -87,6 +113,9 @@ const AIChat = () => {
   // Handle document selection
   const handleSelectDocument = async (documentId: string) => {
     try {
+      // Don't re-fetch if it's already the selected document
+      if (selectedDocumentId === documentId) return;
+      
       setSelectedDocumentId(documentId);
       
       const { data, error } = await supabase
@@ -100,15 +129,8 @@ const AIChat = () => {
       if (data) {
         setDocumentContent(data.content || '');
         
-        // Add a system message about the selected document
-        const systemMessage: Message = {
-          id: `system-${Date.now()}`,
-          content: `📄 Now discussing: "${data.title}". You can ask me questions about this document.`,
-          role: 'system',
-          timestamp: new Date()
-        };
-        
-        setMessages(prev => [...prev, systemMessage]);
+        // Update chat store with document context
+        setDocumentContext(documentId, data.title);
       }
     } catch (error) {
       console.error('Error fetching document content:', error);
@@ -124,16 +146,16 @@ const AIChat = () => {
   const handleSendMessage = async () => {
     if (!inputMessage.trim()) return;
 
-    const userMessage: Message = {
-      id: `user-${Date.now()}`,
-      content: inputMessage.trim(),
-      role: 'user',
-      timestamp: new Date()
-    };
-
-    setMessages(prev => [...prev, userMessage]);
+    const userMessageContent = inputMessage.trim();
     setInputMessage('');
     setIsProcessing(true);
+
+    // Add user message to the current chat session
+    addMessage({
+      content: userMessageContent,
+      role: 'user',
+      timestamp: new Date()
+    });
 
     try {
       let response: string;
@@ -146,30 +168,35 @@ Document content:
 ${documentContent.substring(0, 3000)}
 
 User question:
-${userMessage.content}
+${userMessageContent}
 
 Please answer the user's question based on the document content.
 `;
         response = await generateGeneralChatResponse(prompt);
       } else {
         // General chat without document context
-        response = await generateGeneralChatResponse(userMessage.content);
+        response = await generateGeneralChatResponse(userMessageContent);
       }
       
-      const aiMessage: Message = {
-        id: `ai-${Date.now()}`,
+      // Add AI response to the current chat session
+      addMessage({
         content: response,
         role: 'assistant',
         timestamp: new Date()
-      };
-
-      setMessages(prev => [...prev, aiMessage]);
+      });
     } catch (error) {
       console.error('Error:', error);
       toast({
         title: 'Error',
         description: 'Failed to generate a response. Please try again.',
         variant: 'destructive',
+      });
+      
+      // Add error message to chat
+      addMessage({
+        content: 'Sorry, I encountered an error while generating a response. Please try again.',
+        role: 'assistant',
+        timestamp: new Date()
       });
     } finally {
       setIsProcessing(false);
@@ -210,14 +237,11 @@ Please answer the user's question based on the document content.
       if (docError) throw docError;
 
       // Add system message about document upload
-      const systemMessage: Message = {
-        id: `system-${Date.now()}`,
+      addMessage({
         content: `📄 Document "${file.name}" has been added to your documents.`,
-        role: 'assistant',
+        role: 'system',
         timestamp: new Date()
-      };
-
-      setMessages(prev => [...prev, systemMessage]);
+      });
 
       // Read file content
       let content = '';
@@ -253,11 +277,77 @@ Please answer the user's question based on the document content.
       });
     }
   };
+  
+  // Chat history management
+  const startNewChat = () => {
+    createNewSession();
+    setSelectedDocumentId(null);
+    setDocumentContent('');
+  };
+  
+  const handleSelectChat = (sessionId: string) => {
+    setCurrentSession(sessionId);
+    
+    // Update selected document if this chat has one
+    const session = sessions.find(s => s.id === sessionId);
+    if (session?.documentId) {
+      setSelectedDocumentId(session.documentId);
+      handleSelectDocument(session.documentId);
+    } else {
+      setSelectedDocumentId(null);
+      setDocumentContent('');
+    }
+  };
+  
+  const handleDeleteChat = (sessionId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    deleteSession(sessionId);
+  };
+  
+  const openRenameDialog = (sessionId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const session = sessions.find(s => s.id === sessionId);
+    if (session) {
+      setNewSessionTitle(session.title);
+      setRenameSessionId(sessionId);
+      setRenameDialogOpen(true);
+    }
+  };
+  
+  const handleRenameSession = () => {
+    if (renameSessionId && newSessionTitle.trim()) {
+      updateSessionTitle(renameSessionId, newSessionTitle.trim());
+      setRenameDialogOpen(false);
+      setRenameSessionId(null);
+      setNewSessionTitle('');
+    }
+  };
+  
+  const formatTimestamp = (dateStr: Date) => {
+    const date = new Date(dateStr);
+    return date.toLocaleString(undefined, {
+      month: 'short', 
+      day: 'numeric',
+      hour: '2-digit', 
+      minute: '2-digit'
+    });
+  };
+  
+  const formatMessageTime = (dateStr: Date) => {
+    return new Date(dateStr).toLocaleTimeString([], { 
+      hour: '2-digit', 
+      minute: '2-digit' 
+    });
+  };
+
+  const toggleChatSidebar = () => {
+    setIsChatSidebarOpen(!isChatSidebarOpen);
+  };
 
   return (
     <MainLayout>
       <PageTransition>
-        <div className="container max-w-5xl mx-auto px-4">
+        <div className="container max-w-6xl mx-auto px-4">
           <div className="min-h-[calc(100vh-8rem)] flex flex-col">
             <div className="flex items-center justify-between mb-6">
               <div>
@@ -292,118 +382,205 @@ Please answer the user's question based on the document content.
               </div>
               
               <TabsContent value="chat" className="flex-1 flex flex-col">
-                <Card className="flex-1 flex flex-col overflow-hidden bg-background/50 backdrop-blur-sm border border-border/50">
-                  {selectedDocumentId && (
-                    <div className="bg-muted/30 px-4 py-2 border-b border-border/30 flex items-center justify-between">
-                      <div className="flex items-center text-sm">
-                        <DocumentIcon 
-                          fileType={userDocuments.find(doc => doc.id === selectedDocumentId)?.file_type} 
-                          className="h-4 w-4 mr-2" 
-                        />
-                        <span>
-                          Discussing: {userDocuments.find(doc => doc.id === selectedDocumentId)?.title}
-                        </span>
-                      </div>
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        onClick={() => {
-                          setSelectedDocumentId(null);
-                          setDocumentContent('');
-                        }}
+                <div className="flex flex-1 gap-4">
+                  {/* Chat sidebar - right side */}
+                  <AnimatePresence>
+                    {isChatSidebarOpen && (
+                      <motion.div
+                        initial={{ width: 0, opacity: 0 }}
+                        animate={{ width: "270px", opacity: 1 }}
+                        exit={{ width: 0, opacity: 0 }}
+                        className="border rounded-lg shadow-sm bg-card flex flex-col"
                       >
-                        <XCircle className="h-3 w-3 mr-1" />
-                        Clear
-                      </Button>
-                    </div>
-                  )}
+                        <div className="p-3 border-b flex items-center justify-between">
+                          <h3 className="font-semibold">Chat History</h3>
+                          <Button variant="ghost" size="sm" onClick={startNewChat}>
+                            <Plus className="h-4 w-4" />
+                            <span className="ml-1">New</span>
+                          </Button>
+                        </div>
+                        <ScrollArea className="flex-1 p-2">
+                          {sessions.map((session) => (
+                            <div 
+                              key={session.id} 
+                              className={`mb-2 p-2 rounded-md cursor-pointer hover:bg-accent/50 transition-colors ${
+                                session.id === currentSessionId ? 'bg-accent/70' : ''
+                              }`}
+                              onClick={() => handleSelectChat(session.id)}
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  <MessageSquare className="h-3.5 w-3.5 text-primary/70" />
+                                  <div className="truncate font-medium text-sm">
+                                    {session.title}
+                                  </div>
+                                </div>
+                                <div className="flex gap-1">
+                                  <Button size="icon" variant="ghost" className="h-6 w-6" onClick={(e) => openRenameDialog(session.id, e)}>
+                                    <Edit className="h-3 w-3" />
+                                  </Button>
+                                  <Button size="icon" variant="ghost" className="h-6 w-6" onClick={(e) => handleDeleteChat(session.id, e)}>
+                                    <Trash2 className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                              </div>
+                              
+                              {session.documentTitle && (
+                                <div className="mt-1 text-xs flex items-center text-muted-foreground">
+                                  <FileText className="h-3 w-3 mr-1" />
+                                  {session.documentTitle}
+                                </div>
+                              )}
+                              
+                              <div className="mt-1 text-xs text-muted-foreground">
+                                {formatTimestamp(session.lastUpdated)}
+                              </div>
+                            </div>
+                          ))}
+                        </ScrollArea>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
                   
-                  <div className="flex-1 overflow-y-auto p-4 space-y-6">
-                    <AnimatePresence initial={false}>
-                      {messages.map((message) => (
-                        <motion.div
-                          key={message.id}
-                          initial={{ opacity: 0, y: 20 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, y: -20 }}
-                          className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                        >
-                          {message.role === 'system' ? (
-                            <div className="w-full bg-muted/30 border border-border/40 rounded-lg p-3 text-center text-sm">
-                              {message.content}
-                            </div>
-                          ) : (
-                            <div className={`flex items-start max-w-[80%] space-x-2 ${
-                              message.role === 'user' ? 'flex-row-reverse' : 'flex-row'
-                            }`}>
-                              <div className={`p-1.5 rounded-full ${
-                                message.role === 'user' ? 'bg-primary/20' : 'bg-muted'
-                              }`}>
-                                {message.role === 'user' ? (
-                                  <User className="h-4 w-4" />
-                                ) : (
-                                  <Bot className="h-4 w-4" />
-                                )}
-                              </div>
-                              <div className={`rounded-lg p-4 ${
-                                message.role === 'user' 
-                                  ? 'bg-primary text-primary-foreground' 
-                                  : 'bg-muted'
-                              }`}>
-                                <div className="prose prose-sm dark:prose-invert">
-                                  {message.content}
-                                </div>
-                                <div className="mt-2 text-xs opacity-70">
-                                  {message.timestamp.toLocaleTimeString()}
-                                </div>
-                              </div>
-                            </div>
-                          )}
-                        </motion.div>
-                      ))}
-                      {isProcessing && (
-                        <motion.div
-                          initial={{ opacity: 0, y: 20 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          className="flex justify-start"
-                        >
-                          <div className="flex items-start space-x-2">
-                            <div className="p-1.5 rounded-full bg-muted">
-                              <Bot className="h-4 w-4" />
-                            </div>
-                            <div className="rounded-lg p-4 bg-muted">
-                              <TypingIndicator />
-                            </div>
+                  {/* Main chat area */}
+                  <Card className="flex-1 flex flex-col overflow-hidden bg-background/50 backdrop-blur-sm border border-border/50">
+                    <div className="flex items-center justify-between border-b border-border/30 p-2">
+                      <div className="flex items-center gap-2">
+                        {selectedDocumentId && (
+                          <div className="flex items-center">
+                            <DocumentIcon 
+                              fileType={userDocuments.find(doc => doc.id === selectedDocumentId)?.file_type} 
+                              className="h-4 w-4 mr-1" 
+                            />
+                            <span className="text-sm">
+                              {userDocuments.find(doc => doc.id === selectedDocumentId)?.title}
+                            </span>
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              className="h-7 w-7 p-0 ml-1"
+                              onClick={() => {
+                                setSelectedDocumentId(null);
+                                setDocumentContent('');
+                                clearDocumentContext();
+                              }}
+                            >
+                              <XCircle className="h-3 w-3" />
+                            </Button>
                           </div>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                    <div ref={messagesEndRef} />
-                  </div>
-
-                  <div className="border-t border-border/50 p-4 backdrop-blur-sm">
-                    <div className="flex space-x-2">
-                      <Textarea
-                        value={inputMessage}
-                        onChange={(e) => setInputMessage(e.target.value)}
-                        onKeyDown={handleKeyDown}
-                        placeholder="Type your message..."
-                        className="min-h-[60px] resize-none bg-background/50"
-                        disabled={isProcessing}
-                      />
-                      <Button 
-                        onClick={handleSendMessage} 
-                        disabled={!inputMessage.trim() || isProcessing}
-                        className="px-4"
-                      >
-                        <Send className="h-4 w-4" />
-                      </Button>
+                        )}
+                      </div>
+                      
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={startNewChat}
+                          title="New Chat"
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                        
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8"
+                          onClick={toggleChatSidebar}
+                          title={isChatSidebarOpen ? "Hide History" : "Show History"}
+                        >
+                          <MessageSquare className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
-                    <p className="text-xs text-muted-foreground mt-2">
-                      Press Enter to send, Shift + Enter for new line
-                    </p>
-                  </div>
-                </Card>
+                    
+                    <div className="flex-1 overflow-y-auto p-4 space-y-6">
+                      <AnimatePresence initial={false}>
+                        {messages.map((message) => (
+                          <motion.div
+                            key={message.id}
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -20 }}
+                            className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                          >
+                            {message.role === 'system' ? (
+                              <div className="w-full bg-muted/30 border border-border/40 rounded-lg p-3 text-center text-sm">
+                                {message.content}
+                              </div>
+                            ) : (
+                              <div className={`flex items-start max-w-[80%] space-x-2 ${
+                                message.role === 'user' ? 'flex-row-reverse' : 'flex-row'
+                              }`}>
+                                <div className={`p-1.5 rounded-full ${
+                                  message.role === 'user' ? 'bg-primary/20' : 'bg-muted'
+                                }`}>
+                                  {message.role === 'user' ? (
+                                    <User className="h-4 w-4" />
+                                  ) : (
+                                    <Bot className="h-4 w-4" />
+                                  )}
+                                </div>
+                                <div className={`rounded-lg p-4 ${
+                                  message.role === 'user' 
+                                    ? 'bg-primary text-primary-foreground' 
+                                    : 'bg-muted'
+                                }`}>
+                                  <div className="prose prose-sm dark:prose-invert">
+                                    {message.content}
+                                  </div>
+                                  <div className="mt-2 text-xs opacity-70">
+                                    {formatMessageTime(message.timestamp)}
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </motion.div>
+                        ))}
+                        {isProcessing && (
+                          <motion.div
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            className="flex justify-start"
+                          >
+                            <div className="flex items-start space-x-2">
+                              <div className="p-1.5 rounded-full bg-muted">
+                                <Bot className="h-4 w-4" />
+                              </div>
+                              <div className="rounded-lg p-4 bg-muted">
+                                <TypingIndicator />
+                              </div>
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                      <div ref={messagesEndRef} />
+                    </div>
+
+                    <div className="border-t border-border/50 p-4 backdrop-blur-sm">
+                      <div className="flex space-x-2">
+                        <Textarea
+                          value={inputMessage}
+                          onChange={(e) => setInputMessage(e.target.value)}
+                          onKeyDown={handleKeyDown}
+                          placeholder="Type your message..."
+                          className="min-h-[60px] resize-none bg-background/50"
+                          disabled={isProcessing}
+                        />
+                        <Button 
+                          onClick={handleSendMessage} 
+                          disabled={!inputMessage.trim() || isProcessing}
+                          className="px-4"
+                        >
+                          <Send className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-2">
+                        Press Enter to send, Shift + Enter for new line
+                      </p>
+                    </div>
+                  </Card>
+                </div>
               </TabsContent>
               
               <TabsContent value="documents" className="flex-1">
@@ -449,6 +626,7 @@ Please answer the user's question based on the document content.
                                 if (selectedDocumentId === doc.id) {
                                   setSelectedDocumentId(null);
                                   setDocumentContent('');
+                                  clearDocumentContext();
                                 } else {
                                   handleSelectDocument(doc.id);
                                 }
@@ -466,6 +644,32 @@ Please answer the user's question based on the document content.
             </Tabs>
           </div>
         </div>
+        
+        {/* Rename Dialog */}
+        <Dialog open={renameDialogOpen} onOpenChange={setRenameDialogOpen}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Rename Chat</DialogTitle>
+              <DialogDescription>
+                Give this conversation a new name to help you find it later.
+              </DialogDescription>
+            </DialogHeader>
+            <Input 
+              value={newSessionTitle} 
+              onChange={(e) => setNewSessionTitle(e.target.value)}
+              placeholder="Enter a new title"
+              className="mt-2"
+            />
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setRenameDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button onClick={handleRenameSession}>
+                Save
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </PageTransition>
     </MainLayout>
   );
