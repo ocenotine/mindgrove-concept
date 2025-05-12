@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import MainLayout from '@/components/layout/MainLayout';
@@ -153,24 +154,19 @@ export default function DocumentView() {
             
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
               <div>
-                <h1 className="text-3xl font-bold">{document?.title}</h1>
+                <h1 className="text-3xl font-bold">{document.title}</h1>
                 <div className="flex flex-wrap gap-x-4 gap-y-2 mt-2 text-sm text-muted-foreground">
                   <div className="flex items-center">
-                    <DocumentIcon 
-                      fileType={document?.file_type} 
-                      className="mr-1 h-5 w-5" 
-                      color={document?.file_type?.includes('pdf') ? "#ff5733" : 
-                             document?.file_type?.includes('doc') ? "#4285f4" : undefined}
-                    />
-                    {document?.file_type || "Text Document"}
+                    <DocumentIcon fileType={document.file_type} className="mr-1 h-4 w-4" />
+                    {document.file_type || "Text Document"}
                   </div>
                   <div className="flex items-center">
                     <Calendar className="mr-1 h-4 w-4" />
-                    Created {getTimeAgo(document?.created_at)}
+                    Created {getTimeAgo(document.created_at)}
                   </div>
                   <div className="flex items-center">
                     <Clock className="mr-1 h-4 w-4" />
-                    Updated {getTimeAgo(document?.updated_at)}
+                    Updated {getTimeAgo(document.updated_at)}
                   </div>
                 </div>
               </div>
@@ -191,7 +187,7 @@ export default function DocumentView() {
               <div className="bg-card border rounded-lg p-6 shadow-sm">
                 <h2 className="text-xl font-semibold mb-4">Document Content</h2>
                 <div className="prose prose-sm max-w-none dark:prose-invert">
-                  {document?.content ? (
+                  {document.content ? (
                     <div className="whitespace-pre-line">{document.content}</div>
                   ) : (
                     <p className="text-muted-foreground italic">No content available for this document.</p>
@@ -204,13 +200,13 @@ export default function DocumentView() {
             
             <div className="xl:col-span-4 space-y-6">
               <DocumentAI 
-                documentId={document?.id || ""} 
-                documentText={document?.content || ""} 
+                documentId={document.id} 
+                documentText={document.content || ""} 
               />
               
               <DocumentChat 
-                documentId={document?.id || ""} 
-                documentText={document?.content || ""} 
+                documentId={document.id} 
+                documentText={document.content || ""} 
               />
             </div>
           </div>

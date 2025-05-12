@@ -7,25 +7,22 @@ import { Button } from '@/components/ui/button';
 import { ArrowRight } from 'lucide-react';
 import BackgroundAnimation from '@/components/animations/BackgroundAnimation';
 import LoadingAnimation from '@/components/animations/LoadingAnimation';
-import useAuth from '@/hooks/useAuth';
 
 export default function Index() {
   const navigate = useNavigate();
-  const { isAuthenticated, isLoading: authLoading } = useAuth();
+  const { isAuthenticated, loading: authLoading } = useAuthStore();
   const { refreshDocuments } = useDocuments();
 
   useEffect(() => {
     console.log("Index page: authLoading:", authLoading, "isAuthenticated:", isAuthenticated);
     
-    // Prevent premature redirects - only redirect after auth is confirmed
-    if (!authLoading) {
-      if (isAuthenticated) {
-        refreshDocuments();
-        navigate('/dashboard', { replace: true });
-      } else {
-        // Only navigate to landing if we've confirmed user is not authenticated
-        navigate('/landing', { replace: true });
-      }
+    // If user is authenticated, load documents and redirect to dashboard
+    if (isAuthenticated) {
+      refreshDocuments();
+      navigate('/dashboard');
+    } else if (!authLoading) {
+      // Only navigate to landing if we've confirmed user is not authenticated
+      navigate('/landing', { replace: true });
     }
   }, [isAuthenticated, authLoading, navigate, refreshDocuments]);
 
@@ -63,4 +60,4 @@ export default function Index() {
       </div>
     </div>
   );
-}
+};
