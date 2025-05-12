@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Bot, Send, User, FileText, XCircle, Settings, BookOpen, Plus, Trash2, Edit, MessageSquare, Copy, StopCircle, Download } from 'lucide-react';
@@ -346,13 +345,16 @@ const AIChat = () => {
     clearDocumentContext();
   };
 
-  // User avatar URL from auth store - fixed to handle optional properties
-  const userAvatarUrl = user?.user_metadata?.avatar_url || '';
+  // Fix for the TypeScript error - update how we get the user avatar URL
+  const userAvatarUrl = user?.user_metadata?.avatar_url || 
+                       user?.avatarUrl || 
+                       '';
   
   // Get user initials for avatar fallback - fixed to handle optional properties
   const getUserInitials = (): string => {
     const name = user?.name || 
                 user?.user_metadata?.name || 
+                user?.user_metadata?.full_name ||
                 user?.email || 
                 '';
                 
