@@ -16,13 +16,15 @@ export default function Index() {
   useEffect(() => {
     console.log("Index page: authLoading:", authLoading, "isAuthenticated:", isAuthenticated);
     
-    // If user is authenticated, load documents and redirect to dashboard
-    if (isAuthenticated) {
-      refreshDocuments();
-      navigate('/dashboard');
-    } else if (!authLoading) {
-      // Only navigate to landing if we've confirmed user is not authenticated
-      navigate('/landing', { replace: true });
+    // Prevent premature redirects - only redirect after auth is confirmed
+    if (!authLoading) {
+      if (isAuthenticated) {
+        refreshDocuments();
+        navigate('/dashboard', { replace: true });
+      } else {
+        // Only navigate to landing if we've confirmed user is not authenticated
+        navigate('/landing', { replace: true });
+      }
     }
   }, [isAuthenticated, authLoading, navigate, refreshDocuments]);
 
@@ -60,4 +62,4 @@ export default function Index() {
       </div>
     </div>
   );
-};
+}
