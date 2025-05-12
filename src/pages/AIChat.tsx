@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Bot, Send, User, FileText, XCircle, Settings, BookOpen, Plus, Trash2, Edit, MessageSquare, Copy, StopCircle, Download } from 'lucide-react';
@@ -21,7 +22,6 @@ import { useToast } from "@/components/ui/use-toast"
 import { useDocuments } from '@/hooks/useDocuments';
 import { getOpenRouterApiKey, playNotificationSound } from '@/utils/openRouterUtils';
 import { streamAIResponse } from '@/integrations/openAI/client';
-import { useCompletion } from 'ai/react';
 
 // Import Prism for code highlighting
 import Prism from 'prismjs';
@@ -30,6 +30,8 @@ import 'prismjs/components/prism-typescript';
 import 'prismjs/components/prism-python';
 import 'prismjs/components/prism-markdown';
 import 'prismjs/themes/prism-tomorrow.css';
+
+import { ChatMessage, ChatSession } from '@/types/chat';
 
 const AIChat = () => {
   const [userInput, setUserInput] = useState('');
@@ -58,7 +60,7 @@ const AIChat = () => {
     getCurrentSession,
     getMessages,
   } = useChatStore();
-  const { getDocumentById } = useDocuments();
+  const { fetchDocumentById } = useDocuments();
 
   // Scroll to bottom on message changes
   useEffect(() => {
@@ -95,7 +97,7 @@ const AIChat = () => {
   };
 
   // Handle new messages
-  const updateMessage = (messageId: string, updates: Partial<Message>) => {
+  const updateMessage = (messageId: string, updates: Partial<ChatMessage>) => {
     const currentMessages = getMessages();
     const messageIndex = currentMessages.findIndex(msg => msg.id === messageId);
 
@@ -233,9 +235,10 @@ const AIChat = () => {
       let promptContext = '';
       
       // If a document is selected, use that context for the response
+      const currentSession = getCurrentSession();
       if (currentSession?.documentId && currentSession?.documentTitle) {
         // Fetch the document content if available
-        const document = await getDocumentById(currentSession.documentId);
+        const document = await fetchDocumentById(currentSession.documentId);
         if (document?.content) {
           promptContext = `Context from document "${currentSession.documentTitle}":\n${document.content}`;
         }
@@ -258,7 +261,7 @@ const AIChat = () => {
         content: '',
         role: 'assistant',
         timestamp: new Date(),
-        id: responseId // Passing id explicitly to match the expected type
+        id: responseId
       });
       
       // Generate response
@@ -350,7 +353,6 @@ const AIChat = () => {
   const getUserInitials = (): string => {
     const name = user?.name || 
                 user?.user_metadata?.name || 
-                user?.user_metadata?.full_name || 
                 user?.email || 
                 '';
                 
@@ -427,7 +429,7 @@ const AIChat = () => {
                 </AlertDialogFooter>
               </AlertDialogContent>
             </AlertDialog>
-            <button className="p-2 hover:bg-secondary/80 rounded-md transition-colors" ref={settingsRef}>
+            <button className="p-2 hover:bg-secondary/80 rounded-md transition-colors">
               <Settings className="h-4 w-4" />
             </button>
           </div>

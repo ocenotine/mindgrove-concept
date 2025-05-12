@@ -7,10 +7,11 @@ import { Button } from '@/components/ui/button';
 import { ArrowRight } from 'lucide-react';
 import BackgroundAnimation from '@/components/animations/BackgroundAnimation';
 import LoadingAnimation from '@/components/animations/LoadingAnimation';
+import useAuth from '@/hooks/useAuth';
 
 export default function Index() {
   const navigate = useNavigate();
-  const { isAuthenticated, loading: authLoading } = useAuthStore();
+  const { isAuthenticated, isLoading: authLoading } = useAuth();
   const { refreshDocuments } = useDocuments();
 
   useEffect(() => {
