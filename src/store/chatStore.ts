@@ -1,4 +1,3 @@
-
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { v4 as uuidv4 } from 'uuid';
@@ -26,7 +25,7 @@ interface ChatState {
   // Actions
   createNewSession: () => string;
   setCurrentSession: (sessionId: string) => void;
-  addMessage: (message: Omit<Message, 'id'>, sessionId?: string) => void;
+  addMessage: (message: Omit<Message, 'id'> & { id?: string }, sessionId?: string) => void;
   deleteSession: (sessionId: string) => void;
   updateSessionTitle: (sessionId: string, title: string) => void;
   setDocumentContext: (documentId: string | null, documentTitle: string | null) => void;
@@ -91,7 +90,10 @@ export const useChatStore = create<ChatState>()(
             
             if (sessionIndex !== -1) {
               const updatedSession = { ...sessions[sessionIndex] };
-              const newMessage = { id: uuidv4(), ...message };
+              const newMessage = { 
+                ...message, 
+                id: message.id || uuidv4() 
+              };
               updatedSession.messages = [...updatedSession.messages, newMessage];
               
               // If this is the first user message, update the title
@@ -115,7 +117,10 @@ export const useChatStore = create<ChatState>()(
           
           if (sessionIndex !== -1) {
             const updatedSession = { ...sessions[sessionIndex] };
-            const newMessage = { id: message.id || uuidv4(), ...message };
+            const newMessage = { 
+              ...message, 
+              id: message.id || uuidv4() 
+            };
             updatedSession.messages = [...updatedSession.messages, newMessage];
             
             // If this is the first user message, update the title

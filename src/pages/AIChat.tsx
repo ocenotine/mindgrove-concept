@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Bot, Send, User, FileText, XCircle, Settings, BookOpen, Plus, Trash2, Edit, MessageSquare, Copy, StopCircle, Download } from 'lucide-react';
@@ -265,7 +264,7 @@ const AIChat = () => {
     });
 
     try {
-      let responseId = `assistant-${Date.now()}`;
+      const responseId = `assistant-${Date.now()}`;
       let promptContext = '';
       
       // If a document is selected, use that context for the response
@@ -289,10 +288,10 @@ If asked to generate code, format it with proper syntax highlighting using tripl
       
       // Add an initial empty message that will be updated during streaming
       addMessage({
-        id: responseId,
         content: '',
         role: 'assistant',
-        timestamp: new Date()
+        timestamp: new Date(),
+        id: responseId // Passing id explicitly to match the expected type
       });
       
       // Generate response
@@ -528,7 +527,7 @@ If asked to generate code, format it with proper syntax highlighting using tripl
   };
 
   // User avatar URL from auth store
-  const userAvatarUrl = user?.user_metadata?.avatar_url || user?.avatarUrl;
+  const userAvatarUrl = user?.user_metadata?.avatar_url || '';
   
   // Get user initials for avatar fallback
   const getUserInitials = (): string => {
