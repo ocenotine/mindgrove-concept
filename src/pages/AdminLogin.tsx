@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -10,17 +10,26 @@ import { Lock, Mail, LogIn } from 'lucide-react';
 import { supabase, getUserProfile, cleanupAuthState, ensureUserProfile } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/store/authStore';
 
+const ADMIN_EMAIL = 'admin@mindgrove.com';
+
 const AdminLogin: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
-  const { setUser, setSession } = useAuthStore();
+  const { setUser, setSession, isAuthenticated, user } = useAuthStore();
+  
+  // Redirect if already authenticated as admin
+  useEffect(() => {
+    if (isAuthenticated && user?.user_metadata?.account_type === 'admin') {
+      navigate('/admin/dashboard', { replace: true });
+    }
+  }, [isAuthenticated, user, navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Clear any previous errors
+    // Form validation
     const emailInput = document.getElementById('email') as HTMLInputElement;
     const passwordInput = document.getElementById('password') as HTMLInputElement;
     emailInput?.setCustomValidity('');
@@ -54,6 +63,17 @@ const AdminLogin: React.FC = () => {
     try {
       // Clear local storage to prevent conflicts
       await cleanupAuthState();
+      
+      // Verify email is admin email
+      if (email !== ADMIN_EMAIL) {
+        toast({
+          title: "Access denied",
+          description: "This login is reserved for administrators only.",
+          variant: "destructive",
+        });
+        setLoading(false);
+        return;
+      }
       
       console.log("Attempting admin login with email:", email);
       
@@ -91,17 +111,6 @@ const AdminLogin: React.FC = () => {
       
       const authData = data;
       
-      if (email !== 'admin@mindgrove.com') {
-        toast({
-          title: "Access denied",
-          description: "This login is reserved for administrators only.",
-          variant: "destructive",
-        });
-        await supabase.auth.signOut();
-        setLoading(false);
-        return;
-      }
-      
       console.log("Admin auth successful, user:", authData.user);
       
       // Ensure user profile exists (critical step)
@@ -115,19 +124,6 @@ const AdminLogin: React.FC = () => {
       // Get the profile to verify admin status
       const profile = await getUserProfile(authData.user.id);
       console.log("Admin profile:", profile);
-      
-      if (!profile || profile.account_type !== 'admin') {
-        console.log("Updating profile to admin type");
-        // Update the profile to ensure admin status
-        await supabase
-          .from('profiles')
-          .upsert({
-            id: authData.user.id,
-            email: authData.user.email,
-            account_type: 'admin',
-            updated_at: new Date().toISOString()
-          });
-      }
       
       // Set auth store
       setSession(authData.session);
@@ -189,6 +185,7 @@ const AdminLogin: React.FC = () => {
                     onChange={(e) => setEmail(e.target.value)}
                     required
                     disabled={loading}
+                    autoComplete="username"
                   />
                 </div>
               </div>
@@ -204,6 +201,7 @@ const AdminLogin: React.FC = () => {
                     onChange={(e) => setPassword(e.target.value)}
                     required
                     disabled={loading}
+                    autoComplete="current-password"
                   />
                 </div>
               </div>
@@ -213,6 +211,7 @@ const AdminLogin: React.FC = () => {
                 type="submit"
                 className="w-full"
                 disabled={loading}
+                aria-label="Login to admin panel"
               >
                 {loading ? (
                   <span className="flex items-center">

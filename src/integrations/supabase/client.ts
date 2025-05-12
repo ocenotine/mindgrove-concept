@@ -69,6 +69,14 @@ export const cleanupAuthState = async () => {
       }
     });
   }
+  
+  // Try to perform a global sign out
+  try {
+    await supabase.auth.signOut({ scope: 'global' });
+  } catch (err) {
+    console.error('Error during global sign out:', err);
+    // Continue even if this fails
+  }
 };
 
 // Function to get user profile
@@ -78,7 +86,7 @@ export const getUserProfile = async (userId: string) => {
       .from('profiles')
       .select('*')
       .eq('id', userId)
-      .single();
+      .maybeSingle();  // Use maybeSingle instead of single to prevent errors
     
     if (error) throw error;
     return data;
@@ -90,11 +98,16 @@ export const getUserProfile = async (userId: string) => {
 
 // Ensure user profile exists
 export const ensureUserProfile = async (userId: string, email: string, accountType: string = 'student') => {
+  if (!userId) {
+    console.error('Cannot create profile: No user ID provided');
+    return false;
+  }
+  
   try {
     // Check if profile exists
     const { data, error } = await supabase
       .from('profiles')
-      .select('id')
+      .select('id, account_type')
       .eq('id', userId)
       .maybeSingle();
     
@@ -114,11 +127,25 @@ export const ensureUserProfile = async (userId: string, email: string, accountTy
       
       if (insertError) throw insertError;
       console.log('Profile created successfully');
+      return true;
     } else {
       console.log('Profile already exists for', userId);
+      
+      // Update account_type if needed (especially for admin users)
+      if (accountType === 'admin' && data.account_type !== 'admin') {
+        const { error: updateError } = await supabase
+          .from('profiles')
+          .update({ 
+            account_type: 'admin',
+            updated_at: new Date().toISOString() 
+          })
+          .eq('id', userId);
+          
+        if (updateError) throw updateError;
+        console.log('Updated profile to admin account type');
+      }
+      return true;
     }
-    
-    return true;
   } catch (error) {
     console.error('Error ensuring user profile exists:', error);
     throw error;

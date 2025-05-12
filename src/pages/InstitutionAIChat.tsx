@@ -1,16 +1,17 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import InstitutionLayout from '@/components/layout/InstitutionLayout';
 import { PageTransition } from '@/components/animations/PageTransition';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { useAuthStore } from '@/store/authStore';
 import { supabase } from '@/integrations/supabase/client';
 import { Send, Sparkles, Copy, FileText, Download } from 'lucide-react';
 import { toast } from '@/components/ui/use-toast';
+import { v4 as uuidv4 } from 'uuid';
 
+// Types for chat messages and sessions
 interface Message {
   id: string;
   role: 'user' | 'assistant';
@@ -26,6 +27,22 @@ interface ChatSession {
   messages: Message[];
 }
 
+// Recommended research prompts
+const researchPrompts = [
+  "Analyze the latest trends in AI adoption in higher education",
+  "Provide a literature review on climate change impacts in East Africa",
+  "Suggest research methodologies for studying student engagement",
+  "Generate citations for recent papers about machine learning in healthcare"
+];
+
+// Mock AI responses for demo
+const aiResponses = [
+  "Based on recent academic literature, the trends you're asking about show significant growth in the past five years. Several key papers from top journals highlight the importance of this area. Would you like me to provide specific citations?",
+  "Your research question is interesting. From my analysis, there are three main methodological approaches you could consider: qualitative interviews, quantitative surveys, or mixed methods. Each has advantages depending on your specific objectives.",
+  "I've analyzed the data sources you mentioned, and there appear to be some potential gaps in the methodology section. Consider addressing the sampling approach more explicitly and providing clearer justification for your analytical framework.",
+  "Looking at comparative studies in this field, researchers have identified several key factors that influence outcomes: institutional support, technological infrastructure, and faculty development programs. Would you like me to elaborate on any of these areas?"
+];
+
 const InstitutionAIChat = () => {
   const { user } = useAuthStore();
   const [isPremium, setIsPremium] = useState(false);
@@ -37,42 +54,52 @@ const InstitutionAIChat = () => {
   const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const researchPrompts = [
-    "Analyze the latest trends in AI adoption in higher education",
-    "Provide a literature review on climate change impacts in East Africa",
-    "Suggest research methodologies for studying student engagement",
-    "Generate citations for recent papers about machine learning in healthcare"
-  ];
-
+  // Scroll to bottom when messages update
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [activeSession?.messages]);
 
+  // Initialize chat and check premium status
   useEffect(() => {
-    const checkPremiumStatus = async () => {
+    const initializeChat = async () => {
       try {
-        const institutionId = user?.user_metadata?.institution_id || user?.institution_id;
-        
-        if (institutionId) {
-          const { data, error } = await supabase
-            .from('institutions')
-            .select('is_premium')
-            .eq('id', institutionId)
-            .single();
-          
-          if (!error && data) {
-            setIsPremium(!!data.is_premium);
-          }
-        }
+        await checkPremiumStatus();
+        loadMockSessions();
       } catch (error) {
-        console.error('Error checking premium status:', error);
+        console.error('Error initializing chat:', error);
       } finally {
         setIsLoading(false);
       }
     };
     
-    checkPremiumStatus();
-    
+    initializeChat();
+  }, [user]);
+
+  // Check if institution has premium features
+  const checkPremiumStatus = async () => {
+    try {
+      const institutionId = user?.user_metadata?.institution_id || user?.institution_id;
+      
+      if (institutionId) {
+        const { data, error } = await supabase
+          .from('institutions')
+          .select('is_premium')
+          .eq('id', institutionId)
+          .maybeSingle();
+        
+        if (!error && data) {
+          setIsPremium(!!data.is_premium);
+        }
+      }
+    } catch (error) {
+      console.error('Error checking premium status:', error);
+      // Default to non-premium if there's an error
+      setIsPremium(false);
+    }
+  };
+
+  // Load mock sessions for demo purposes
+  const loadMockSessions = () => {
     const mockSessions: ChatSession[] = [
       {
         id: '1',
@@ -120,15 +147,16 @@ const InstitutionAIChat = () => {
     
     setChatSessions(mockSessions);
     setActiveSession(mockSessions[0]);
-  }, [user]);
+  };
 
+  // Handle sending a message
   const handleSendMessage = () => {
-    if (!inputMessage.trim()) return;
+    if (!inputMessage.trim() || isSending) return;
     
     setIsSending(true);
     
     const userMessage: Message = {
-      id: Date.now().toString(),
+      id: uuidv4(),
       role: 'user',
       content: inputMessage.trim(),
       timestamp: new Date()
@@ -142,16 +170,10 @@ const InstitutionAIChat = () => {
     setActiveSession(updatedSession);
     setInputMessage('');
     
+    // Simulate AI response with a delay
     setTimeout(() => {
-      const aiResponses = [
-        "Based on recent academic literature, the trends you're asking about show significant growth in the past five years. Several key papers from top journals highlight the importance of this area. Would you like me to provide specific citations?",
-        "Your research question is interesting. From my analysis, there are three main methodological approaches you could consider: qualitative interviews, quantitative surveys, or mixed methods. Each has advantages depending on your specific objectives.",
-        "I've analyzed the data sources you mentioned, and there appear to be some potential gaps in the methodology section. Consider addressing the sampling approach more explicitly and providing clearer justification for your analytical framework.",
-        "Looking at comparative studies in this field, researchers have identified several key factors that influence outcomes: institutional support, technological infrastructure, and faculty development programs. Would you like me to elaborate on any of these areas?"
-      ];
-      
       const aiMessage: Message = {
-        id: (Date.now() + 1).toString(),
+        id: uuidv4(),
         role: 'assistant',
         content: aiResponses[Math.floor(Math.random() * aiResponses.length)],
         timestamp: new Date()
@@ -172,9 +194,11 @@ const InstitutionAIChat = () => {
       );
       
       setIsSending(false);
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }, 1500);
   };
 
+  // Handle textarea key events
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -182,9 +206,10 @@ const InstitutionAIChat = () => {
     }
   };
 
+  // Start a new chat session
   const startNewChat = () => {
     const newSession: ChatSession = {
-      id: Date.now().toString(),
+      id: uuidv4(),
       title: 'New Research Chat',
       lastMessage: 'How can I help with your research?',
       timestamp: new Date(),
@@ -202,15 +227,18 @@ const InstitutionAIChat = () => {
     setActiveSession(newSession);
   };
 
+  // Select an existing chat session
   const selectSession = (session: ChatSession) => {
     setActiveSession(session);
   };
 
+  // Add a prompt to the input field
   const usePrompt = (prompt: string) => {
     setInputMessage(prompt);
     setExpandedTextarea(true);
   };
 
+  // Copy text to clipboard
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
     toast({
@@ -219,6 +247,7 @@ const InstitutionAIChat = () => {
     });
   };
 
+  // Format message timestamp
   const formatMessageTime = (date: Date) => {
     return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
@@ -239,6 +268,7 @@ const InstitutionAIChat = () => {
       <PageTransition>
         <div className="pb-10 h-[calc(100vh-80px)]">
           <div className="flex h-full">
+            {/* Sidebar with chat history */}
             <div className="hidden md:block w-64 border-r border-gray-800 h-full overflow-y-auto pr-2">
               <div className="p-4">
                 <Button
@@ -277,7 +307,9 @@ const InstitutionAIChat = () => {
               </div>
             </div>
             
+            {/* Chat area */}
             <div className="flex-1 flex flex-col h-full overflow-hidden">
+              {/* Chat header */}
               <div className="border-b border-gray-800 py-3 px-4 flex items-center justify-between">
                 <div>
                   <h2 className="font-semibold text-white">{activeSession?.title}</h2>
@@ -293,17 +325,28 @@ const InstitutionAIChat = () => {
                   )}
                 </div>
                 <div className="flex items-center space-x-2">
-                  <Button size="sm" variant="outline" className="h-8 border-gray-700 text-gray-300 hover:bg-gray-800">
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    className="h-8 border-gray-700 text-gray-300 hover:bg-gray-800"
+                    title="Save conversation"
+                  >
                     <FileText className="h-3.5 w-3.5 mr-1" />
                     Save
                   </Button>
-                  <Button size="sm" variant="outline" className="h-8 border-gray-700 text-gray-300 hover:bg-gray-800">
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    className="h-8 border-gray-700 text-gray-300 hover:bg-gray-800"
+                    title="Export conversation"
+                  >
                     <Download className="h-3.5 w-3.5 mr-1" />
                     Export
                   </Button>
                 </div>
               </div>
               
+              {/* Messages container */}
               <div className="flex-1 overflow-y-auto p-4 space-y-6">
                 {activeSession?.messages.map((message) => (
                   <div 
@@ -334,6 +377,7 @@ const InstitutionAIChat = () => {
                             className="h-6 w-6 p-1 text-gray-400 hover:text-white hover:bg-gray-800"
                           >
                             <Copy className="h-3.5 w-3.5" />
+                            <span className="sr-only">Copy to clipboard</span>
                           </Button>
                         )}
                       </div>
@@ -343,6 +387,7 @@ const InstitutionAIChat = () => {
                 <div ref={messagesEndRef} />
               </div>
               
+              {/* Prompt suggestions (premium only) */}
               {isPremium && (
                 <div className="px-4 py-2 border-t border-gray-800 flex items-center gap-2 overflow-x-auto">
                   {researchPrompts.map((prompt, index) => (
@@ -359,6 +404,7 @@ const InstitutionAIChat = () => {
                 </div>
               )}
               
+              {/* Input area */}
               <div className="border-t border-gray-800 p-4">
                 <div className="relative">
                   <Textarea
@@ -371,12 +417,15 @@ const InstitutionAIChat = () => {
                     className={`bg-[#131620] border-gray-700 text-white resize-none pr-12 ${
                       expandedTextarea ? 'min-h-[120px]' : 'min-h-[60px]'
                     }`}
+                    maxLength={1000}
+                    aria-label="Chat message"
                   />
                   <Button
                     className="absolute right-2 bottom-2"
                     size="sm"
                     disabled={!inputMessage.trim() || isSending}
                     onClick={handleSendMessage}
+                    aria-label="Send message"
                   >
                     {isSending ? (
                       <span className="animate-spin h-4 w-4">⊝</span>

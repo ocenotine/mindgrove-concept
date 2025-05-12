@@ -1,16 +1,40 @@
 
 import { useAuthStore } from '@/store/authStore';
+import { useCallback } from 'react';
 
+/**
+ * Custom hook that provides authentication utilities with improved performance
+ */
 export const useAuth = () => {
-  const { user, session, isAuthenticated, loading, logout, login } = useAuthStore();
+  const { 
+    user, 
+    session, 
+    isAuthenticated, 
+    loading, 
+    logout, 
+    login,
+    loginWithGoogle 
+  } = useAuthStore();
+  
+  // Memoized version of the logout function
+  const handleLogout = useCallback(async () => {
+    try {
+      await logout();
+      return true;
+    } catch (error) {
+      console.error('Logout error:', error);
+      return false;
+    }
+  }, [logout]);
 
   return {
     user,
     session,
     isAuthenticated,
-    isLoading: loading, // Renamed from isInitialized to isLoading to match the store property
-    logout,
-    login
+    isLoading: loading, // Renamed for clarity
+    logout: handleLogout,
+    login,
+    loginWithGoogle
   };
 };
 

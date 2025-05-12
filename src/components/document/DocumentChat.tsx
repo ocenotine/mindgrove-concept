@@ -1,9 +1,9 @@
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Send, Bot, User, Loader } from 'lucide-react';
+import { Send, Bot, User, Loader, Copy } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { chatWithDocument } from '@/utils/nlpUtils';
 import { ChatMessage } from '@/types/chat';
@@ -42,7 +42,7 @@ const DocumentChat: React.FC<DocumentChatProps> = ({ documentId, documentText })
       };
       setMessages([initialMessage]);
     }
-  }, [documentId, user]);
+  }, [documentId, user, isInitialPromptShown]);
 
   // Scroll to bottom when messages update
   useEffect(() => {
@@ -50,13 +50,15 @@ const DocumentChat: React.FC<DocumentChatProps> = ({ documentId, documentText })
   }, [messages]);
 
   // Load chat history from Supabase
-  const loadChatHistory = async () => {
+  const loadChatHistory = useCallback(async () => {
+    if (!documentId || !user?.id) return;
+    
     try {
       const { data, error } = await supabase
         .from('document_chats')
         .select('*')
         .eq('document_id', documentId)
-        .eq('user_id', user?.id)
+        .eq('user_id', user.id)
         .order('created_at', { ascending: true });
         
       if (error) throw error;
@@ -73,11 +75,11 @@ const DocumentChat: React.FC<DocumentChatProps> = ({ documentId, documentText })
     } catch (error) {
       console.error('Error loading chat history:', error);
     }
-  };
+  }, [documentId, user]);
 
   // Save message to Supabase
-  const saveChatMessage = async (message: ChatMessage) => {
-    if (!user) return;
+  const saveChatMessage = useCallback(async (message: ChatMessage) => {
+    if (!user?.id || !documentId) return;
     
     try {
       await supabase.from('document_chats').insert({
@@ -90,7 +92,7 @@ const DocumentChat: React.FC<DocumentChatProps> = ({ documentId, documentText })
     } catch (error) {
       console.error('Error saving chat message:', error);
     }
-  };
+  }, [user, documentId]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -99,10 +101,11 @@ const DocumentChat: React.FC<DocumentChatProps> = ({ documentId, documentText })
   const handleSendMessage = async () => {
     if (!message.trim() || isLoading) return;
     
+    const trimmedMessage = message.trim();
     const userMessage: ChatMessage = {
       id: uuidv4(),
       role: 'user',
-      content: message.trim(),
+      content: trimmedMessage,
       timestamp: new Date(),
     };
 
@@ -151,6 +154,14 @@ const DocumentChat: React.FC<DocumentChatProps> = ({ documentId, documentText })
       handleSendMessage();
     }
   };
+  
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    toast({
+      title: "Copied to clipboard",
+      description: "Message content copied successfully"
+    });
+  };
 
   return (
     <Card className="h-full flex flex-col">
@@ -196,6 +207,18 @@ const DocumentChat: React.FC<DocumentChatProps> = ({ documentId, documentText })
                   }`}
                 >
                   {msg.content}
+                  {msg.role === 'assistant' && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-6 w-6 p-0 ml-2 opacity-50 hover:opacity-100"
+                      onClick={() => copyToClipboard(msg.content)}
+                      title="Copy to clipboard"
+                    >
+                      <Copy className="h-3 w-3" />
+                      <span className="sr-only">Copy to clipboard</span>
+                    </Button>
+                  )}
                 </div>
               </div>
             </div>
@@ -222,12 +245,15 @@ const DocumentChat: React.FC<DocumentChatProps> = ({ documentId, documentText })
             placeholder="Ask a question about this document..."
             disabled={isLoading}
             className="flex-1"
+            aria-label="Chat message input"
+            maxLength={500}
           />
           <Button 
             type="submit" 
             size="icon"
             disabled={isLoading || !message.trim()}
             onClick={handleSendMessage}
+            aria-label="Send message"
           >
             {isLoading ? <Loader className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
           </Button>

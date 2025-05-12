@@ -1,5 +1,5 @@
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useDocumentStore, Document } from '@/store/documentStore';
 import { useAuthStore } from '@/store/authStore';
 import { supabase } from '@/integrations/supabase/client';
@@ -22,10 +22,18 @@ export const useDocuments = () => {
     isLoading
   } = useDocumentStore();
 
-  // Add refreshDocuments function with improved error handling
+  // Create refresh token (changes when user changes)
+  const refreshToken = useMemo(() => user?.id, [user?.id]);
+
+  // Add refreshDocuments function with improved error handling and debouncing
   const refreshDocuments = useCallback(async () => {
     if (!user?.id) {
       console.log("Cannot refresh documents: No authenticated user");
+      return;
+    }
+    
+    // Prevent multiple refreshes happening at the same time
+    if (isRefreshing) {
       return;
     }
     
@@ -45,9 +53,14 @@ export const useDocuments = () => {
     } finally {
       setIsRefreshing(false);
     }
-  }, [user?.id, fetchDocuments]);
+  }, [user?.id, fetchDocuments, isRefreshing]);
 
   const handleSearch = useCallback(async (query: string): Promise<Document[]> => {
+    if (!query.trim()) {
+      setSearchResults([]);
+      return [];
+    }
+    
     setIsSearching(true);
     
     try {
@@ -70,7 +83,6 @@ export const useDocuments = () => {
   // Set up realtime subscription for document updates with improved logging
   useEffect(() => {
     if (!user?.id) {
-      console.log("No user ID available for document subscription");
       return;
     }
     
@@ -87,7 +99,7 @@ export const useDocuments = () => {
           filter: `user_id=eq.${user.id}`
         },
         (payload) => {
-          console.log("Document change detected:", payload.eventType, payload);
+          console.log("Document change detected:", payload.eventType);
           refreshDocuments();
         }
       )
@@ -99,7 +111,7 @@ export const useDocuments = () => {
       console.log("Cleaning up document subscription");
       supabase.removeChannel(channel);
     };
-  }, [user?.id, refreshDocuments]);
+  }, [refreshToken, refreshDocuments]);
 
   // Initial fetch of documents with improved logging
   useEffect(() => {
@@ -107,7 +119,7 @@ export const useDocuments = () => {
       console.log("Initial document fetch for user:", user.id);
       refreshDocuments();
     }
-  }, [user?.id, documents.length, isLoading, refreshDocuments]);
+  }, [refreshToken, documents.length, isLoading, refreshDocuments]);
 
   return {
     documents,

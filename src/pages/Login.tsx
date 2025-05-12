@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+
+import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@/store/authStore';
 import { Button } from '@/components/ui/button';
@@ -6,17 +7,20 @@ import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { toast } from '@/hooks/use-toast';
 import { PageTransition } from '@/components/animations/PageTransition';
-import { Mail, Lock, LogIn, Github, ArrowLeft } from 'lucide-react';
+import { Mail, Lock, LogIn, ArrowLeft } from 'lucide-react';
 import ParallaxScroll from '@/components/animations/ParallaxScroll';
-import { supabase, ensureUserProfile } from '@/integrations/supabase/client';
+import { supabase, ensureUserProfile, cleanupAuthState } from '@/integrations/supabase/client';
+
+const ADMIN_EMAIL = 'admin@mindgrove.com';
 
 const Login = () => {
   const navigate = useNavigate();
-  const { login, loginWithGoogle, isAuthenticated, user, cleanupAuthState } = useAuthStore();
+  const { login, loginWithGoogle, isAuthenticated, user, cleanupAuthState: storeCleanupAuthState } = useAuthStore();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
+  // Redirect if already authenticated
   useEffect(() => {
     if (isAuthenticated && user) {
       console.log("User authenticated:", user);
@@ -26,11 +30,11 @@ const Login = () => {
       console.log("Account type:", accountType);
       
       if (accountType === 'admin') {
-        navigate('/admin/dashboard');
+        navigate('/admin/dashboard', { replace: true });
       } else if (accountType === 'institution') {
-        navigate('/institution/dashboard');
+        navigate('/institution/dashboard', { replace: true });
       } else {
-        navigate('/dashboard');
+        navigate('/dashboard', { replace: true });
       }
     }
   }, [isAuthenticated, user, navigate]);
@@ -39,20 +43,46 @@ const Login = () => {
     navigate('/landing');
   };
 
+  // Clean auth thoroughly
+  const cleanAuth = useCallback(async () => {
+    await cleanupAuthState();
+    storeCleanupAuthState();
+  }, [storeCleanupAuthState]);
+
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!email || !email.includes('@')) {
+      toast({
+        title: "Invalid email",
+        description: "Please enter a valid email address.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
+    if (!password || password.length < 6) {
+      toast({
+        title: "Invalid password",
+        description: "Password must be at least 6 characters.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     setIsLoading(true);
     
     try {
       // Clean up auth state first
-      cleanupAuthState();
+      await cleanAuth();
       
       console.log("Attempting login with:", email);
       
       // Special handling for admin@mindgrove.com
-      if (email === 'admin@mindgrove.com') {
+      if (email === ADMIN_EMAIL) {
         console.log("Admin login detected, redirecting to admin login page");
         navigate('/admin/login');
+        setIsLoading(false);
         return;
       }
       
@@ -82,9 +112,15 @@ const Login = () => {
           description: "Welcome back to MindGrove!",
           variant: "default"
         });
+        
+        // Determine redirect based on account type
+        const accountType = data.user.user_metadata?.account_type;
+        if (accountType === 'institution') {
+          window.location.href = '/institution/dashboard';
+        } else {
+          window.location.href = '/dashboard';
+        }
       }
-      
-      // Redirect will happen via the isAuthenticated check above on the next render
     } catch (error) {
       console.error("Login error:", error);
       toast({
@@ -99,7 +135,7 @@ const Login = () => {
   const handleGoogleLogin = async () => {
     try {
       // Clean up auth state first
-      cleanupAuthState();
+      await cleanAuth();
       
       await loginWithGoogle();
     } catch (error) {
@@ -121,6 +157,7 @@ const Login = () => {
             size="icon"
             onClick={handleBackToLanding}
             className="hover:bg-muted/50"
+            aria-label="Back to landing page"
           >
             <ArrowLeft className="h-5 w-5" />
           </Button>
@@ -148,6 +185,8 @@ const Login = () => {
                         onChange={(e) => setEmail(e.target.value)}
                         required
                         className="pl-10"
+                        autoComplete="username"
+                        aria-label="Email address"
                       />
                     </div>
                   </div>
@@ -162,6 +201,8 @@ const Login = () => {
                         onChange={(e) => setPassword(e.target.value)}
                         required
                         className="pl-10"
+                        autoComplete="current-password"
+                        aria-label="Password"
                       />
                     </div>
                     <div className="text-right">
@@ -178,6 +219,7 @@ const Login = () => {
                     type="submit" 
                     className="w-full"
                     disabled={isLoading}
+                    aria-label="Sign in to your account"
                   >
                     {isLoading ? (
                       <span className="flex items-center">
@@ -211,8 +253,9 @@ const Login = () => {
                       type="button" 
                       variant="outline" 
                       onClick={handleGoogleLogin}
+                      aria-label="Sign in with Google"
                     >
-                      <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
+                      <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24" aria-hidden="true">
                         <path
                           d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
                           fill="#4285F4"
@@ -260,6 +303,7 @@ const Login = () => {
                     src="/mindgrove.png" 
                     alt="MindGrove AI Research" 
                     className="mx-auto max-w-full h-auto mb-6"
+                    loading="lazy"
                   />
                   
                   <div className="max-w-sm mx-auto p-6 mt-6 rounded-lg bg-card/90 backdrop-blur-sm border shadow-lg">
