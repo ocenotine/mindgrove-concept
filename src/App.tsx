@@ -36,77 +36,6 @@ import AdminDashboard from './pages/AdminDashboard';
 import QuizPractice from './pages/QuizPractice';
 import QuizEdit from './pages/QuizEdit';
 
-// Define page groups for error boundary isolation
-const AuthPages = () => (
-  <ErrorBoundary>
-    <Routes>
-      <Route path="/login" element={<Login />} />
-      <Route path="/signup" element={<Signup />} />
-      <Route path="/admin/login" element={<AdminLogin />} />
-      <Route path="/auth/callback" element={<AuthCallback />} />
-    </Routes>
-  </ErrorBoundary>
-);
-
-const StudentPages = () => (
-  <ErrorBoundary>
-    <Routes>
-      <Route path="/dashboard" element={<Dashboard />} />
-      <Route path="/documents" element={<DocumentsPage />} />
-      <Route path="/document/:id" element={<DocumentView />} />
-      <Route path="/documents/view/:id" element={<DocumentView />} />
-      <Route path="/documents/upload" element={<DocumentUploadPage />} />
-      <Route path="/ai-chat" element={<AIChat />} />
-      <Route path="/flashcards" element={<FlashcardsPage />} />
-      <Route path="/progress" element={<ProgressPage />} />
-      <Route path="/quiz" element={<QuizPage />} />
-      <Route path="/quiz/practice/:id" element={<QuizPractice />} />
-      <Route path="/quiz/edit/:id" element={<QuizEdit />} />
-    </Routes>
-  </ErrorBoundary>
-);
-
-const InstitutionPages = () => (
-  <ErrorBoundary>
-    <Routes>
-      <Route path="/institution/dashboard" element={<InstitutionDashboard />} />
-      <Route path="/institution/settings" element={<InstitutionSettings />} />
-      <Route path="/institution/subscription" element={<InstitutionSubscription />} />
-      <Route path="/institution/users" element={<InstitutionUsers />} />
-      <Route path="/institution/ai-chat" element={<InstitutionAIChat />} />
-    </Routes>
-  </ErrorBoundary>
-);
-
-const AdminPages = () => (
-  <ErrorBoundary>
-    <Routes>
-      <Route path="/admin/dashboard" element={<AdminDashboard />} />
-    </Routes>
-  </ErrorBoundary>
-);
-
-const ProfilePages = () => (
-  <ErrorBoundary>
-    <Routes>
-      <Route path="/profile" element={<ProfilePage />} />
-      <Route path="/profile/edit" element={<EditProfile />} />
-    </Routes>
-  </ErrorBoundary>
-);
-
-const StaticPages = () => (
-  <ErrorBoundary>
-    <Routes>
-      <Route path="/" element={<Index />} />
-      <Route path="/landing" element={<LandingPage />} />
-      <Route path="/privacy" element={<PrivacyPolicy />} />
-      <Route path="/terms" element={<TermsOfService />} />
-      <Route path="*" element={<NotFound />} />
-    </Routes>
-  </ErrorBoundary>
-);
-
 function App() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -129,6 +58,7 @@ function App() {
   // Ensure index route redirects correctly
   useEffect(() => {
     if (location.pathname === '/' && !location.hash.includes('#/')) {
+      console.log("Redirecting from / to /landing");
       navigate('/landing', { replace: true });
     }
   }, [location, navigate]);
@@ -164,9 +94,8 @@ function App() {
     <ErrorBoundary>
       <Suspense fallback={<div className="h-screen w-screen flex items-center justify-center"><LoadingScreen /></div>}>
         <Routes>
-          {/* Group routes by sections for better error isolation */}
-          <Route path="/*" element={<StaticPages />} />
-          <Route path="/auth/*" element={<AuthPages />} />
+          <Route path="/" element={<Index />} />
+          <Route path="/landing" element={<LandingPage />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
           <Route path="/admin/login" element={<AdminLogin />} />

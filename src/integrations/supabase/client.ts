@@ -3,6 +3,7 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
+// Make sure we have valid values for Supabase URL and key
 const SUPABASE_URL = "https://jlyxtvwnjrxrdvxnneii.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpseXh0dnduanJ4cmR2eG5uZWlpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDMzMjI0NjgsImV4cCI6MjA1ODg5ODQ2OH0.kQuW3Qy8Q1qpArvchZXUV-6FkzIu3Ri63DEWgbraURw";
 

@@ -14,6 +14,8 @@ export default function Index() {
   const { refreshDocuments } = useDocuments();
 
   useEffect(() => {
+    console.log("Index page: authLoading:", authLoading, "isAuthenticated:", isAuthenticated);
+    
     // If user is authenticated, load documents and redirect to dashboard
     if (isAuthenticated) {
       refreshDocuments();
