@@ -16,11 +16,9 @@ export default function Index() {
   useEffect(() => {
     // If user is authenticated, load documents and redirect to dashboard
     if (isAuthenticated) {
-      console.log("User is authenticated, redirecting to dashboard");
       refreshDocuments();
       navigate('/dashboard');
     } else if (!authLoading) {
-      console.log("User is not authenticated, redirecting to landing");
       // Only navigate to landing if we've confirmed user is not authenticated
       navigate('/landing', { replace: true });
     }

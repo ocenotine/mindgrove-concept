@@ -6,42 +6,105 @@ import { useAuthStore } from '@/store/authStore';
 import LoadingScreen from './components/animations/LoadingScreen';
 import BackToTop from './components/ui/BackToTop';
 import { ErrorBoundary } from './components/ErrorBoundary';
-import Home from './pages/Home';
 
-// Lazy load components for better performance
-const LazyIndex = React.lazy(() => import('./pages/Index'));
-const LazyLandingPage = React.lazy(() => import('./pages/LandingPage'));
-const LazyLogin = React.lazy(() => import('./pages/Login'));
-const LazySignup = React.lazy(() => import('./pages/Signup'));
-const LazyDashboard = React.lazy(() => import('./pages/Dashboard'));
-const LazyProfilePage = React.lazy(() => import('./pages/ProfilePage'));
-const LazyEditProfile = React.lazy(() => import('./pages/EditProfile'));
-const LazyNotFound = React.lazy(() => import('./pages/NotFound'));
-const LazyDocumentsPage = React.lazy(() => import('./pages/DocumentsPage'));
-const LazyDocumentView = React.lazy(() => import('./pages/DocumentView'));
-const LazyDocumentUploadPage = React.lazy(() => import('./pages/DocumentUploadPage'));
-const LazyAIChat = React.lazy(() => import('./pages/AIChat'));
-const LazyFlashcardsPage = React.lazy(() => import('./pages/FlashcardsPage'));
-const LazyPrivacyPolicy = React.lazy(() => import('./pages/PrivacyPolicy'));
-const LazyTermsOfService = React.lazy(() => import('./pages/TermsOfService'));
-const LazyInstitutionDashboard = React.lazy(() => import('./pages/InstitutionDashboard'));
-const LazyInstitutionSettings = React.lazy(() => import('./pages/InstitutionSettings'));
-const LazyInstitutionSubscription = React.lazy(() => import('./pages/InstitutionSubscription'));
-const LazyInstitutionUsers = React.lazy(() => import('./pages/InstitutionUsers'));
-const LazyInstitutionAIChat = React.lazy(() => import('./pages/InstitutionAIChat'));
-const LazyAuthCallback = React.lazy(() => import('./pages/AuthCallback'));
-const LazyProgressPage = React.lazy(() => import('./pages/ProgressPage'));
-const LazyQuizPage = React.lazy(() => import('./pages/QuizPage'));
-const LazyAdminLogin = React.lazy(() => import('./pages/AdminLogin'));
-const LazyAdminDashboard = React.lazy(() => import('./pages/AdminDashboard'));
-const LazyQuizPractice = React.lazy(() => import('./pages/QuizPractice'));
-const LazyQuizEdit = React.lazy(() => import('./pages/QuizEdit'));
+// Import all pages
+import Index from './pages/Index';
+import LandingPage from './pages/LandingPage';
+import Login from './pages/Login';
+import Signup from './pages/Signup';
+import Dashboard from './pages/Dashboard';
+import ProfilePage from './pages/ProfilePage';
+import EditProfile from './pages/EditProfile';
+import NotFound from './pages/NotFound';
+import DocumentsPage from './pages/DocumentsPage';
+import DocumentView from './pages/DocumentView';
+import DocumentUploadPage from './pages/DocumentUploadPage';
+import AIChat from './pages/AIChat';
+import FlashcardsPage from './pages/FlashcardsPage';
+import PrivacyPolicy from './pages/PrivacyPolicy';
+import TermsOfService from './pages/TermsOfService';
+import InstitutionDashboard from './pages/InstitutionDashboard';
+import InstitutionSettings from './pages/InstitutionSettings';
+import InstitutionSubscription from './pages/InstitutionSubscription';
+import InstitutionUsers from './pages/InstitutionUsers';
+import InstitutionAIChat from './pages/InstitutionAIChat';
+import AuthCallback from './pages/AuthCallback';
+import ProgressPage from './pages/ProgressPage';
+import QuizPage from './pages/QuizPage';
+import AdminLogin from './pages/AdminLogin';
+import AdminDashboard from './pages/AdminDashboard';
+import QuizPractice from './pages/QuizPractice';
+import QuizEdit from './pages/QuizEdit';
 
-// Loading component for suspense fallback
-const PageLoader = () => (
-  <div className="h-screen w-screen flex items-center justify-center">
-    <LoadingScreen />
-  </div>
+// Define page groups for error boundary isolation
+const AuthPages = () => (
+  <ErrorBoundary>
+    <Routes>
+      <Route path="/login" element={<Login />} />
+      <Route path="/signup" element={<Signup />} />
+      <Route path="/admin/login" element={<AdminLogin />} />
+      <Route path="/auth/callback" element={<AuthCallback />} />
+    </Routes>
+  </ErrorBoundary>
+);
+
+const StudentPages = () => (
+  <ErrorBoundary>
+    <Routes>
+      <Route path="/dashboard" element={<Dashboard />} />
+      <Route path="/documents" element={<DocumentsPage />} />
+      <Route path="/document/:id" element={<DocumentView />} />
+      <Route path="/documents/view/:id" element={<DocumentView />} />
+      <Route path="/documents/upload" element={<DocumentUploadPage />} />
+      <Route path="/ai-chat" element={<AIChat />} />
+      <Route path="/flashcards" element={<FlashcardsPage />} />
+      <Route path="/progress" element={<ProgressPage />} />
+      <Route path="/quiz" element={<QuizPage />} />
+      <Route path="/quiz/practice/:id" element={<QuizPractice />} />
+      <Route path="/quiz/edit/:id" element={<QuizEdit />} />
+    </Routes>
+  </ErrorBoundary>
+);
+
+const InstitutionPages = () => (
+  <ErrorBoundary>
+    <Routes>
+      <Route path="/institution/dashboard" element={<InstitutionDashboard />} />
+      <Route path="/institution/settings" element={<InstitutionSettings />} />
+      <Route path="/institution/subscription" element={<InstitutionSubscription />} />
+      <Route path="/institution/users" element={<InstitutionUsers />} />
+      <Route path="/institution/ai-chat" element={<InstitutionAIChat />} />
+    </Routes>
+  </ErrorBoundary>
+);
+
+const AdminPages = () => (
+  <ErrorBoundary>
+    <Routes>
+      <Route path="/admin/dashboard" element={<AdminDashboard />} />
+    </Routes>
+  </ErrorBoundary>
+);
+
+const ProfilePages = () => (
+  <ErrorBoundary>
+    <Routes>
+      <Route path="/profile" element={<ProfilePage />} />
+      <Route path="/profile/edit" element={<EditProfile />} />
+    </Routes>
+  </ErrorBoundary>
+);
+
+const StaticPages = () => (
+  <ErrorBoundary>
+    <Routes>
+      <Route path="/" element={<Index />} />
+      <Route path="/landing" element={<LandingPage />} />
+      <Route path="/privacy" element={<PrivacyPolicy />} />
+      <Route path="/terms" element={<TermsOfService />} />
+      <Route path="*" element={<NotFound />} />
+    </Routes>
+  </ErrorBoundary>
 );
 
 function App() {
@@ -63,6 +126,13 @@ function App() {
     initAuth();
   }, [initialize]);
   
+  // Ensure index route redirects correctly
+  useEffect(() => {
+    if (location.pathname === '/' && !location.hash.includes('#/')) {
+      navigate('/landing', { replace: true });
+    }
+  }, [location, navigate]);
+  
   // Handle redirection based on user account type
   useEffect(() => {
     if (isAuthenticated && user) {
@@ -83,55 +153,56 @@ function App() {
   }, [isAuthenticated, user, location.pathname, navigate]);
 
   if (loading) {
-    return <PageLoader />;
+    return (
+      <div className="h-screen w-screen flex items-center justify-center">
+        <LoadingScreen />
+      </div>
+    );
   }
   
   return (
     <ErrorBoundary>
-      <Suspense fallback={<PageLoader />}>
+      <Suspense fallback={<div className="h-screen w-screen flex items-center justify-center"><LoadingScreen /></div>}>
         <Routes>
-          {/* Static pages */}
-          <Route path="/" element={<Home />} />
-          <Route path="/index" element={<LazyIndex />} />
-          <Route path="/landing" element={<LazyLandingPage />} />
-          <Route path="/privacy" element={<LazyPrivacyPolicy />} />
-          <Route path="/terms" element={<LazyTermsOfService />} />
+          {/* Group routes by sections for better error isolation */}
+          <Route path="/*" element={<StaticPages />} />
+          <Route path="/auth/*" element={<AuthPages />} />
+          <Route path="/login" element={<Login />} />
+          <Route path="/signup" element={<Signup />} />
+          <Route path="/admin/login" element={<AdminLogin />} />
+          <Route path="/auth/callback" element={<AuthCallback />} />
           
-          {/* Auth pages */}
-          <Route path="/login" element={<LazyLogin />} />
-          <Route path="/signup" element={<LazySignup />} />
-          <Route path="/admin/login" element={<LazyAdminLogin />} />
-          <Route path="/auth/callback" element={<LazyAuthCallback />} />
+          {/* Student Routes */}
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/documents" element={<DocumentsPage />} />
+          <Route path="/document/:id" element={<DocumentView />} />
+          <Route path="/documents/view/:id" element={<DocumentView />} />
+          <Route path="/documents/upload" element={<DocumentUploadPage />} />
+          <Route path="/ai-chat" element={<AIChat />} />
+          <Route path="/flashcards" element={<FlashcardsPage />} />
+          <Route path="/progress" element={<ProgressPage />} />
+          <Route path="/quiz" element={<QuizPage />} />
+          <Route path="/quiz/practice/:id" element={<QuizPractice />} />
+          <Route path="/quiz/edit/:id" element={<QuizEdit />} />
           
-          {/* Student pages */}
-          <Route path="/dashboard" element={<LazyDashboard />} />
-          <Route path="/documents" element={<LazyDocumentsPage />} />
-          <Route path="/document/:id" element={<LazyDocumentView />} />
-          <Route path="/documents/view/:id" element={<LazyDocumentView />} />
-          <Route path="/documents/upload" element={<LazyDocumentUploadPage />} />
-          <Route path="/ai-chat" element={<LazyAIChat />} />
-          <Route path="/flashcards" element={<LazyFlashcardsPage />} />
-          <Route path="/progress" element={<LazyProgressPage />} />
-          <Route path="/quiz" element={<LazyQuizPage />} />
-          <Route path="/quiz/practice/:id" element={<LazyQuizPractice />} />
-          <Route path="/quiz/edit/:id" element={<LazyQuizEdit />} />
+          {/* Institution Routes */}
+          <Route path="/institution/dashboard" element={<InstitutionDashboard />} />
+          <Route path="/institution/settings" element={<InstitutionSettings />} />
+          <Route path="/institution/subscription" element={<InstitutionSubscription />} />
+          <Route path="/institution/users" element={<InstitutionUsers />} />
+          <Route path="/institution/ai-chat" element={<InstitutionAIChat />} />
           
-          {/* Institution pages */}
-          <Route path="/institution/dashboard" element={<LazyInstitutionDashboard />} />
-          <Route path="/institution/settings" element={<LazyInstitutionSettings />} />
-          <Route path="/institution/subscription" element={<LazyInstitutionSubscription />} />
-          <Route path="/institution/users" element={<LazyInstitutionUsers />} />
-          <Route path="/institution/ai-chat" element={<LazyInstitutionAIChat />} />
+          {/* Admin Routes */}
+          <Route path="/admin/dashboard" element={<AdminDashboard />} />
           
-          {/* Admin pages */}
-          <Route path="/admin/dashboard" element={<LazyAdminDashboard />} />
-          
-          {/* Profile pages */}
-          <Route path="/profile" element={<LazyProfilePage />} />
-          <Route path="/profile/edit" element={<LazyEditProfile />} />
+          {/* Common Routes */}
+          <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/profile/edit" element={<EditProfile />} />
+          <Route path="/privacy" element={<PrivacyPolicy />} />
+          <Route path="/terms" element={<TermsOfService />} />
           
           {/* 404 Route - MUST be last */}
-          <Route path="*" element={<LazyNotFound />} />
+          <Route path="*" element={<NotFound />} />
         </Routes>
         
         {/* Global BackToTop component */}
