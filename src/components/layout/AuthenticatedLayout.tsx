@@ -1,7 +1,7 @@
 
 import React from 'react';
-import { Navigate } from 'react-router-dom';
-import { useAuthStore } from '@/store/authStore';
+import { Navigate, useNavigate } from 'react-router-dom';
+import { useAuth } from '@/hooks/useAuth';
 import LoadingScreen from '@/components/animations/LoadingScreen';
 
 interface AuthenticatedLayoutProps {
@@ -18,10 +18,11 @@ const AuthenticatedLayout: React.FC<AuthenticatedLayoutProps> = ({
   requiredRole,
   redirectTo = '/login'
 }) => {
-  const { isAuthenticated, user, loading } = useAuthStore();
+  const { isAuthenticated, user, isLoading } = useAuth();
+  const navigate = useNavigate();
   
   // Show loading screen while initializing auth
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="h-screen w-screen flex items-center justify-center">
         <LoadingScreen />
@@ -31,6 +32,11 @@ const AuthenticatedLayout: React.FC<AuthenticatedLayoutProps> = ({
   
   // Redirect to login if not authenticated
   if (!isAuthenticated || !user) {
+    // Preserve pathname for after login
+    const currentPath = window.location.pathname;
+    if (currentPath !== '/' && currentPath !== '/login' && currentPath !== '/signup') {
+      sessionStorage.setItem('redirectAfterLogin', currentPath);
+    }
     return <Navigate to={redirectTo} replace />;
   }
   

@@ -1,9 +1,9 @@
 
 import { createClient } from '@supabase/supabase-js';
 
-// Define environment variables
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || '';
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+// Define environment variables with fallback values
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || 'https://jlyxtvwnjrxrdvxnneii.supabase.co';
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpseXh0dnduanJ4cmR2eG5uZWlpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDMzMjI0NjgsImV4cCI6MjA1ODg5ODQ2OH0.kQuW3Qy8Q1qpArvchZXUV-6FkzIu3Ri63DEWgbraURw';
 
 // Define types for wellbeing data
 export interface WellbeingData {
